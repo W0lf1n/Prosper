@@ -22,6 +22,7 @@ function txn(amount: number, extra: Partial<Txn> = {}): Txn {
 		owedAmount: null,
 		owedBy: null,
 		settledByTxnId: null,
+		scheduleId: null,
 		createdAt: '2026-08-20T10:00:00.000Z',
 		updatedAt: '2026-08-20T10:00:00.000Z',
 		deviceId: 'dev-1',

@@ -134,7 +134,9 @@ speed.
 ### Non-goals (v1)
 
 - Multi-user / household sharing
-- Investment portfolio tracking, net worth
+- ~~Investment portfolio tracking, net worth~~ — **partly reversed, Q36.** Hand-typed
+  holding values and a `celkem` figure shipped 2026-08-25; see `INVESTMENTS.md`.
+  Tickers, units, cost basis and any kind of price feed stay out
 - Tax reporting, invoicing, business accounting for the 3D printing side business
 - Automatic categorisation via ML — the vocabulary in `domain/vocabulary.ts` is
   a hand-written dictionary of Petr's own words, and that is deliberate
@@ -703,7 +705,10 @@ Non-negotiable. Violations are bugs regardless of test status.
 
 - **Unit (Vitest):** `money.ts` exhaustively. Tape building. Keypad state.
   Every check rule. Receivables. Goal validation, pace and history. Czech
-  plurals. Merge/LWW logic. — _136 tests_
+  plurals. Merge/LWW logic. Current valuation, staleness and the wealth total —
+  including the invariant that holdings never reach the month summary or the
+  split. Recurring due dates, month clamping, bounded catch-up and the annual
+  figure. — _203 tests_
 - **Integration (P2):** outbox drain against a mock API — happy path, 4xx, 5xx,
   offline mid-flush, duplicate push.
 - **Manual, mandatory before each phase ships:** airplane mode → enter 5

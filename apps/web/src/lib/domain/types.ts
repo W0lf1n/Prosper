@@ -96,6 +96,62 @@ export interface Txn extends Synced {
 	owedAmount: Minor | null;
 	owedBy: string | null;
 	settledByTxnId: string | null;
+	/**
+	 * The schedule that produced this row — DECISIONS Q40. Null for anything
+	 * typed by hand, which is most of the ledger.
+	 *
+	 * It is what lets the app tell "the mortgage went out" from "a payment that
+	 * looks like the mortgage", which is the difference between a missing-payment
+	 * check that is exact and one that is statistical.
+	 */
+	scheduleId: string | null;
+}
+
+/**
+ * How a due payment reaches the ledger — DECISIONS Q40.
+ *
+ * `confirm` is the default and the honest one: the app offers the row and a tap
+ * accepts it, so nothing enters the ledger that was not looked at. `auto` exists
+ * because retyping a fixed mortgage every month is not awareness, it is data
+ * entry — that decision was made once, years ago, and re-making it monthly
+ * teaches nothing.
+ */
+export type ScheduleMode = 'confirm' | 'auto';
+
+/**
+ * A payment that repeats — a subscription, a standing order, a mortgage.
+ *
+ * A *declaration*, not a detection. `findMissingRecurring` infers repetition
+ * from three months of history and can only ever be statistical; this row says
+ * what is owed, to whom, out of which bucket and on which day, so a payment
+ * that did not arrive is a fact rather than a guess.
+ *
+ * It never posts by itself while the app is closed — there is no server. The
+ * catch-up runs on launch, the same way `closePreviousDay` does.
+ */
+export interface Schedule extends Synced {
+	id: string;
+	/** Goes into the payee field of every row it makes, and names it on screen. */
+	payee: string;
+	categoryId: string;
+	/** Signed, like `Txn.amount`. The sheet takes the sign from the category. */
+	amount: Minor;
+	/** 1–31. Clamped into short months — the 31st of February is the 28th. */
+	dayOfMonth: number;
+	/** YYYY-MM. The first month it may post; never earlier than it was written. */
+	startMonth: string;
+	/** YYYY-MM, inclusive. Null is open-ended — most subscriptions are. */
+	endMonth: string | null;
+	mode: ScheduleMode;
+	/**
+	 * The last month this schedule was settled in, whether by posting a row or
+	 * by being skipped. A watermark rather than a derivation: it makes the
+	 * catch-up idempotent, and it means deleting a posted row does not bring it
+	 * back on the next launch.
+	 */
+	lastPostedMonth: string | null;
+	isArchived: boolean;
+	sortOrder: number;
 }
 
 export interface Reconciliation extends Synced {
@@ -149,6 +205,63 @@ export interface MonthTarget extends Synced {
 	amount: Minor; // positive magnitude to set aside that month
 }
 
+/**
+ * What a holding is, and it is only ever the dot's colour.
+ *
+ * Liquid and semi-liquid only — DECISIONS Q38. A flat or a car is a number that
+ * is true and useless: at six million it makes every other figure on the screen
+ * disappear, and none of it can be spent this month.
+ */
+export type HoldingKind = 'cash' | 'savings' | 'investment' | 'crypto';
+
+/**
+ * Something owned whose value is *stated*, not derived — DECISIONS Q36.
+ *
+ * This is the one place in the app where a number comes from outside the
+ * ledger. An account's balance is computed (`balanceOf`); a holding's value is
+ * typed in by hand off a statement, and it is stale the moment after. The two
+ * are separate tables so that difference is structural rather than a convention
+ * somebody has to remember — see `docs/INVESTMENTS.md` I1.
+ */
+export interface Holding extends Synced {
+	id: string;
+	name: string;
+	kind: HoldingKind;
+	currency: string; // 'CZK' — unused in v1, same contract as Account
+	/**
+	 * Which bucket funds it. Unused in v1: contributions and growth are a later
+	 * step, and Q37 already rules that two holdings sharing a category means the
+	 * app shows no contribution figure for either rather than a split guess.
+	 */
+	categoryId: string | null;
+	/** How often it is worth asking about. Per holding — a pension statement is
+	    quarterly and a crypto wallet takes ten seconds, and one global interval
+	    would nag hardest about the thing that cannot be answered. */
+	reminderDays: number;
+	isArchived: boolean;
+	sortOrder: number;
+}
+
+/**
+ * One reading of a holding, on a day.
+ *
+ * A series rather than a mutable `currentValue` column: a field would answer
+ * "what is it worth" and lose both of the things that make the answer usable —
+ * *when was that true*, which the reminder runs on, and *what did it do since*,
+ * which is the only reason to open the screen twice. A wrong reading is soft
+ * deleted like a wrong transaction; nothing here is edited in place.
+ */
+export interface Valuation extends Synced {
+	id: string;
+	holdingId: string;
+	/** The day the value was true — not the day it was typed. */
+	date: IsoDate;
+	value: Minor; // positive magnitude
+	note: string | null;
+	/** Tie-breaks two readings entered for the same date. */
+	createdAt: IsoDateTime;
+}
+
 /** Explicit "I spent nothing that day". Keyed by the date itself. */
 export interface DayMark {
 	date: IsoDate;
@@ -157,7 +270,16 @@ export interface DayMark {
 }
 
 export type SyncedEntity =
-	'txn' | 'account' | 'category' | 'goal' | 'monthTarget' | 'reconciliation' | 'dayMark';
+	| 'txn'
+	| 'account'
+	| 'category'
+	| 'goal'
+	| 'monthTarget'
+	| 'reconciliation'
+	| 'dayMark'
+	| 'holding'
+	| 'valuation'
+	| 'schedule';
 
 /** Client-only. Never synced, never sent. Populated from P2 onwards. */
 export interface OutboxEntry {

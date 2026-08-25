@@ -9,6 +9,8 @@
 
 import { monthKey, nowIso, startOfMonth, today } from '$lib/domain/datetime';
 import { validateGoal, validateGoalShape } from '$lib/domain/goals';
+import { DEFAULT_REMINDER_DAYS } from '$lib/domain/holdings';
+import { dueSchedules, partitionByMode, type DueItem } from '$lib/domain/recurring';
 import { newDeviceId, uuidv7 } from '$lib/domain/ids';
 import { ZERO, abs, neg, type Minor } from '$lib/domain/money';
 import type {
@@ -16,10 +18,13 @@ import type {
 	Category,
 	DayMark,
 	Goal,
+	Holding,
 	MonthTarget,
+	Schedule,
 	SyncedEntity,
 	Txn,
-	TxnSource
+	TxnSource,
+	Valuation
 } from '$lib/domain/types';
 import { db } from './schema';
 import { seedCategories } from './seed';
@@ -166,6 +171,8 @@ export interface NewTxn {
 	isOneOff?: boolean;
 	owedAmount?: Minor | null;
 	owedBy?: string | null;
+	/** Set only by the recurring catch-up. Everything typed by hand leaves it null. */
+	scheduleId?: string | null;
 }
 
 export async function createTxn(input: NewTxn): Promise<Txn> {
@@ -185,6 +192,7 @@ export async function createTxn(input: NewTxn): Promise<Txn> {
 		owedAmount: input.owedAmount ?? null,
 		owedBy: input.owedBy?.trim() || null,
 		settledByTxnId: null,
+		scheduleId: input.scheduleId ?? null,
 		createdAt: updatedAt,
 		updatedAt,
 		deviceId,
@@ -381,6 +389,229 @@ export async function archiveCategory(id: string): Promise<void> {
 	await updateCategory(id, { isArchived: true });
 }
 
+// ── recurring payments ───────────────────────────────────────────
+
+export async function createSchedule(
+	input: Pick<Schedule, 'payee' | 'categoryId' | 'amount' | 'dayOfMonth'> &
+		Partial<Pick<Schedule, 'startMonth' | 'endMonth' | 'mode'>>
+): Promise<Schedule> {
+	const database = db();
+	const { updatedAt, deviceId } = await stamp();
+	const schedule: Schedule = {
+		id: uuidv7(),
+		payee: input.payee.trim(),
+		categoryId: input.categoryId,
+		amount: input.amount,
+		dayOfMonth: Math.min(31, Math.max(1, Math.trunc(input.dayOfMonth))),
+		startMonth: input.startMonth ?? monthKey(today()),
+		endMonth: input.endMonth ?? null,
+		mode: input.mode ?? 'confirm',
+		/**
+		 * Written as settled for the month before it starts, so a schedule added
+		 * on the 20th for a payment that went out on the 5th does not immediately
+		 * claim to owe that month. Backfilling the current month is a decision,
+		 * and it is made by typing the row.
+		 */
+		lastPostedMonth: null,
+		isArchived: false,
+		sortOrder: await database.schedules.count(),
+		updatedAt,
+		deviceId,
+		isDeleted: false
+	};
+	await database.schedules.put(schedule);
+	await enqueue('schedule', schedule.id, schedule);
+	return schedule;
+}
+
+export async function updateSchedule(
+	id: string,
+	patch: Partial<
+		Pick<
+			Schedule,
+			| 'payee'
+			| 'categoryId'
+			| 'amount'
+			| 'dayOfMonth'
+			| 'startMonth'
+			| 'endMonth'
+			| 'mode'
+			| 'lastPostedMonth'
+			| 'sortOrder'
+			| 'isArchived'
+		>
+	>
+): Promise<void> {
+	const database = db();
+	const existing = await database.schedules.get(id);
+	if (!existing) return;
+
+	const next: Schedule = { ...existing, ...patch, ...(await stamp()) };
+	await database.schedules.put(next);
+	await enqueue('schedule', next.id, next);
+}
+
+export async function archiveSchedule(id: string): Promise<void> {
+	await updateSchedule(id, { isArchived: true });
+}
+
+/** The watermark only ever moves forward. */
+async function settle(schedule: Schedule, month: string): Promise<void> {
+	if (schedule.lastPostedMonth && schedule.lastPostedMonth >= month) return;
+	await updateSchedule(schedule.id, { lastPostedMonth: month });
+}
+
+/**
+ * Turn one due instance into a real row.
+ *
+ * `amount` overrides the schedule's own figure without changing it — the gas
+ * bill is 2 800 Kč most months and 4 100 Kč in February, and correcting one
+ * month must not silently rewrite the standing order.
+ */
+export async function confirmScheduled(
+	item: DueItem,
+	options: { accountId: string; amount?: Minor }
+): Promise<Txn> {
+	const txn = await createTxn({
+		accountId: options.accountId,
+		amount: options.amount ?? item.schedule.amount,
+		date: item.date,
+		categoryId: item.schedule.categoryId,
+		payee: item.schedule.payee,
+		source: 'recurring',
+		scheduleId: item.schedule.id
+	});
+	await settle(item.schedule, item.month);
+	return txn;
+}
+
+/**
+ * "Not this month." A holiday from a subscription, or a row already typed by
+ * hand — both are the same fact to the next launch, and neither should leave
+ * the app asking again tomorrow.
+ */
+export async function skipScheduled(item: DueItem): Promise<void> {
+	await settle(item.schedule, item.month);
+}
+
+export interface CatchUpResult {
+	/** Rows written without being asked. */
+	posted: number;
+	/** Instances now waiting to be confirmed. */
+	waiting: number;
+}
+
+/**
+ * The launch catch-up.
+ *
+ * Nothing happens while the app is closed — there is no server — so the
+ * standing orders are settled on the way in, exactly as `closePreviousDay`
+ * closes off yesterday. Only `auto` schedules write anything; `confirm` ones are
+ * counted and shown.
+ */
+export async function catchUpSchedules(accountId: string | null): Promise<CatchUpResult> {
+	if (!accountId) return { posted: 0, waiting: 0 };
+
+	const schedules = await db().schedules.toArray();
+	const items = dueSchedules({ schedules, today: today() });
+	const { auto, confirm } = partitionByMode(items);
+
+	for (const item of auto) {
+		await confirmScheduled(item, { accountId });
+	}
+
+	return { posted: auto.length, waiting: confirm.length };
+}
+
+// ── holdings ─────────────────────────────────────────────────────
+
+export async function createHolding(
+	input: Pick<Holding, 'name' | 'kind'> & Partial<Pick<Holding, 'categoryId' | 'reminderDays'>>
+): Promise<Holding> {
+	const database = db();
+	const { updatedAt, deviceId } = await stamp();
+	const holding: Holding = {
+		id: uuidv7(),
+		name: input.name.trim(),
+		kind: input.kind,
+		currency: 'CZK',
+		categoryId: input.categoryId ?? null,
+		reminderDays: input.reminderDays ?? DEFAULT_REMINDER_DAYS,
+		isArchived: false,
+		sortOrder: await database.holdings.count(),
+		updatedAt,
+		deviceId,
+		isDeleted: false
+	};
+	await database.holdings.put(holding);
+	await enqueue('holding', holding.id, holding);
+	return holding;
+}
+
+export async function updateHolding(
+	id: string,
+	patch: Partial<
+		Pick<Holding, 'name' | 'kind' | 'categoryId' | 'reminderDays' | 'sortOrder' | 'isArchived'>
+	>
+): Promise<void> {
+	const database = db();
+	const existing = await database.holdings.get(id);
+	if (!existing) return;
+
+	const next: Holding = { ...existing, ...patch, ...(await stamp()) };
+	await database.holdings.put(next);
+	await enqueue('holding', next.id, next);
+}
+
+/**
+ * Archived, never deleted, for the same reason categories are: the readings
+ * point at it, and a value with nothing to belong to is worse than a row that
+ * has stopped appearing on the screen.
+ */
+export async function archiveHolding(id: string): Promise<void> {
+	await updateHolding(id, { isArchived: true });
+}
+
+/**
+ * A reading. `date` is the day the number was *true* — a statement opened on
+ * the 14th for the 3rd is filed on the 3rd, or the age the reminder runs on is
+ * wrong by eleven days.
+ */
+export async function recordValuation(input: {
+	holdingId: string;
+	value: Minor;
+	date?: string;
+	note?: string | null;
+}): Promise<Valuation> {
+	const database = db();
+	const { updatedAt, deviceId } = await stamp();
+	const valuation: Valuation = {
+		id: uuidv7(),
+		holdingId: input.holdingId,
+		date: input.date ?? today(),
+		value: abs(input.value),
+		note: input.note?.trim() || null,
+		createdAt: nowIso(),
+		updatedAt,
+		deviceId,
+		isDeleted: false
+	};
+	await database.valuations.put(valuation);
+	await enqueue('valuation', valuation.id, valuation);
+	return valuation;
+}
+
+/** Soft, like everything else. The reading before it becomes current again. */
+export async function deleteValuation(id: string): Promise<void> {
+	const database = db();
+	const existing = await database.valuations.get(id);
+	if (!existing) return;
+
+	const next: Valuation = { ...existing, isDeleted: true, ...(await stamp()) };
+	await database.valuations.put(next);
+	await enqueue('valuation', next.id, next);
+}
+
 // ── day marks ───────────────────────────────────────────────────────────────
 
 /** "I spent nothing today" — the explicit alternative to a gap. */
@@ -575,6 +806,9 @@ export interface Backup {
 	dayMarks: DayMark[];
 	goals: Goal[];
 	monthTargets: MonthTarget[];
+	holdings: Holding[];
+	valuations: Valuation[];
+	schedules: Schedule[];
 }
 
 /**
@@ -585,14 +819,17 @@ export async function exportBackup(): Promise<Backup> {
 	const database = db();
 	return {
 		format: 'finance-backup',
-		version: 2,
+		version: 4,
 		exportedAt: nowIso(),
 		accounts: await database.accounts.toArray(),
 		categories: await database.categories.toArray(),
 		txns: await database.txns.toArray(),
 		dayMarks: await database.dayMarks.toArray(),
 		goals: await database.goals.toArray(),
-		monthTargets: await database.monthTargets.toArray()
+		monthTargets: await database.monthTargets.toArray(),
+		holdings: await database.holdings.toArray(),
+		valuations: await database.valuations.toArray(),
+		schedules: await database.schedules.toArray()
 	};
 }
 
@@ -609,7 +846,7 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 	}
 	const database = db();
 
-	// Six tables: past five, Dexie wants the array form rather than varargs.
+	// Nine tables: past five, Dexie wants the array form rather than varargs.
 	await database.transaction(
 		'rw',
 		[
@@ -618,7 +855,10 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 			database.txns,
 			database.dayMarks,
 			database.goals,
-			database.monthTargets
+			database.monthTargets,
+			database.holdings,
+			database.valuations,
+			database.schedules
 		],
 		async () => {
 			await mergeRows(
@@ -645,6 +885,21 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 				backup.monthTargets ?? [],
 				(id) => database.monthTargets.get(id),
 				(row) => database.monthTargets.put(row)
+			);
+			await mergeRows(
+				backup.holdings ?? [],
+				(id) => database.holdings.get(id),
+				(row) => database.holdings.put(row)
+			);
+			await mergeRows(
+				backup.valuations ?? [],
+				(id) => database.valuations.get(id),
+				(row) => database.valuations.put(row)
+			);
+			await mergeRows(
+				backup.schedules ?? [],
+				(id) => database.schedules.get(id),
+				(row) => database.schedules.put(row)
 			);
 			for (const mark of backup.dayMarks ?? []) await database.dayMarks.put(mark);
 		}

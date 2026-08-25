@@ -26,3 +26,4 @@ export function counted(count: number, forms: PluralForms): string {
 
 export const RECORDS: PluralForms = { one: 'záznam', few: 'záznamy', many: 'záznamů' };
 export const DAYS: PluralForms = { one: 'den', few: 'dny', many: 'dní' };
+export const PAYMENTS: PluralForms = { one: 'platba', few: 'platby', many: 'plateb' };

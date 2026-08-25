@@ -1,6 +1,8 @@
 # Investments — what I own, and what it is worth today
 
-**Status:** design, not built. Requires four rulings (Q36–Q39) before any code.
+**Status:** items 1–4 **built** 2026-08-25. Q36–Q39 ruled — see `DECISIONS.md`.
+Items 5–8 (holding management in Settings, the stale finding on `/mesic` and the
+entry screen, contributions and growth, the push channel) are still design.
 **Audience:** Claude Code (implementation), Petr (decisions)
 **Reads with:** `PROJECT-PLAN.md` §3, §4, §6.1, §8 and `DECISIONS.md`
 

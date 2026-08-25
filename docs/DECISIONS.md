@@ -367,6 +367,112 @@ so rather than dividing by zero or quietly falling back to a share of outflow.
 `domain/prosperity.ts` reads `summariseMonth`'s output rather than raw rows, so
 the refund and income rules of §6.1 are applied once, in one place.
 
+### Q36 — Investments and a net-worth figure · new, applied
+
+**This reverses a v1 non-goal.** `PROJECT-PLAN.md` §3 lists "Investment portfolio
+tracking, net worth" as out of scope, and §3 is binding, so the reversal is
+recorded here rather than assumed.
+
+**What was actually rejected, and stays rejected:** portfolio tracking — tickers,
+units, cost basis, prices fetched from anywhere. None of that is built and none
+of it is planned.
+
+**What is applied:** a holding is a name, a kind, and a number typed in by hand
+off a statement, with the day that number was true. `/jmeni` adds them to the
+ledger balance and calls the result `celkem`.
+
+The case for it: the Targeting law already runs on a figure the app could not
+see. SPOŘENÍ and INVESTICE DO MĚ take money out of the ledger every month, and
+the ledger loses sight of it the moment it leaves — the app could say what was
+set aside and never what it grew into.
+
+**Data change, schema v4:** two new tables, `holdings` and `valuations`. New
+tables only, so no upgrade function and no existing row is touched.
+
+**The invariant this rests on:** a valuation is not a transaction. It never
+reaches `income`, `outflow`, `net`, a `BucketTotal`, or `prosperitySplit`.
+Unrealised growth is not income — if it ever were, a month where the pension
+moved up 8 000 Kč would report a healthy savings share out of money nobody
+earned, and the 10/10/10/70 split would become fiction. `summariseMonth` does
+not take holdings as an input, and `holdings.test.ts` asserts both functions are
+byte-identical with a full set of holdings in the database.
+
+**Consequence for P2:** two more entity types, two more tables in the backup.
+Backup `version` moves to 3; an older backup simply has no holdings.
+
+### Q37 — Two holdings on one category · answered 2026-08-25
+
+Contributions to a holding would be read off the ledger, the way goal progress
+is. If two live holdings point at the same bucket, the outflows cannot be
+attributed between them.
+
+**Answer: show nothing.** An evenly split figure is wrong in a way nobody would
+ever catch, and a number you cannot check is worse than a blank. The app says
+why instead.
+
+Not yet in force: contributions and growth are a later step, and `categoryId` is
+carried on `Holding` from the first version so adding them is not a migration.
+
+### Q38 — What may be a holding · answered 2026-08-25
+
+**Liquid and semi-liquid only:** `investment`, `savings`, `cash`, `crypto`.
+
+A flat at 6 800 000 Kč makes `celkem` a number that is true and useless — every
+other figure on the screen disappears next to it, and none of it can be spent
+this month. If property is ever tracked it needs a line of its own rather than a
+place in the same sum. `HoldingKind` has room; the screen does not.
+
+### Q39 — Debt in the total · answered 2026-08-25
+
+**Not in v1.** `celkem` is a pure assets total. `AccountKind` already carries
+`loan` and `credit`, and a mortgage balance is the same shape as a holding with
+the sign turned round — stated from outside, stale by default — but netting it
+off is a second feature and `Wealth` is shaped to hold it when it arrives.
+
+### Q40 — Recurring payments, and whether they post themselves · answered 2026-08-25
+
+Twelve subscriptions were retyped by hand every month in the workbook, and a
+mortgage is the same act with a bigger number. The app could already _detect_
+repetition (`missing-recurring`), which is statistical by construction; this
+lets a payment be **declared** instead — what is owed, to whom, out of which
+bucket, on which day.
+
+**The tension, stated plainly:** auto-posting cuts against the Tracking law.
+Money that lands in the ledger without anyone looking at it is the state the
+spreadsheet left him in. Against that: retyping a fixed mortgage monthly is not
+awareness, it is data entry — the decision was made once, years ago.
+
+**Answer: both, per schedule, default `confirm`.** `confirm` offers the row on
+the due day and a tap accepts it, amount editable first. `auto` writes it on the
+next launch. The mortgage is `auto`; everything else starts at `confirm`.
+
+**Data change, schema v5:** a `schedules` table, and `Txn.scheduleId` — null for
+everything typed by hand. The migration restates `txns` in full because Dexie
+replaces a table's whole index declaration, and it backfills `scheduleId: null`
+rather than leaving the field absent: an index over `undefined` works, but
+`row.scheduleId === null` would answer false for the entire existing ledger.
+
+**Three consequences worth recording:**
+
+- **`lastPostedMonth` is a watermark, not a derivation.** Posting is therefore
+  idempotent, deleting a posted row does not resurrect it on the next launch,
+  and "we skipped July" is expressible at all — none of which a ledger-derived
+  version could do.
+- **The confirmation strip offers one instance per schedule, oldest first.** The
+  watermark is a high-water mark, so confirming August before May would mark May
+  settled without ever showing it. This is correctness, not simplification.
+- **An amount override never rewrites the schedule.** The gas bill is 2 800 Kč
+  most months and 4 100 Kč in February.
+
+**Not built, deliberately:** promotion to `auto` after three identical confirmed
+months (`scheduleId` is carried so it needs no migration), and any cadence other
+than monthly — every payment in the workbook is monthly.
+
+**Consequence for P2:** one more entity type, one more table in the backup, and
+one more field on every `Txn`. Backup `version` moves to 4.
+
+Full design in `docs/RECURRING.md`.
+
 ### The tape was clipping most of its own content · found 2026-08-24
 
 `.tape` is a flex column and `.month` is therefore a flex item. `.month` carries

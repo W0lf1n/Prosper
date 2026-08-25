@@ -3,19 +3,25 @@
 	import { db, SCHEMA_VERSION } from '$lib/db/schema';
 	import {
 		archiveCategory,
+		archiveSchedule,
 		createCategory,
+		createSchedule,
 		exportBackup,
 		importBackup,
 		updateAccount,
 		updateCategory,
+		updateSchedule,
 		type Backup
 	} from '$lib/db/repo';
-	import { formatMoney, parseAmount } from '$lib/domain/money';
+	import { formatMoney, parseAmount, type Minor } from '$lib/domain/money';
 	import { today } from '$lib/domain/datetime';
-	import type { Category, SpendType } from '$lib/domain/types';
+	import { MODE_LABEL, recurringCost, remainingPayments } from '$lib/domain/recurring';
+	import { PAYMENTS, counted } from '$lib/domain/czech';
+	import type { Category, Schedule, SpendType } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
+	import ScheduleSheet from '$lib/ui/ScheduleSheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
@@ -27,6 +33,50 @@
 	);
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
 	const txnCount = liveQuery(() => db().txns.count());
+	const schedules = liveQuery(() => db().schedules.orderBy('sortOrder').toArray());
+
+	// ── recurring payments ──────────────────────────────────────────────────
+	const liveSchedules = $derived(
+		(($schedules ?? []) as Schedule[]).filter((s) => !s.isDeleted && !s.isArchived)
+	);
+	const cost = $derived(recurringCost(liveSchedules));
+	const pickable = $derived(
+		(($categories ?? []) as Category[]).filter((c) => !c.isDeleted && !c.isArchived)
+	);
+
+	let editing = $state<Schedule | null>(null);
+	let sheetOpen = $state(false);
+
+	function openSchedule(schedule: Schedule | null) {
+		editing = schedule;
+		sheetOpen = true;
+	}
+
+	async function saveSchedule(input: {
+		payee: string;
+		categoryId: string;
+		amount: number;
+		dayOfMonth: number;
+		endMonth: string | null;
+		mode: Schedule['mode'];
+	}) {
+		if (editing) await updateSchedule(editing.id, { ...input, amount: input.amount as Minor });
+		else await createSchedule({ ...input, amount: input.amount as Minor });
+		sheetOpen = false;
+		toast.show(editing ? 'Uloženo' : 'Pravidelná platba přidána');
+	}
+
+	async function removeSchedule() {
+		if (!editing) return;
+		const name = editing.payee;
+		await archiveSchedule(editing.id);
+		sheetOpen = false;
+		toast.show(`„${name}" zrušeno`);
+	}
+
+	function categoryName(id: string): string {
+		return (($categories ?? []) as Category[]).find((c) => c.id === id)?.name ?? '—';
+	}
 
 	const SPEND_TYPES: { value: SpendType; label: string }[] = [
 		{ value: 'need', label: 'nutné' },
@@ -239,6 +289,85 @@
 		<p class="hint prose">Kategorie se archivují, nemažou — staré záznamy musí zůstat čitelné.</p>
 	</section>
 
+	<!--
+	  ── pravidelné platby ──────────────────────────────────────────
+
+	  Under the buckets, because that is where he went looking for it — but its
+	  own list, not a field on a category: Netflix and Spotify are both LIFESTYLE
+	  and they are two different standing orders.
+
+	  The year is the number this section exists for. Twelve subscriptions at a
+	  few hundred a month each is a rounding error twelve times over; the same
+	  twelve as one annual figure is a decision.
+	-->
+	<section class="card">
+		<h2 class="u-label">Pravidelné platby</h2>
+
+		{#if liveSchedules.length === 0}
+			<p class="hint prose">
+				Nic tu zatím není. Zapiš předplatné, hypotéku nebo pojištění a app ti je každý měsíc nabídne
+				sáma — a hlavně spočítá, na kolik přijdou za rok.
+			</p>
+		{:else}
+			<ul class="schedules">
+				{#each liveSchedules as schedule (schedule.id)}
+					{@const left = remainingPayments(schedule, today())}
+					<li>
+						<button type="button" class="schedule" onclick={() => openSchedule(schedule)}>
+							<span class="schedule__head">
+								<span class="schedule__name">{schedule.payee}</span>
+								<span class="schedule__amount">
+									{formatMoney(schedule.amount, { sign: 'never' })}
+								</span>
+							</span>
+
+							<span class="schedule__foot">
+								<span class="schedule__where">
+									{schedule.dayOfMonth}. · {categoryName(schedule.categoryId)}
+									<span class="schedule__mode" data-mode={schedule.mode}>
+										{MODE_LABEL[schedule.mode]}
+									</span>
+								</span>
+
+								<span class="schedule__year">
+									{#if left}
+										zbývá {counted(left.payments, PAYMENTS)} · {formatMoney(left.total, {
+											sign: 'never'
+										})}
+									{:else if schedule.amount < 0}
+										{formatMoney((Math.abs(schedule.amount) * 12) as Minor)} / rok
+									{/if}
+								</span>
+							</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+
+			{#if cost.rows.length > 0}
+				<dl class="standing">
+					<div>
+						<dt>Za měsíc</dt>
+						<dd class="mono">{formatMoney(cost.monthly)}</dd>
+					</div>
+					<div>
+						<dt>Za rok</dt>
+						<dd class="mono standing__year">{formatMoney(cost.yearly)}</dd>
+					</div>
+				</dl>
+			{/if}
+		{/if}
+
+		<div class="row-actions">
+			<button type="button" class="btn" onclick={() => openSchedule(null)}>Přidat platbu</button>
+		</div>
+
+		<p class="hint prose">
+			<strong>Potvrdit</strong> ti platbu v den splatnosti nabídne na úvodní obrazovce.
+			<strong>Automaticky</strong> ji zapíše samo při otevření app — jen pro částky, které se nemění.
+		</p>
+	</section>
+
 	<section class="card">
 		<h2 class="u-label">Vzhled</h2>
 		<div class="segments" role="group" aria-label="Motiv">
@@ -307,6 +436,15 @@
 		</dl>
 	</section>
 </main>
+
+<ScheduleSheet
+	open={sheetOpen}
+	schedule={editing}
+	categories={pickable}
+	onsave={saveSchedule}
+	onarchive={editing ? removeSchedule : null}
+	onclose={() => (sheetOpen = false)}
+/>
 
 <TabBar />
 
@@ -483,6 +621,140 @@
 	/* ── theme ───────────────────────────────────────────────────────────
 	   A three-position switch, built from the same parts as the direction
 	   switch on the entry screen. */
+
+	/* ── recurring ────────────────────────────────────────────────── */
+
+	.schedules {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.schedule {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		width: 100%;
+		min-height: var(--touch-lg);
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-sm);
+		text-align: left;
+		transition: background var(--dur-fast) var(--ease-out);
+	}
+
+	.schedule:active {
+		background: var(--surface-2);
+	}
+
+	@media (hover: hover) {
+		.schedule:hover {
+			background: var(--surface-2);
+		}
+	}
+
+	.schedule__head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-3);
+	}
+
+	.schedule__name {
+		min-width: 0;
+		font-size: var(--text-base);
+		font-weight: 600;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.schedule__amount {
+		flex: none;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: var(--text-md);
+		font-weight: 600;
+		letter-spacing: var(--track-tight);
+	}
+
+	.schedule__foot {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		font-size: var(--text-xs);
+		color: var(--ink-3);
+	}
+
+	.schedule__where {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Which way it reaches the ledger, said once and quietly. `auto` takes the
+	   signal because it is the one that writes without being asked. */
+	.schedule__mode {
+		flex: none;
+		padding: 1px var(--space-2);
+		border-radius: var(--radius-full);
+		background: var(--surface-3);
+		font-size: var(--text-2xs);
+		font-weight: 600;
+		color: var(--ink-3);
+	}
+
+	.schedule__mode[data-mode='auto'] {
+		background: var(--signal-wash);
+		color: var(--in);
+	}
+
+	.schedule__year {
+		flex: none;
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		letter-spacing: var(--track-tight);
+	}
+
+	/* The figure the whole section is for. */
+	.standing {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		margin: var(--space-3) 0 0;
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--hairline);
+	}
+
+	.standing > div {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-3);
+	}
+
+	.standing dt {
+		font-size: var(--text-md);
+		color: var(--ink-3);
+	}
+
+	.standing dd {
+		margin: 0;
+		font-size: var(--text-md);
+	}
+
+	.standing__year {
+		font-size: var(--text-lg);
+		font-weight: 600;
+		color: var(--ink);
+	}
 
 	.segments {
 		display: flex;

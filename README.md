@@ -36,7 +36,8 @@ pnpm dev
 Then <http://localhost:5173>.
 
 ```bash
-pnpm test     # 148 unit tests — money, ledger, keypad, checks, receivables, goals, the split
+pnpm test     # 203 unit tests — money, ledger, keypad, checks, receivables, goals,
+              #             the split, holdings, recurring payments
 pnpm check    # svelte-check, TypeScript strict
 pnpm lint     # prettier + eslint
 pnpm build    # static output in apps/web/build
@@ -74,7 +75,7 @@ apps/web/src/
 ├─ lib/ui/         hand-rolled components against the token set
 ├─ lib/styles/     design tokens, self-hosted fonts
 └─ routes/         / (entry) · /tape (ledger) · /mesic (month) · /cil (goal)
-                   · /settings
+                   · /jmeni (what it all adds up to) · /settings
 ```
 
 `docs/PROJECT-PLAN.md` is the specification. `docs/DECISIONS.md` records every

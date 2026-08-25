@@ -58,6 +58,7 @@ function txn(amount: number, date: string, categoryId: string | null = SAVE): Tx
 		owedAmount: null,
 		owedBy: null,
 		settledByTxnId: null,
+		scheduleId: null,
 		createdAt: `${date}T10:00:00.000Z`,
 		updatedAt: `${date}T10:00:00.000Z`,
 		deviceId: 'dev-1',

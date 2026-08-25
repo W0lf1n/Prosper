@@ -42,6 +42,17 @@
 		'arrow-up': '<path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"/>',
 		check: '<path d="m5.6 12.4 4.4 4.4 8.4-9.6"/>',
 
+		/**
+		 * Jmění — a stack, narrowing as it rises.
+		 *
+		 * Not a coin and not a bank: both are pictures of money in general, and
+		 * this screen is about an amount that has been piled up. Three slabs on
+		 * the same centre line, in the same rounded language as the app's own
+		 * surfaces.
+		 */
+		wealth:
+			'<rect x="3.8" y="15.6" width="16.4" height="4.6" rx="2.3"/><rect x="5.9" y="9.8" width="12.2" height="4.6" rx="2.3"/><rect x="8" y="4" width="8" height="4.6" rx="2.3"/>',
+
 		/** Označit den bez výdaje — a day closed with nothing in it. */
 		'zero-day':
 			'<rect x="4.2" y="5.4" width="15.6" height="14.4" rx="2.4"/><path d="M4.2 10h15.6M8.6 3.6v3.2M15.4 3.6v3.2"/><path d="m9.9 14.9 4.2 0"/>'

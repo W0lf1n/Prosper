@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
-	import { createTxn, deleteTxn } from '$lib/db/repo';
+	import { confirmScheduled, createTxn, deleteTxn, skipScheduled } from '$lib/db/repo';
 	import {
 		EMPTY,
 		display,
@@ -24,9 +24,11 @@
 	} from '$lib/domain/money';
 	import { categoryRanking, recentPayees } from '$lib/domain/ledger';
 	import { checkDraft, summariseMonth, type Finding } from '$lib/domain/checks';
+	import { dueGroups, type DueGroup } from '$lib/domain/recurring';
 	import { goalCategoryIds, goalStatus, pickPrimary } from '$lib/domain/goals';
-	import type { Category, Goal, MonthTarget } from '$lib/domain/types';
+	import type { Category, Goal, MonthTarget, Schedule } from '$lib/domain/types';
 	import CategoryPicker from '$lib/ui/CategoryPicker.svelte';
+	import DueStrip from '$lib/ui/DueStrip.svelte';
 	import GoalStrip from '$lib/ui/GoalStrip.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Keypad from '$lib/ui/Keypad.svelte';
@@ -57,6 +59,21 @@
 
 	const allMonthTargets = liveQuery(async () =>
 		(await db().monthTargets.toArray()).filter((t: MonthTarget) => !t.isDeleted)
+	);
+
+	const allSchedules = liveQuery(() => db().schedules.orderBy('sortOrder').toArray());
+
+	/**
+	 * Standing orders whose day has come and which have not been settled.
+	 *
+	 * `auto` ones were already written by the launch catch-up, so what is left
+	 * here is exactly the `confirm` set — the ones whose whole point is that
+	 * somebody looks at them.
+	 */
+	const due = $derived(
+		dueGroups({ schedules: ($allSchedules ?? []) as Schedule[], today: today() }).filter(
+			(group) => group.item.schedule.mode === 'confirm'
+		)
 	);
 
 	// ── entry state ─────────────────────────────────────────────────────────
@@ -241,6 +258,22 @@
 		return `${before.name} · chybí ${formatMoney(missing)}`;
 	}
 
+	async function confirmDue(group: DueGroup, amount: Minor | null) {
+		if (!accountId) return;
+		const txn = await confirmScheduled(group.item, { accountId, amount: amount ?? undefined });
+		navigator.vibrate?.(12);
+		scene.flash(txn.amount < 0 ? 'out' : 'in');
+		toast.money(txn.amount, {
+			message: group.item.schedule.payee,
+			undo: () => deleteTxn(txn.id)
+		});
+	}
+
+	async function skipDue(group: DueGroup) {
+		await skipScheduled(group.item);
+		toast.show(`„${group.item.schedule.payee}" tenhle měsíc přeskočeno`);
+	}
+
 	function setDirection(next: 'out' | 'in') {
 		if (direction === next) return;
 		direction = next;
@@ -324,6 +357,15 @@
 					<a class="icon-link" href={resolve('/tape')} aria-label="Výpis">
 						<Icon name="tape" size={20} />
 					</a>
+					<!--
+					  Jmění is the one stock figure in the app and it is not a tab — the
+					  bar at the bottom is the four things done repeatedly. Here it costs
+					  no height at all on the screen that has none to spare, and it is one
+					  tap from launch.
+					-->
+					<a class="icon-link" href={resolve('/jmeni')} aria-label="Jmění">
+						<Icon name="wealth" size={20} />
+					</a>
 					<a class="icon-link" href={resolve('/settings')} aria-label="Nastavení">
 						<Icon name="settings" size={20} />
 					</a>
@@ -334,6 +376,13 @@
 				{/snippet}
 			</MonthTotals>
 		</div>
+
+		<!--
+		  What the standing orders are waiting on. Renders nothing at all when
+		  nothing is due, so the screen the five-second budget belongs to keeps
+		  exactly the height it always had.
+		-->
+		<DueStrip groups={due} onconfirm={confirmDue} onskip={skipDue} />
 
 		<!--
 		  ── the amount, and the sign that turned into a switch ────────────

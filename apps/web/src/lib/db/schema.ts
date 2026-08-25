@@ -18,11 +18,14 @@ import type {
 	Category,
 	DayMark,
 	Goal,
+	Holding,
 	MetaEntry,
 	MonthTarget,
 	OutboxEntry,
 	Reconciliation,
-	Txn
+	Schedule,
+	Txn,
+	Valuation
 } from '$lib/domain/types';
 
 export interface Migration {
@@ -76,6 +79,48 @@ export const migrations: Migration[] = [
 				}
 			}
 		}
+	},
+	{
+		/**
+		 * Holdings and their readings — DECISIONS Q36.
+		 *
+		 * New tables only, so there is nothing to upgrade: no existing row grows a
+		 * column and no existing row is touched. `[holdingId+date]` is what picks
+		 * the current value without loading every reading ever taken.
+		 */
+		version: 4,
+		stores: {
+			holdings: 'id, sortOrder, categoryId',
+			valuations: 'id, holdingId, date, [holdingId+date]'
+		}
+	},
+	{
+		/**
+		 * Declared recurring payments — DECISIONS Q40.
+		 *
+		 * `txns` is restated in full because it grows an index: Dexie replaces the
+		 * whole declaration for a table it is given, so every existing index has
+		 * to be repeated or it is dropped.
+		 *
+		 * The upgrade backfills `scheduleId: null` on every existing row rather
+		 * than leaving it absent. An index over a field that is `undefined` on
+		 * most rows works, but `row.scheduleId === null` then answers false for
+		 * the entire pre-existing ledger, and that is the kind of difference that
+		 * shows up months later as one screen disagreeing with another.
+		 */
+		version: 5,
+		stores: {
+			schedules: 'id, sortOrder, categoryId',
+			txns: 'id, date, accountId, categoryId, createdAt, updatedAt, scheduleId, [accountId+date]'
+		},
+		upgrade: async (tx: Transaction) => {
+			await tx
+				.table('txns')
+				.toCollection()
+				.modify((row: { scheduleId?: string | null }) => {
+					if (row.scheduleId === undefined) row.scheduleId = null;
+				});
+		}
 	}
 ];
 
@@ -86,6 +131,9 @@ export class FinanceDb extends Dexie {
 	reconciliations!: EntityTable<Reconciliation, 'id'>;
 	goals!: EntityTable<Goal, 'id'>;
 	monthTargets!: EntityTable<MonthTarget, 'id'>;
+	holdings!: EntityTable<Holding, 'id'>;
+	valuations!: EntityTable<Valuation, 'id'>;
+	schedules!: EntityTable<Schedule, 'id'>;
 	dayMarks!: EntityTable<DayMark, 'date'>;
 	outbox!: EntityTable<OutboxEntry, 'seq'>;
 	meta!: EntityTable<MetaEntry, 'key'>;

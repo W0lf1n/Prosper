@@ -12,13 +12,18 @@ export const prerender = true;
 export const load: LayoutLoad = async () => {
 	if (!browser) return { accountId: null };
 
-	const { ensureSeeded, closePreviousDay } = await import('$lib/db/repo');
+	const { ensureSeeded, closePreviousDay, catchUpSchedules } = await import('$lib/db/repo');
 	const { accountId } = await ensureSeeded();
 
 	// Yesterday is over. If the app was open on it and nothing went in, that is a
 	// zero rather than a gap — see `closePreviousDay` for why it only ever
 	// reaches back one day.
 	await closePreviousDay();
+
+	// Standing orders do not post themselves while the app is closed — there is
+	// no server. They are settled on the way in: `auto` schedules write their
+	// rows here, `confirm` ones surface on the entry screen.
+	await catchUpSchedules(accountId);
 
 	// Ask the browser not to evict the ledger under storage pressure (§12).
 	// Chrome grants this silently once the app is installed.
