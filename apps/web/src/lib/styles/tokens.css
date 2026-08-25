@@ -1,0 +1,411 @@
+/**
+ * Design tokens — "graphite instrument".
+ *
+ * The app is used one-handed, in bed, with the lights off. So it is built dark
+ * first and the light theme is its daylight counterpart, not the other way
+ * round. The world is a machined instrument: a graphite ground, surfaces raised
+ * by *luminance* rather than by boxes, hairlines only where an edge is
+ * load-bearing, and exactly one signal colour.
+ *
+ * Money is the object this app exists for, so money gets the display type: IBM
+ * Plex Mono, tabular, tight. Everything else is a label.
+ *
+ * The colour rules, and they are short:
+ *   · SIGNAL (mint) is the primary action, the current selection, and money
+ *     coming in. Nothing else. It is never decoration.
+ *   · Money going out has no hue at all — it is the ink. Most rows in a ledger
+ *     are outflow, and forty red numbers is noise, not information.
+ *   · FLAG (amber) means look at this. DANGER (coral) means destroy or refuse.
+ *
+ * The rule for adding anything here is the old one: if it does not help you
+ * read a number or hit a target, it does not go in.
+ */
+
+:root {
+	color-scheme: light dark;
+
+	/* ═══ light: the daylight instrument ═════════════════════════════════ */
+
+	/* Ground and surfaces. Each step up is a step lighter — that is the whole
+	   elevation system; shadows only confirm what luminance already said. */
+	--ground: #eeefec;
+	--ground-2: #e4e6e2;
+	--surface: #fbfcfa;
+	--surface-2: #f1f3ef;
+	--surface-3: #e7eae5;
+
+	--hairline: #dcdfd9;
+	--hairline-2: #c3c8c0;
+
+	/**
+	 * One step up from `--surface-2`, and the only token that has to be spelled
+	 * out per theme rather than derived.
+	 *
+	 * Elevation inverts between the two: in daylight a raised slab is *lighter*
+	 * than what it sits on, on graphite it is lighter too — but the graphite
+	 * scale runs the other way, so `--surface` is the bottom of it and
+	 * `--surface-3` the top. A control that hard-codes either one is raised in
+	 * one theme and sunk in the other. This is the name for "raised", and it
+	 * resolves to whichever end of the scale that means here.
+	 */
+	--raised: var(--surface);
+
+	--ink: #101413;
+	--ink-2: #4a5250;
+	--ink-3: #5f6764;
+
+	/* The one accent. AA as text on every surface, AA as a fill under white. */
+	--signal: #007850;
+	--signal-ink: #ffffff;
+	--signal-wash: rgb(0 120 80 / 10%);
+	--signal-edge: rgb(0 120 80 / 22%);
+
+	/* ── money ───────────────────────────────────────────────────────────
+	   Out is the ink. In is the signal. The asymmetry is deliberate: an
+	   expense is the normal case and needs no colour to announce itself. */
+	--out: #101413;
+	--in: #007850;
+	--flag: #7d5900;
+	--danger: #b93225;
+
+	--in-wash: rgb(0 120 80 / 10%);
+	--flag-wash: rgb(125 89 0 / 11%);
+	--danger-wash: rgb(185 50 37 / 10%);
+	/* The counterpart to `--signal-edge`: what a coral object throws onto the
+	   surface under it, for the one control that is allowed to be coral. */
+	--danger-edge: rgb(185 50 37 / 22%);
+
+	/* ── the 10/10/10/70 split ───────────────────────────────────────────
+	   Four classes that must stay apart at a glance in a ring 13 units thick. */
+	--split-give: #5b41c4;
+	--split-save: #007850;
+	--split-debt: #8e5d00;
+	--split-live: #5c6461;
+	--split-left: #d5d9d2; /* what income has left — a ghost, not a class */
+
+	/* ── elevation ───────────────────────────────────────────────────────
+	   Tinted with the ground's own hue. A black shadow on a green-grey page is
+	   the cheapest possible way to look unfinished. */
+	--elev-1: 0 1px 2px rgb(18 28 24 / 5%), 0 2px 8px rgb(18 28 24 / 5%);
+	--elev-2: 0 2px 4px rgb(18 28 24 / 6%), 0 10px 28px rgb(18 28 24 / 9%);
+	--elev-3: 0 8px 16px rgb(18 28 24 / 8%), 0 28px 60px rgb(18 28 24 / 13%);
+	--elev-sheet: 0 -2px 12px rgb(18 28 24 / 8%), 0 -20px 60px rgb(18 28 24 / 16%);
+
+	/* The lit top edge — what makes a surface read as a slab and not a box. */
+	--edge: inset 0 1px 0 rgb(255 255 255 / 90%);
+	--edge-strong: inset 0 1px 0 rgb(255 255 255 / 100%);
+
+	/* The light the instrument sits in; the pool the amount floats in. */
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(0 120 80 / 6%) 0%,
+		rgb(0 120 80 / 2%) 40%,
+		transparent 72%
+	);
+
+	/**
+	 * The same pool, in the direction's own hue.
+	 *
+	 * This is the one place the "outflow has no colour" rule is deliberately
+	 * suspended. In the ledger it holds — forty red rows is noise. Here there is
+	 * exactly one number on the screen and the whole question is which way it is
+	 * going, so the light behind it answers before the sign is read. It stays a
+	 * wash: seven per cent, the same weight as the mint it replaces, tinting the
+	 * ground rather than colouring the digits.
+	 */
+	--ambient-out: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(185 50 37 / 7%) 0%,
+		rgb(185 50 37 / 2.5%) 40%,
+		transparent 72%
+	);
+	--ambient-in: var(--ambient);
+
+	/* Fine grain over the ground. Breaks the digital flatness, and you only
+	   notice it once it is gone. Each theme dials its own strength. */
+	--grain-opacity: 0.3;
+
+	/* ═══ theme-independent ══════════════════════════════════════════════ */
+
+	/* ── type ────────────────────────────────────────────────────────────
+	   One family for the interface, one for money. Product UI does not need a
+	   display face; it needs a well-tuned sans at eight honest sizes. Fixed
+	   rem, never fluid — the single clamp in the system is the keypad amount,
+	   and that one is a hero, not a heading. */
+	--font-ui:
+		'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+
+	--text-2xs: 0.6875rem; /* 11 — micro-labels only */
+	--text-xs: 0.75rem; /* 12 */
+	--text-sm: 0.8125rem; /* 13 */
+	--text-md: 0.875rem; /* 14 */
+	--text-base: 1rem; /* 16 — the floor for anything read on a phone */
+	--text-lg: 1.125rem; /* 18 */
+	--text-xl: 1.375rem; /* 22 */
+	--text-2xl: 1.75rem; /* 28 */
+	--text-3xl: 2.125rem; /* 34 */
+	--text-display: clamp(2.75rem, 13.5vw, 4rem); /* the keypad amount */
+
+	--track-display: -0.045em;
+	--track-tight: -0.02em;
+	--track-label: 0.09em; /* the only place uppercase is allowed */
+
+	--leading-tight: 1.15;
+	--leading-snug: 1.35;
+	--leading-base: 1.5;
+	--leading-loose: 1.6;
+
+	/* ── space ───────────────────────────────────────────────────────────
+	   4 px base. Tight inside a group, generous between groups. */
+	--space-1: 0.25rem; /* 4 */
+	--space-2: 0.5rem; /* 8 */
+	--space-3: 0.75rem; /* 12 */
+	--space-4: 1rem; /* 16 */
+	--space-5: 1.5rem; /* 24 */
+	--space-6: 2rem; /* 32 */
+	--space-7: 2.5rem; /* 40 */
+	--space-8: 3.5rem; /* 56 */
+
+	/* ── radius ──────────────────────────────────────────────────────────
+	   Tighter inside, softer outside: an element nested in a container never
+	   carries the container's radius. */
+	--radius-xs: 6px;
+	--radius-sm: 10px;
+	--radius: 12px;
+	--radius-md: 16px;
+	--radius-lg: 20px;
+	--radius-xl: 26px;
+	--radius-full: 999px;
+
+	/* ── targets ─────────────────────────────────────────────────────────
+	   Nothing is smaller than a thumb. Ever — but "thumb" is a property of the
+	   *target*, not of the drawing. `--touch` is the floor for what you can hit;
+	   `--control` is how tall a secondary control is allowed to look.
+
+	   A control drawn at `--control` carries a transparent `::after` that pushes
+	   its hit area back out to `--touch`, which is why the rows around it keep a
+	   `--control-gap` gutter: that gutter is where the hit areas live. Shrink it
+	   and two neighbouring targets start stealing each other's taps.
+
+	   The entry screen is a form you fill in with one thumb while the keypad
+	   holds the bottom third of the glass. Its pills, chips and toggles are
+	   navigation *around* the number, not the number, so they are drawn small
+	   and hit big. `--touch` still governs the keypad, the save button and every
+	   row link, which are the things you actually aim at. */
+	--touch: 44px;
+	--touch-lg: 54px;
+	--control: 24px;
+	/**
+	 * The gutter between two rows of `--control` controls, and it is derived
+	 * rather than chosen: it is exactly the overhang the two hit areas need to
+	 * reach `--touch` without meeting in the middle. Change `--control` and the
+	 * gutter follows on its own.
+	 */
+	--control-gap: calc(var(--touch) - var(--control));
+	--tabbar: 58px;
+
+	/* ── motion ──────────────────────────────────────────────────────────
+	   Exponential ease-out from an already-visible default. This is a place
+	   people are working; nobody wants to watch it arrive. */
+	--dur-press: 90ms;
+	--dur-fast: 150ms;
+	--dur-base: 220ms;
+	--dur-slow: 360ms;
+
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+	/* Heavier than `--ease-out`, and still without overshoot. A real object
+	   decelerates into its resting place; it does not bounce past it and come
+	   back. Bounce reads as a toy, and this one counts money. */
+	--ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+
+	--transition: var(--dur-fast) var(--ease-out);
+
+	/* ── layers ──────────────────────────────────────────────────────────
+	   A scale, so that nobody ever writes 9999 again. */
+	--z-raised: 1;
+	--z-nav: 20;
+	--z-sticky: 30;
+	/* The save flash sits over the furniture and under the message about it. */
+	--z-scenery: 50;
+	--z-toast: 60;
+}
+
+/**
+ * Dark is the theme the app was designed for, not a nicety. It is declared
+ * twice — once for the system preference, once for an explicit choice — so the
+ * settings toggle wins in both directions.
+ *
+ * Elevation inverts here: surfaces get *lighter* as they rise, shadows get
+ * deeper, and the lit top edge becomes a one-pixel sliver of white at 6 %.
+ */
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--ground: #0a0c0d;
+		--ground-2: #0e1113;
+		--surface: #15181a;
+		--surface-2: #1c2023;
+		--surface-3: #242a2d;
+
+		--hairline: #232829;
+		--hairline-2: #333a3c;
+
+		--raised: var(--surface-3);
+
+		--ink: #e8ecec;
+		--ink-2: #9aa4a6;
+		--ink-3: #8a9497;
+
+		--signal: #3de0a0;
+		--signal-ink: #06231a;
+		--signal-wash: rgb(61 224 160 / 13%);
+		--signal-edge: rgb(61 224 160 / 30%);
+
+		--out: #e8ecec;
+		--in: #3de0a0;
+		--flag: #f3c563;
+		--danger: #ff6b5b;
+
+		--in-wash: rgb(61 224 160 / 13%);
+		--flag-wash: rgb(243 197 99 / 13%);
+		--danger-wash: rgb(255 107 91 / 13%);
+		--danger-edge: rgb(255 107 91 / 30%);
+
+		--split-give: #9b8cf5;
+		--split-save: #3de0a0;
+		--split-debt: #e0a34f;
+		--split-live: #869397;
+		--split-left: #262c2e;
+
+		--elev-1: 0 1px 2px rgb(0 0 0 / 34%), 0 2px 8px rgb(0 0 0 / 22%);
+		--elev-2: 0 2px 5px rgb(0 0 0 / 40%), 0 12px 30px rgb(0 0 0 / 34%);
+		--elev-3: 0 10px 20px rgb(0 0 0 / 40%), 0 30px 64px rgb(0 0 0 / 48%);
+		--elev-sheet: 0 -2px 12px rgb(0 0 0 / 34%), 0 -22px 64px rgb(0 0 0 / 56%);
+
+		--edge: inset 0 1px 0 rgb(255 255 255 / 6%);
+		--edge-strong: inset 0 1px 0 rgb(255 255 255 / 10%);
+
+		--ambient: radial-gradient(
+			78% 46% at 50% 0%,
+			rgb(61 224 160 / 8%) 0%,
+			rgb(61 224 160 / 2.5%) 40%,
+			transparent 72%
+		);
+
+		/* Coral rather than the light theme's brick: on graphite a dark red wash
+		   reads as dirt, and the pool has to stay light to read as light. */
+		--ambient-out: radial-gradient(
+			78% 46% at 50% 0%,
+			rgb(255 107 91 / 9%) 0%,
+			rgb(255 107 91 / 3%) 40%,
+			transparent 72%
+		);
+		--ambient-in: var(--ambient);
+
+		--grain-opacity: 0.5;
+	}
+}
+
+/**
+ * An explicit choice has to move `color-scheme` with it, not just the palette.
+ * Left at `light dark`, the browser keeps rendering its own surfaces — form
+ * controls, scrollbars, the canvas behind the page, the date picker — from the
+ * *system* preference, so choosing the light theme on a phone in dark mode
+ * produced a light page wearing dark native controls.
+ */
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
+	--ground: #0a0c0d;
+	--ground-2: #0e1113;
+	--surface: #15181a;
+	--surface-2: #1c2023;
+	--surface-3: #242a2d;
+
+	--hairline: #232829;
+	--hairline-2: #333a3c;
+
+	--raised: var(--surface-3);
+
+	--ink: #e8ecec;
+	--ink-2: #9aa4a6;
+	--ink-3: #8a9497;
+
+	--signal: #3de0a0;
+	--signal-ink: #06231a;
+	--signal-wash: rgb(61 224 160 / 13%);
+	--signal-edge: rgb(61 224 160 / 30%);
+
+	--out: #e8ecec;
+	--in: #3de0a0;
+	--flag: #f3c563;
+	--danger: #ff6b5b;
+
+	--in-wash: rgb(61 224 160 / 13%);
+	--flag-wash: rgb(243 197 99 / 13%);
+	--danger-wash: rgb(255 107 91 / 13%);
+	--danger-edge: rgb(255 107 91 / 30%);
+
+	--split-give: #9b8cf5;
+	--split-save: #3de0a0;
+	--split-debt: #e0a34f;
+	--split-live: #869397;
+	--split-left: #262c2e;
+
+	--elev-1: 0 1px 2px rgb(0 0 0 / 34%), 0 2px 8px rgb(0 0 0 / 22%);
+	--elev-2: 0 2px 5px rgb(0 0 0 / 40%), 0 12px 30px rgb(0 0 0 / 34%);
+	--elev-3: 0 10px 20px rgb(0 0 0 / 40%), 0 30px 64px rgb(0 0 0 / 48%);
+	--elev-sheet: 0 -2px 12px rgb(0 0 0 / 34%), 0 -22px 64px rgb(0 0 0 / 56%);
+
+	--edge: inset 0 1px 0 rgb(255 255 255 / 6%);
+	--edge-strong: inset 0 1px 0 rgb(255 255 255 / 10%);
+
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(61 224 160 / 8%) 0%,
+		rgb(61 224 160 / 2.5%) 40%,
+		transparent 72%
+	);
+
+	/* Coral rather than the light theme's brick: on graphite a dark red wash
+	   reads as dirt, and the pool has to stay light to read as light. */
+	--ambient-out: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(255 107 91 / 9%) 0%,
+		rgb(255 107 91 / 3%) 40%,
+		transparent 72%
+	);
+	--ambient-in: var(--ambient);
+
+	--grain-opacity: 0.5;
+}
+
+/**
+ * Compatibility aliases.
+ *
+ * The previous token names map onto the new system, so a rule missed in the
+ * redesign degrades to something coherent instead of to an unstyled box. They
+ * resolve against whichever theme block won, because both halves of the
+ * `var()` live on the same element.
+ */
+:root {
+	--paper: var(--ground);
+	--paper-2: var(--ground-2);
+	--tape: var(--surface);
+	--tape-2: var(--surface-2);
+	--rule: var(--hairline);
+	--rule-strong: var(--hairline-2);
+	--accent: var(--signal);
+	--accent-ink: var(--signal-ink);
+	--out-wash: var(--danger-wash);
+	--shadow-1: var(--elev-1);
+	--shadow-2: var(--elev-2);
+	--shadow-hero: var(--elev-3);
+	--shadow-sheet: var(--elev-sheet);
+	--glow: var(--ambient);
+}

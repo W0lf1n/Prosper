@@ -1,0 +1,539 @@
+@import './tokens.css';
+
+/* ── typefaces, self-hosted: a CDN would break the offline promise ───────── */
+
+@font-face {
+	font-family: 'Instrument Sans';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('/fonts/instrument-sans-latin.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'Instrument Sans';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('/fonts/instrument-sans-latin-ext.woff2') format('woff2');
+	unicode-range:
+		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+		U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+		U+A720-A7FF;
+}
+
+@font-face {
+	font-family: 'IBM Plex Mono';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/plex-mono-400-latin.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'IBM Plex Mono';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/plex-mono-400-latin-ext.woff2') format('woff2');
+	unicode-range:
+		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+		U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+		U+A720-A7FF;
+}
+
+@font-face {
+	font-family: 'IBM Plex Mono';
+	font-style: normal;
+	font-weight: 600;
+	font-display: swap;
+	src: url('/fonts/plex-mono-600-latin.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'IBM Plex Mono';
+	font-style: normal;
+	font-weight: 600;
+	font-display: swap;
+	src: url('/fonts/plex-mono-600-latin-ext.woff2') format('woff2');
+	unicode-range:
+		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+		U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+		U+A720-A7FF;
+}
+
+/* ── base ────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+/**
+ * App shell: the window itself never scrolls. Every screen is a fixed frame and
+ * anything long scrolls inside it, so the keypad can never be pushed off the
+ * bottom of the phone and the tab bar can never drift up the page.
+ */
+html,
+body {
+	height: 100%;
+	/* The dynamic viewport, so the window itself is never taller than the part
+	   of it you can actually see. */
+	height: 100dvh;
+	overflow: hidden;
+	/* Nothing here hands a scroll up to the browser: no rubber-band on either
+	   axis, and no pull-to-refresh wiping a half-typed amount. */
+	overscroll-behavior: none;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	min-height: 100%;
+	/* The ground is painted flat first, so the page never depends on a gradient
+	   resolving in order to have a colour under it. */
+	background-color: var(--ground);
+	/* Two layers over it: the ambient bloom the instrument sits in, then the
+	   slow vertical gradient that gives the ground a top and a bottom. */
+	background-image: var(--ambient), linear-gradient(175deg, var(--ground) 0%, var(--ground-2) 100%);
+	background-attachment: fixed, fixed;
+	background-repeat: no-repeat, no-repeat;
+	color: var(--ink);
+	font-family: var(--font-ui);
+	font-size: var(--text-base);
+	line-height: var(--leading-snug);
+	font-synthesis-weight: none;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	/* One-handed use means fat fingers on small targets; never zoom on a tap. */
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/**
+ * How far the toast has to stand off the bottom edge.
+ *
+ * The toast is the one fixed overlay in the app, and the bottom edge is the one
+ * place every screen puts something you have to be able to hit. On a tab screen
+ * that is the navigation, and a confirmation parked on top of it is a
+ * confirmation you have to wait out before you can leave. So the screens
+ * declare the furniture and the toast clears it.
+ *
+ * Global rather than scoped, because the toast lives in the layout and the bar
+ * it has to clear belongs to the route. Anything without `:has()` falls back to
+ * the plain offset, which is exactly where the toast used to sit.
+ */
+.app {
+	--toast-lift: var(--space-5);
+}
+
+.app:has(.tabbar) {
+	--toast-lift: calc(var(--tabbar) + var(--space-4));
+}
+
+/**
+ * Fine grain over the ground.
+ *
+ * A graphite surface with no tooth reads as a flat fill; with tooth it reads as
+ * a material. Fixed, so it never scrolls with content, and painted below the
+ * app so it textures the gutters rather than the numbers.
+ */
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	opacity: var(--grain-opacity);
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+	background-size: 160px 160px;
+}
+
+h1,
+h2,
+h3,
+p,
+figure {
+	margin: 0;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+}
+
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+	caret-color: var(--signal);
+}
+
+a {
+	color: inherit;
+}
+
+/* ── browser surfaces ────────────────────────────────────────────────────
+   The parts nobody draws still carry the design. A default blue selection on
+   a graphite page is the loudest thing on it. */
+
+::selection {
+	background: var(--signal-wash);
+	color: var(--ink);
+}
+
+:focus-visible {
+	outline: 2px solid var(--signal);
+	outline-offset: 2px;
+	border-radius: var(--radius-xs);
+}
+
+/* Themed, not reinvented: the platform scrollbar, in the platform's shape. */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--hairline-2) transparent;
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--hairline-2);
+	border-radius: var(--radius-full);
+}
+
+/* Native date and number pickers: the indicator ships black by default, which
+   disappears entirely on graphite. */
+::-webkit-calendar-picker-indicator {
+	filter: invert(var(--picker-invert, 0));
+	opacity: 0.6;
+	cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--picker-invert: 1;
+	}
+}
+
+:root[data-theme='dark'] {
+	--picker-invert: 1;
+}
+
+/* ── primitives ──────────────────────────────────────────────────────────── */
+
+/**
+ * All money is mono, tabular, right-aligned. This is the visual identity, and
+ * it is the reason two amounts in a column can be compared without reading
+ * them: the digits land in the same place every time.
+ */
+.money {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: 'tnum' 1;
+	letter-spacing: var(--track-tight);
+	text-align: right;
+	white-space: nowrap;
+}
+
+.money--out {
+	color: var(--out);
+}
+
+.money--in {
+	color: var(--in);
+}
+
+/**
+ * A slab: a surface raised out of the ground by luminance, confirmed by a lit
+ * top edge and a shadow beneath it. One hairline, and only because a slab with
+ * no edge at all loses its corners on a bright screen.
+ */
+.slab {
+	background: var(--surface);
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--edge), var(--elev-1);
+}
+
+/**
+ * The micro-label. Uppercase is allowed here and nowhere else, because these
+ * are machine labels on an instrument rather than headings in a document.
+ */
+.u-label {
+	font-size: var(--text-2xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: var(--track-label);
+	color: var(--ink-3);
+}
+
+/**
+ * The rule that separates two parts of one slab.
+ *
+ * A machined score line, not a dashed paper perforation: full strength in the
+ * middle, fading out before it reaches either edge, so it never collides with
+ * the slab's own border.
+ */
+.perforation {
+	border: 0;
+	height: 1px;
+	margin: 0;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		var(--hairline-2) 12%,
+		var(--hairline-2) 88%,
+		transparent
+	);
+	opacity: 0.85;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+/* Long prose never runs past a comfortable measure, even on a tablet. */
+.prose {
+	max-width: 62ch;
+	line-height: var(--leading-base);
+	text-wrap: pretty;
+}
+
+/* ── controls ────────────────────────────────────────────────────────────
+   One button vocabulary and one field vocabulary for the whole app. These are
+   global rather than scoped because the alternative is five copies that drift:
+   if the save button on two screens does not look identical, one of them is
+   wrong, and nobody ever finds out which. */
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.field__label {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-2);
+	font-size: var(--text-xs);
+	font-weight: 500;
+	color: var(--ink-2);
+}
+
+.field__input {
+	width: 100%;
+	min-height: var(--touch-lg);
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius-md);
+	background: var(--surface-2);
+	color: var(--ink);
+	font-size: var(--text-base);
+	transition:
+		border-color var(--dur-fast) var(--ease-out),
+		background var(--dur-fast) var(--ease-out);
+}
+
+.field__input::placeholder {
+	color: var(--ink-3);
+}
+
+.field__input:focus-visible {
+	outline: none;
+	border-color: var(--signal);
+	box-shadow: 0 0 0 3px var(--signal-wash);
+}
+
+.field__input--mono {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: var(--track-tight);
+}
+
+.field__input--area {
+	min-height: 5.5rem;
+	line-height: var(--leading-base);
+	resize: vertical;
+}
+
+/* A select needs its own arrow: the platform one is drawn in the platform's
+   colour and disappears on graphite. */
+select.field__input {
+	appearance: none;
+	padding-right: var(--space-6);
+	background-image:
+		linear-gradient(45deg, transparent 50%, currentColor 50%),
+		linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position:
+		calc(100% - 18px) calc(50% + 1px),
+		calc(100% - 13px) calc(50% + 1px);
+	background-size:
+		5px 5px,
+		5px 5px;
+	background-repeat: no-repeat;
+	cursor: pointer;
+}
+
+.field__hint {
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+	line-height: var(--leading-base);
+}
+
+/**
+ * Buttons. One shape, one height, three ranks: primary carries the signal,
+ * default is a slab, quiet is text with a target around it.
+ */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	min-height: var(--touch-lg);
+	padding-inline: var(--space-4);
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius-md);
+	background: var(--surface-2);
+	color: var(--ink);
+	font-size: var(--text-md);
+	font-weight: 500;
+	text-align: center;
+	text-decoration: none;
+	transition:
+		background var(--dur-fast) var(--ease-out),
+		border-color var(--dur-fast) var(--ease-out),
+		color var(--dur-fast) var(--ease-out),
+		box-shadow var(--dur-press) var(--ease-out),
+		transform var(--dur-press) var(--ease-out);
+}
+
+.btn:active {
+	transform: scale(0.98);
+}
+
+@media (hover: hover) {
+	.btn:hover {
+		background: var(--surface-3);
+		border-color: var(--hairline-2);
+	}
+}
+
+.btn--primary {
+	background: var(--signal);
+	border-color: var(--signal);
+	color: var(--signal-ink);
+	font-weight: 600;
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 22%),
+		0 1px 2px rgb(0 0 0 / 14%),
+		0 6px 18px var(--signal-edge);
+}
+
+.btn--primary:active {
+	box-shadow:
+		inset 0 1px 2px rgb(0 0 0 / 18%),
+		0 1px 2px rgb(0 0 0 / 10%);
+}
+
+@media (hover: hover) {
+	.btn--primary:hover {
+		background: var(--signal);
+		border-color: var(--signal);
+		box-shadow:
+			inset 0 1px 0 rgb(255 255 255 / 26%),
+			0 2px 4px rgb(0 0 0 / 14%),
+			0 10px 26px var(--signal-edge);
+	}
+}
+
+.btn--primary:disabled,
+.btn:disabled {
+	background: var(--surface-2);
+	border-color: var(--hairline);
+	color: var(--ink-3);
+	box-shadow: none;
+	cursor: default;
+	transform: none;
+}
+
+.btn--quiet {
+	background: transparent;
+	border-color: transparent;
+	color: var(--ink-3);
+}
+
+@media (hover: hover) {
+	.btn--quiet:hover {
+		background: var(--surface-2);
+		border-color: transparent;
+		color: var(--ink-2);
+	}
+}
+
+.btn--danger {
+	background: transparent;
+	border-color: var(--hairline-2);
+	color: var(--danger);
+}
+
+@media (hover: hover) {
+	.btn--danger:hover {
+		background: var(--danger-wash);
+		border-color: var(--danger);
+	}
+}
+
+.btn--block {
+	width: 100%;
+}
+
+/* The error line under a form. Names the problem in the product's own voice. */
+.error-text {
+	font-size: var(--text-md);
+	color: var(--danger);
+	line-height: var(--leading-snug);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

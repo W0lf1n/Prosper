@@ -1,0 +1,178 @@
+<script lang="ts">
+	import Icon from './Icon.svelte';
+
+	interface Props {
+		ondigit: (digit: string) => void;
+		oncomma: () => void;
+		onbackspace: () => void;
+		onclear: () => void;
+	}
+
+	let { ondigit, oncomma, onbackspace, onclear }: Props = $props();
+
+	/**
+	 * Calculator order — 7-8-9 on top, 1-2-3 at the bottom.
+	 *
+	 * Not phone-dialler order. The thing being typed is a sum, and every keypad
+	 * that exists for typing sums, from a till to a pocket calculator, puts the
+	 * low digits nearest the thumb.
+	 */
+	const keys = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+
+	let holdTimer: ReturnType<typeof setTimeout> | undefined;
+	let clearedByHold = false;
+
+	/**
+	 * Hold backspace to wipe the amount — faster than tapping it away.
+	 *
+	 * The deletion itself hangs off `click`, not `pointerup`, so the key still
+	 * works for anyone driving the pad from a keyboard. The pointer handlers only
+	 * run the hold timer and, when the hold fires, suppress the click that
+	 * follows.
+	 */
+	function startHold() {
+		clearedByHold = false;
+		holdTimer = setTimeout(() => {
+			clearedByHold = true;
+			onclear();
+			navigator.vibrate?.(15);
+		}, 450);
+	}
+
+	function cancelHold() {
+		clearTimeout(holdTimer);
+	}
+
+	function deleteDigit() {
+		clearTimeout(holdTimer);
+		if (clearedByHold) {
+			clearedByHold = false;
+			return;
+		}
+		onbackspace();
+	}
+</script>
+
+<div class="keypad">
+	{#each keys as key (key)}
+		<button type="button" class="key" onclick={() => ondigit(key)}>
+			<span class="key__face">{key}</span>
+		</button>
+	{/each}
+
+	<button type="button" class="key key--aux" onclick={oncomma} aria-label="desetinná čárka">
+		<span class="key__face">,</span>
+	</button>
+
+	<button type="button" class="key" onclick={() => ondigit('0')}>
+		<span class="key__face">0</span>
+	</button>
+
+	<button
+		type="button"
+		class="key key--aux"
+		aria-label="smazat číslici, podržením smažeš vše"
+		onclick={deleteDigit}
+		onpointerdown={startHold}
+		onpointerleave={cancelHold}
+		onpointercancel={cancelHold}
+	>
+		<span class="key__face"><Icon name="backspace" size={23} /></span>
+	</button>
+</div>
+
+<style>
+	.keypad {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: var(--space-2);
+	}
+
+	/* On a short screen the gutters between the keys close before the keys do. */
+	@media (max-height: 700px) {
+		.keypad {
+			gap: var(--space-1);
+		}
+	}
+
+	/**
+	 * A key is a physical object: a slab raised out of the pad by one step of
+	 * luminance, lit along its top edge, with a contact shadow underneath.
+	 *
+	 * Pressing it moves it. The face travels a pixel, the top highlight goes
+	 * out, the shadow collapses to nothing and the surface darkens — the four
+	 * things that happen when you push a real key into its housing. Ninety
+	 * milliseconds, because a key that takes longer than that feels broken.
+	 */
+	.key {
+		display: grid;
+		place-items: center;
+		/**
+		 * `dvh`, so a key sizes against the glass that is actually visible rather
+		 * than against a viewport with the address bar counted in twice.
+		 *
+		 * The floor is `--touch` and the floor is the point. Everything else on
+		 * this screen has been drawn down to 32 px and given its 44 px back with
+		 * a hit area; a key is the one control you aim at forty times a day, so
+		 * it is drawn at the size it is hit at. The slack came out of the ramp
+		 * instead — 6.4dvh lands a 640 px phone exactly on 44 rather than 47.
+		 */
+		min-height: clamp(var(--touch), 6.4dvh, 56px);
+		border-radius: var(--radius);
+		background: var(--surface-2);
+		color: var(--ink);
+		user-select: none;
+		box-shadow:
+			var(--edge),
+			0 1px 2px rgb(0 0 0 / 12%);
+		transition:
+			background var(--dur-press) var(--ease-out),
+			box-shadow var(--dur-press) var(--ease-out),
+			transform var(--dur-press) var(--ease-out);
+	}
+
+	.key__face {
+		display: grid;
+		place-items: center;
+		font-family: var(--font-mono);
+		font-size: var(--text-xl);
+		font-weight: 400;
+		line-height: 1;
+		letter-spacing: 0;
+		transition: transform var(--dur-press) var(--ease-out);
+	}
+
+	.key:active {
+		background: var(--surface-3);
+		box-shadow: inset 0 1px 3px rgb(0 0 0 / 22%);
+		transform: translateY(1px);
+	}
+
+	.key:active .key__face {
+		transform: scale(0.94);
+	}
+
+	/* Auxiliary keys keep the target and the geometry, and give up the material:
+	   the pad has ten digits on it, not twelve. */
+	.key--aux {
+		background: transparent;
+		color: var(--ink-3);
+		box-shadow: none;
+	}
+
+	.key--aux:active {
+		background: var(--surface-2);
+		box-shadow: inset 0 1px 3px rgb(0 0 0 / 18%);
+	}
+
+	@media (hover: hover) {
+		.key:hover {
+			background: var(--surface-3);
+		}
+
+		.key--aux:hover {
+			background: var(--surface-2);
+			color: var(--ink-2);
+		}
+	}
+</style>

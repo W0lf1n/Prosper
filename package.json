@@ -1,0 +1,14 @@
+{
+	"name": "finance",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "pnpm --filter web dev",
+		"build": "pnpm --filter web build",
+		"preview": "pnpm --filter web preview",
+		"test": "pnpm --filter web test",
+		"check": "pnpm --filter web check",
+		"lint": "pnpm --filter web lint",
+		"format": "pnpm --filter web format"
+	}
+}

@@ -1,0 +1,22 @@
+{
+	"name": "Výdaje — osobní finance",
+	"short_name": "Výdaje",
+	"description": "Zápis výdaje do pěti vteřin. Funguje offline.",
+	"lang": "cs",
+	"dir": "ltr",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#0A0C0D",
+	"theme_color": "#0A0C0D",
+	"categories": ["finance", "productivity"],
+	"icons": [
+		{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	],
+	"shortcuts": [
+		{ "name": "Výpis", "short_name": "Výpis", "url": "/tape" }
+	]
+}

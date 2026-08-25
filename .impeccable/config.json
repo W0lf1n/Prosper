@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "apps/web/src/lib/ui/GoalStrip.svelte"
+        ],
+        "createdAt": "2026-08-24T18:34:19.569Z",
+        "reason": "user confirmed: pill-shaped meter must animate width, not scaleX (scaleX squashes the end-cap radius into an ellipse); animates once on data load. Note: layout-transition has no extractable ignore value, so only a file-scoped wildcard suppresses it."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "apps/web/src/lib/ui/MonthTotals.svelte"
+        ],
+        "createdAt": "2026-08-24T18:34:19.629Z",
+        "reason": "user confirmed: pill-shaped meter must animate width, not scaleX (scaleX squashes the end-cap radius into an ellipse); animates once on data load. Note: layout-transition has no extractable ignore value, so only a file-scoped wildcard suppresses it."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "apps/web/src/routes/mesic/+page.svelte"
+        ],
+        "createdAt": "2026-08-24T18:36:10.660Z",
+        "reason": "user confirmed: pill-shaped meter must animate width, not scaleX (scaleX squashes the end-cap radius into an ellipse); animates once on data load. layout-transition exposes no extractable value, so only a file-scoped wildcard suppresses it."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "apps/web/src/routes/cil/+page.svelte"
+        ],
+        "createdAt": "2026-08-24T18:36:10.725Z",
+        "reason": "user confirmed: pill-shaped meter must animate width, not scaleX (scaleX squashes the end-cap radius into an ellipse); animates once on data load. layout-transition exposes no extractable value, so only a file-scoped wildcard suppresses it."
+      }
+    ]
+  }
+}

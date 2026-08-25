@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="cs">
+	<head>
+		<meta charset="utf-8" />
+		<!--
+			`viewport-fit=cover` is what makes `env(safe-area-inset-*)` resolve to
+			anything but zero: without it the page is letterboxed inside the notch
+			rather than painting under it, and every inset in the stylesheets is 0px.
+
+			No `maximum-scale`. Double-tap zoom is already off — `touch-action:
+			manipulation` handles that — and capping the scale takes pinch-to-zoom
+			with it, which is the one thing a person who cannot read an 11 px label
+			has left.
+		-->
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="color-scheme" content="light dark" />
+		<meta name="theme-color" content="#EEEFEC" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#0A0C0D" media="(prefers-color-scheme: dark)" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Výdaje" />
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<link rel="icon" href="%sveltekit.assets%/icon.svg" type="image/svg+xml" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-180.png" />
+		<script>
+			// Applied before first paint so a dark-mode launch never flashes paper white.
+			try {
+				var t = localStorage.getItem('theme');
+				if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+			} catch (e) {
+				/* private mode: fall back to the system preference */
+			}
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="tap">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
