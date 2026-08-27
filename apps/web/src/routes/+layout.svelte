@@ -3,8 +3,22 @@
 	import Scenery from '$lib/ui/Scenery.svelte';
 	import Toaster from '$lib/ui/Toaster.svelte';
 	import { shell } from '$lib/ui/shell.svelte';
+	import { initSync, watchTriggers } from '$lib/sync/status.svelte';
 
 	let { children } = $props();
+
+	/**
+	 * Sync takes up position once, here, and then gets on with it in the
+	 * background (§10.6 — it never blocks the UI).
+	 *
+	 * `initSync` is a no-op on a device that has never been paired, which is
+	 * every device until somebody opens Settings and types a code. The triggers
+	 * are the §10.7 set: foreground, and connectivity regained.
+	 */
+	$effect(() => {
+		void initSync();
+		return watchTriggers();
+	});
 
 	/* Only written when a route has measured its own floor; otherwise the
 	   cascade in `app.css` keeps the say. */

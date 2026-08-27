@@ -1,5 +1,29 @@
 node_modules/
+
+# Build output
+build/
+.svelte-kit/
+
+# .NET
+bin/
+obj/
+*.user
+*.db
+*.db-shm
+*.db-wal
+
+# Editors and local tooling
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.playwright/
+.impeccable/hook.cache.json
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Env
 .env
 .env.*
 !.env.example

@@ -12,6 +12,7 @@ import { validateGoal, validateGoalShape } from '$lib/domain/goals';
 import { DEFAULT_REMINDER_DAYS } from '$lib/domain/holdings';
 import { dueSchedules, partitionByMode, type DueItem } from '$lib/domain/recurring';
 import { newDeviceId, uuidv7 } from '$lib/domain/ids';
+import { ADJUSTMENT_PAYEE, reconcileDelta } from '$lib/domain/reconcile';
 import { ZERO, abs, neg, type Minor } from '$lib/domain/money';
 import type {
 	Account,
@@ -20,21 +21,39 @@ import type {
 	Goal,
 	Holding,
 	MonthTarget,
+	Reconciliation,
 	Schedule,
 	SyncedEntity,
 	Txn,
 	TxnSource,
 	Valuation
 } from '$lib/domain/types';
+import { normalize } from '$lib/domain/vocabulary';
 import { db } from './schema';
 import { seedCategories } from './seed';
-
-/** Flipped on in P2, together with the sync engine. Until then nothing drains. */
-const SYNC_ENABLED = false;
 
 const META_DEVICE_ID = 'deviceId';
 const META_ACTIVE_ACCOUNT = 'activeAccountId';
 const META_LAST_SEEN = 'lastSeenDate';
+const META_SYNC_BASE_URL = 'syncBaseUrl';
+
+/**
+ * Whether mutations are queued for the server.
+ *
+ * Was a `const false` until P2 existed. It is now "has this device ever been
+ * paired", cached because `enqueue` is on the path of every single write and a
+ * meta read per mutation would be a database round trip for a question whose
+ * answer changes twice in the app's life.
+ *
+ * `null` means not yet asked. `refreshSyncEnabled()` is called by the sync
+ * layer whenever pairing changes.
+ */
+let syncEnabled: boolean | null = null;
+
+export async function refreshSyncEnabled(): Promise<boolean> {
+	syncEnabled = (await getMeta<string>(META_SYNC_BASE_URL)) != null;
+	return syncEnabled;
+}
 
 // ── meta ────────────────────────────────────────────────────────────────────
 
@@ -72,7 +91,8 @@ export async function setActiveAccountId(id: string): Promise<void> {
 // ── outbox seam ─────────────────────────────────────────────────────────────
 
 async function enqueue(entity: SyncedEntity, entityId: string, payload: unknown): Promise<void> {
-	if (!SYNC_ENABLED) return;
+	if (syncEnabled === null) await refreshSyncEnabled();
+	if (!syncEnabled) return;
 	await db().outbox.add({
 		entity,
 		entityId,
@@ -281,7 +301,7 @@ export async function settleReceivable(txnId: string, date?: string): Promise<Tx
 		date: date ?? today(),
 		categoryId: original.categoryId,
 		payee: original.owedBy ? `vrácení — ${original.owedBy}` : 'vrácení',
-		note: `k výdaji „${original.payee || 'bez popisu'}"`
+		note: `k výdaji „${original.payee || 'bez popisu'}“`
 	});
 
 	const next: Txn = { ...original, settledByTxnId: repayment.id, ...(await stamp()) };
@@ -526,7 +546,8 @@ export async function catchUpSchedules(accountId: string | null): Promise<CatchU
 // ── holdings ─────────────────────────────────────────────────────
 
 export async function createHolding(
-	input: Pick<Holding, 'name' | 'kind'> & Partial<Pick<Holding, 'categoryId' | 'reminderDays'>>
+	input: Pick<Holding, 'name' | 'kind'> &
+		Partial<Pick<Holding, 'categoryId' | 'reminderDays' | 'startDate'>>
 ): Promise<Holding> {
 	const database = db();
 	const { updatedAt, deviceId } = await stamp();
@@ -536,6 +557,9 @@ export async function createHolding(
 		kind: input.kind,
 		currency: 'CZK',
 		categoryId: input.categoryId ?? null,
+		// The first of the month it was written — the same rule as `Goal.startDate`
+		// (Q27), so a new holding never opens already funded by an existing pot.
+		startDate: input.startDate ?? startOfMonth(today()),
 		reminderDays: input.reminderDays ?? DEFAULT_REMINDER_DAYS,
 		isArchived: false,
 		sortOrder: await database.holdings.count(),
@@ -551,7 +575,10 @@ export async function createHolding(
 export async function updateHolding(
 	id: string,
 	patch: Partial<
-		Pick<Holding, 'name' | 'kind' | 'categoryId' | 'reminderDays' | 'sortOrder' | 'isArchived'>
+		Pick<
+			Holding,
+			'name' | 'kind' | 'categoryId' | 'reminderDays' | 'startDate' | 'sortOrder' | 'isArchived'
+		>
 	>
 ): Promise<void> {
 	const database = db();
@@ -610,6 +637,98 @@ export async function deleteValuation(id: string): Promise<void> {
 	const next: Valuation = { ...existing, isDeleted: true, ...(await stamp()) };
 	await database.valuations.put(next);
 	await enqueue('valuation', next.id, next);
+}
+
+// ── reconciliation ──────────────────────────────────────────────────────────
+
+export interface ReconcileInput {
+	accountId: string;
+	/** What the bank says. Positive or negative, as the statement reads. */
+	statementBalance: Minor;
+	/** What the ledger says at that moment — captured by the caller, before this. */
+	computedBalance: Minor;
+	date?: string;
+	/**
+	 * Write a row to close the gap. False records the disagreement and leaves the
+	 * ledger alone, which is the right answer when the difference is a payment
+	 * that has not cleared yet.
+	 */
+	adjust: boolean;
+	/** Where the adjustment lands. Required when `adjust` is true. */
+	categoryId?: string | null;
+}
+
+export interface ReconcileResult {
+	reconciliation: Reconciliation;
+	adjustment: Txn | null;
+}
+
+/**
+ * Check the ledger against a statement, and optionally record what is missing.
+ *
+ * **A delta is not an error, it is a missing transaction.** The bank is right
+ * about the balance and the ledger is right about the reasons, so the fix is to
+ * write the difference in as an ordinary row rather than to overwrite the
+ * balance — which would hide the very gap this exercise exists to find.
+ *
+ * The adjustment is **one-off by construction**: a correction is not the running
+ * cost of a month, and letting it into the average would damage the number this
+ * is meant to protect.
+ *
+ * `computedBalance` is passed in rather than derived here. It has to be captured
+ * *before* the adjustment is written — a balance read afterwards includes the
+ * row that was just added, and the reconciliation would record a delta of zero
+ * against a figure that never existed.
+ */
+export async function reconcileAccount(input: ReconcileInput): Promise<ReconcileResult> {
+	const database = db();
+	const date = input.date ?? today();
+	const delta = reconcileDelta({
+		computed: input.computedBalance,
+		statement: input.statementBalance
+	});
+
+	let adjustment: Txn | null = null;
+	if (input.adjust && delta.adjustment !== ZERO) {
+		adjustment = await createTxn({
+			accountId: input.accountId,
+			amount: delta.adjustment,
+			date,
+			categoryId: input.categoryId ?? null,
+			payee: ADJUSTMENT_PAYEE,
+			source: 'adjustment',
+			isOneOff: true
+		});
+	}
+
+	const { updatedAt, deviceId } = await stamp();
+	const reconciliation: Reconciliation = {
+		id: uuidv7(),
+		accountId: input.accountId,
+		date,
+		statementBalance: input.statementBalance,
+		computedBalance: input.computedBalance,
+		adjustmentTxnId: adjustment?.id ?? null,
+		updatedAt,
+		deviceId,
+		isDeleted: false
+	};
+
+	await database.reconciliations.put(reconciliation);
+	await enqueue('reconciliation', reconciliation.id, reconciliation);
+
+	return { reconciliation, adjustment };
+}
+
+/** Soft, like everything else. The adjustment row is left alone — it is real. */
+export async function deleteReconciliation(id: string): Promise<void> {
+	const database = db();
+	const existing = await database.reconciliations.get(id);
+	if (!existing || existing.isDeleted) return;
+
+	const next: Reconciliation = { ...existing, isDeleted: true, ...(await stamp()) };
+	await database.reconciliations.put(next);
+	await enqueue('reconciliation', next.id, next);
 }
 
 // ── day marks ───────────────────────────────────────────────────────────────
@@ -794,7 +913,140 @@ export async function contributeToGoal(input: {
 	});
 }
 
+// ── first pair ──────────────────────────────────────────────────────────────
+
+/**
+ * Put every existing row in the outbox, once.
+ *
+ * A device that has been recording for weeks has an empty outbox — nothing was
+ * queued, because nothing was paired. Without this the server would learn only
+ * about rows written *after* pairing, and the second device would sync down a
+ * ledger that starts on a Tuesday in October.
+ *
+ * Idempotent by way of being a no-op the second time: it refuses to run if the
+ * outbox already holds anything, and pairing writes the base URL before calling
+ * it, so `enqueue` is live by then and ordinary writes are not lost either.
+ */
+export async function seedOutbox(): Promise<number> {
+	const database = db();
+	if ((await database.outbox.count()) > 0) return 0;
+
+	const queue = async (entity: SyncedEntity, rows: { id: string }[]) => {
+		for (const row of rows) await enqueue(entity, row.id, row);
+	};
+
+	await queue('account', await database.accounts.toArray());
+	await queue('category', await database.categories.toArray());
+	await queue('txn', await database.txns.toArray());
+	await queue('goal', await database.goals.toArray());
+	await queue('monthTarget', await database.monthTargets.toArray());
+	await queue('holding', await database.holdings.toArray());
+	await queue('valuation', await database.valuations.toArray());
+	await queue('schedule', await database.schedules.toArray());
+	await queue('reconciliation', await database.reconciliations.toArray());
+
+	// Day marks are keyed by their date rather than an id.
+	for (const mark of await database.dayMarks.toArray()) {
+		await enqueue('dayMark', mark.date, mark);
+	}
+
+	return database.outbox.count();
+}
+
+/**
+ * Join a ledger that already exists somewhere else.
+ *
+ * Every device seeds itself on first launch — one account, the starter
+ * categories — because until it is paired it is the only device there is. Pair
+ * two of them and the ledger has two accounts and two of every bucket, and each
+ * device shows an empty tape while holding the other's rows: they belong to an
+ * account it is not looking at.
+ *
+ * So a device gives up a seed it has never written into. The test is not "is
+ * this database empty" — by the time this runs the pull has already landed the
+ * *other* device's rows, and counting those would make every device look busy.
+ * It is narrower and it is the right question: **does an account this device
+ * created still have no transactions of its own?** If so it is a seed nobody
+ * used, and the older account is the real one.
+ *
+ * A device that has recorded something keeps its account, and two accounts then
+ * stand — which is a genuine question for a human rather than something to
+ * guess at.
+ *
+ * Soft-deleted like everything else (rule 2), and the tombstones sync.
+ *
+ * Returns the account now active, or null if nothing changed.
+ */
+export async function adoptRemoteLedger(): Promise<string | null> {
+	const database = db();
+
+	const accounts = (await database.accounts.toArray()).filter((a) => !a.isDeleted);
+	if (accounts.length < 2) return null;
+
+	const deviceId = await getDeviceId();
+	const txns = (await database.txns.toArray()).filter((t) => !t.isDeleted);
+	const used = new Set(txns.map((t) => t.accountId));
+
+	// Mine, and never written into. Anything else is somebody's real ledger.
+	const redundant = accounts.filter((a) => a.deviceId === deviceId && !used.has(a.id));
+	if (redundant.length === 0 || redundant.length === accounts.length) return null;
+
+	// UUIDv7 is time-sortable, so the smallest id is the account that existed
+	// first — the one the other device has been writing into all along.
+	const keep = [...accounts]
+		.filter((a) => !redundant.includes(a))
+		.sort((a, b) => a.id.localeCompare(b.id))[0]!;
+
+	const stamped = await stamp();
+	for (const account of redundant) {
+		const next: Account = { ...account, isDeleted: true, ...stamped };
+		await database.accounts.put(next);
+		await enqueue('account', next.id, next);
+	}
+
+	// The starter categories duplicated too. Drop this device's unused copies of
+	// any bucket name that also arrived from elsewhere; keep anything genuinely
+	// new, and keep anything a transaction already points at.
+	const categories = (await database.categories.toArray()).filter((c) => !c.isDeleted);
+	const referenced = new Set(
+		txns.map((t) => t.categoryId).filter((id): id is string => id !== null)
+	);
+
+	const byName = new Map<string, Category[]>();
+	for (const category of categories) {
+		const key = normalize(category.name);
+		byName.set(key, [...(byName.get(key) ?? []), category]);
+	}
+
+	for (const group of byName.values()) {
+		if (group.length < 2) continue;
+		const oldest = [...group].sort((a, b) => a.id.localeCompare(b.id))[0]!;
+		for (const category of group) {
+			if (category.id === oldest.id) continue;
+			if (category.deviceId !== deviceId) continue;
+			if (referenced.has(category.id)) continue;
+
+			const next: Category = { ...category, isDeleted: true, ...stamped };
+			await database.categories.put(next);
+			await enqueue('category', next.id, next);
+		}
+	}
+
+	await setActiveAccountId(keep.id);
+	return keep.id;
+}
+
 // ── backup ──────────────────────────────────────────────────────────────────
+
+/**
+ * The backup format's own version, independent of the Dexie schema version.
+ *
+ * It moves whenever a table is added to the file, because that is exactly the
+ * change an older build cannot represent:
+ *   1 → the original six tables · 2 → monthTargets · 3 → holdings, valuations
+ *   4 → schedules · 5 → reconciliations
+ */
+export const BACKUP_VERSION = 5;
 
 export interface Backup {
 	format: 'finance-backup';
@@ -809,17 +1061,22 @@ export interface Backup {
 	holdings: Holding[];
 	valuations: Valuation[];
 	schedules: Schedule[];
+	reconciliations: Reconciliation[];
 }
 
 /**
  * Until sync exists, this file is the only copy of the ledger that survives a
  * cleared browser profile. Settings nags about it for a reason.
+ *
+ * Every table that holds user data goes in, including ones nothing writes yet:
+ * a backup that silently omits a table is a backup that loses it the moment the
+ * feature behind that table ships.
  */
 export async function exportBackup(): Promise<Backup> {
 	const database = db();
 	return {
 		format: 'finance-backup',
-		version: 4,
+		version: BACKUP_VERSION,
 		exportedAt: nowIso(),
 		accounts: await database.accounts.toArray(),
 		categories: await database.categories.toArray(),
@@ -829,7 +1086,8 @@ export async function exportBackup(): Promise<Backup> {
 		monthTargets: await database.monthTargets.toArray(),
 		holdings: await database.holdings.toArray(),
 		valuations: await database.valuations.toArray(),
-		schedules: await database.schedules.toArray()
+		schedules: await database.schedules.toArray(),
+		reconciliations: await database.reconciliations.toArray()
 	};
 }
 
@@ -839,14 +1097,36 @@ export interface ImportResult {
 	txns: number;
 }
 
-/** Merge a backup in. Same last-write-wins rule the sync layer will use. */
+/**
+ * Merge a backup in. Same last-write-wins rule the sync layer will use.
+ *
+ * A backup written by a *newer* build is refused rather than merged. Merging it
+ * would drop every table this build does not know about — and then the next
+ * export would write the truncated version back out, so the refusal is what
+ * stops one stale device from quietly eating the tables it cannot see.
+ *
+ * An *older* backup is fine: a table it does not carry is a table that was
+ * empty when it was written.
+ */
 export async function importBackup(backup: Backup): Promise<ImportResult> {
 	if (backup?.format !== 'finance-backup') {
 		throw new Error('Tohle není záloha téhle aplikace.');
 	}
+
+	const version = backup.version;
+	if (typeof version !== 'number' || !Number.isFinite(version)) {
+		throw new Error('Záloha neuvádí svou verzi — načíst ji bezpečně nejde.');
+	}
+	if (version > BACKUP_VERSION) {
+		throw new Error(
+			`Záloha je z novější verze aplikace (${version} > ${BACKUP_VERSION}). ` +
+				'Aktualizuj aplikaci a zkus to znovu.'
+		);
+	}
+
 	const database = db();
 
-	// Nine tables: past five, Dexie wants the array form rather than varargs.
+	// Ten tables: past five, Dexie wants the array form rather than varargs.
 	await database.transaction(
 		'rw',
 		[
@@ -858,7 +1138,8 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 			database.monthTargets,
 			database.holdings,
 			database.valuations,
-			database.schedules
+			database.schedules,
+			database.reconciliations
 		],
 		async () => {
 			await mergeRows(
@@ -900,6 +1181,11 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 				backup.schedules ?? [],
 				(id) => database.schedules.get(id),
 				(row) => database.schedules.put(row)
+			);
+			await mergeRows(
+				backup.reconciliations ?? [],
+				(id) => database.reconciliations.get(id),
+				(row) => database.reconciliations.put(row)
 			);
 			for (const mark of backup.dayMarks ?? []) await database.dayMarks.put(mark);
 		}

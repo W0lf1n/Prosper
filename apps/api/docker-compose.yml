@@ -1,0 +1,36 @@
+# The P2 deployment, as PROJECT-PLAN §5 describes it: Caddy in front, the API,
+# Postgres behind. Caddy is not here because it belongs to the host rather than
+# to this app — put the API behind whatever already terminates TLS.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: prosper
+      POSTGRES_USER: prosper
+      # Set POSTGRES_PASSWORD in a .env file beside this one. There is no
+      # default on purpose: a default password is one nobody changes.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U prosper']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Postgres: Host=db;Port=5432;Database=prosper;Username=prosper;Password=${POSTGRES_PASSWORD}
+      # The code a device types once. No default — see above.
+      Pairing__Code: ${PAIRING_CODE:?set PAIRING_CODE in .env}
+    ports:
+      - '127.0.0.1:8080:8080'
+
+volumes:
+  pgdata:

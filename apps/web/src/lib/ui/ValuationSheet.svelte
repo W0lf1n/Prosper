@@ -145,7 +145,7 @@
 			-->
 			{#if confirmingArchive}
 				<div class="archive">
-					<p class="archive__ask">Schovat „{reading.holding.name}"? Zápisy zůstanou.</p>
+					<p class="archive__ask">Schovat „{reading.holding.name}“? Zápisy zůstanou.</p>
 					<div class="archive__actions">
 						<button type="button" class="btn" onclick={() => (confirmingArchive = false)}>
 							Zpět

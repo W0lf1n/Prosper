@@ -2,11 +2,16 @@
 	import { liveQuery } from 'dexie';
 	import { resolve } from '$app/paths';
 	import { db } from '$lib/db/schema';
-	import { settleReceivable, unsettleReceivable } from '$lib/db/repo';
+	import { settleReceivable, unsettleReceivable, updateTxn } from '$lib/db/repo';
 	import { summariseMonth } from '$lib/domain/checks';
 	import { formatMonthHeading, monthKey, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, type Minor } from '$lib/domain/money';
 	import { openReceivables, totalOwed } from '$lib/domain/receivables';
+	import { readHoldings, staleValuationFindings } from '$lib/domain/holdings';
+	import { categoryTrends, TREND_WINDOW, type CategoryTrend } from '$lib/domain/trends';
+	import { currentStreak, monthCoverage } from '$lib/domain/coverage';
+	import { refileCandidates } from '$lib/domain/refile';
+	import { DAYS, plural } from '$lib/domain/czech';
 	import { goalStatus, paceText, pickPrimary } from '$lib/domain/goals';
 	import {
 		CLASS_NOTE,
@@ -15,11 +20,20 @@
 		verdict,
 		type ProsperityClass
 	} from '$lib/domain/prosperity';
-	import type { Category, Goal, MonthTarget, Txn } from '$lib/domain/types';
+	import type {
+		Category,
+		DayMark,
+		Goal,
+		Holding,
+		MonthTarget,
+		Txn,
+		Valuation
+	} from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Doughnut, { type Segment } from '$lib/ui/Doughnut.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
+	import RefileSheet from '$lib/ui/RefileSheet.svelte';
 	import MonthTotals from '$lib/ui/MonthTotals.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
@@ -41,6 +55,9 @@
 	const monthTargets = liveQuery(async () =>
 		(await db().monthTargets.toArray()).filter((t: MonthTarget) => !t.isDeleted)
 	);
+	const holdings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
+	const valuations = liveQuery(() => db().valuations.toArray());
+	const dayMarks = liveQuery(() => db().dayMarks.toArray());
 
 	/**
 	 * Subscribed by hand rather than through the `$txns` auto-subscription.
@@ -68,8 +85,115 @@
 			month,
 			txns: rows,
 			categories: ($categories ?? []) as Category[],
+			marks: ($dayMarks ?? []) as DayMark[],
 			today: today()
 		})
+	);
+
+	/**
+	 * The Tracking law reporting on itself (`TRIMMING-AND-TRAINING.md` R1).
+	 *
+	 * Against days **elapsed**, never days in the month — otherwise the 3rd reads
+	 * as a 90 % failure. A day counts if it has a row *or* an explicit mark,
+	 * which is the whole reason `DayMark` exists.
+	 */
+	const coverage = $derived(
+		monthCoverage({
+			month,
+			txns: rows,
+			marks: ($dayMarks ?? []) as DayMark[],
+			today: today()
+		})
+	);
+
+	/** Only meaningful for the month you are actually in. */
+	const streak = $derived(
+		month === monthKey(today())
+			? currentStreak({ txns: rows, marks: ($dayMarks ?? []) as DayMark[], today: today() })
+			: null
+	);
+
+	// ── draining a bucket (T4) ──────────────────────────────────────────────
+	//
+	// `other-overflow` has been able to state the problem since P1 and do nothing
+	// about it. This is the doing.
+	let draining = $state<string | null>(null);
+
+	const drainBucket = $derived(
+		draining ? ((($categories ?? []) as Category[]).find((c) => c.id === draining) ?? null) : null
+	);
+
+	/**
+	 * Re-derived from `rows`, so the sheet's list shrinks as each row is moved.
+	 * Watching the bucket empty is the whole reward this offers.
+	 */
+	const drainCandidates = $derived(
+		draining
+			? refileCandidates({
+					txns: rows,
+					categories: ($categories ?? []) as Category[],
+					month,
+					categoryId: draining
+				})
+			: []
+	);
+
+	async function refile(txnId: string, categoryId: string) {
+		await updateTxn(txnId, { categoryId });
+		navigator.vibrate?.(10);
+	}
+
+	function streakLine(days: number, includesToday: boolean): string {
+		if (days === 0) return 'Série přetržená. Zítra se dá začít znovu.';
+		const counted = `${days} ${plural(days, DAYS)} v řadě`;
+		return includesToday ? `${counted}.` : `${counted} — dnešek zatím chybí.`;
+	}
+
+	/**
+	 * The month's findings, plus anything the holdings have to say.
+	 *
+	 * Concatenated here rather than inside `summariseMonth`, and that is not a
+	 * detail: `summariseMonth` must stay unable to see a holding, or a valuation
+	 * could reach income and the 10/10/10/70 split becomes fiction
+	 * (`INVESTMENTS.md` §1). A stale reading is a fact about a *statement nobody
+	 * opened*, not about the ledger — so it is raised beside the month's
+	 * findings, never from inside them.
+	 *
+	 * Only on the current month: a stale valuation is a thing to do now, and
+	 * telling somebody in August that a reading was old in May is noise.
+	 */
+	const staleFindings = $derived(
+		month === monthKey(today())
+			? staleValuationFindings(
+					readHoldings({
+						holdings: ($holdings ?? []) as Holding[],
+						valuations: ($valuations ?? []) as Valuation[],
+						today: today()
+					})
+				)
+			: []
+	);
+
+	const findings = $derived([...summary.findings, ...staleFindings]);
+
+	/**
+	 * What each bucket usually costs, so this month has something to be read
+	 * against. Keyed by category so the ranking can look its own row up.
+	 *
+	 * `typical` is the mean of the earlier months in the window, one-offs
+	 * excluded — a front door is not what a month costs. A bucket with no
+	 * history gets no verdict rather than a confident-looking one.
+	 */
+	const trends = $derived(
+		new Map<string | null, CategoryTrend>(
+			categoryTrends({
+				month,
+				txns: rows,
+				categories: ($categories ?? []) as Category[],
+				today: today(),
+				window: TREND_WINDOW
+			}).map((trend) => [trend.categoryId, trend])
+		)
 	);
 
 	/** Months that actually contain something, newest first, plus this one. */
@@ -238,16 +362,83 @@
 		</a>
 	{/if}
 
-	{#if summary.findings.length > 0}
+	<!--
+	  Zápisy — the Tracking law's own report card (R1).
+
+	  It sits above Kontrola on purpose: coverage is a statement about whether
+	  every number further up this screen can be believed, and that belongs before
+	  the findings rather than among them.
+	-->
+	<section class="card coverage">
+		<h2 class="u-label">Zápisy</h2>
+
+		<div class="coverage__body">
+			<Doughnut
+				segments={[
+					{ value: coverage.covered, colour: 'var(--signal)', label: 'zapsáno' },
+					{ value: coverage.gaps.length, colour: 'var(--split-left)', label: 'bez zápisu' }
+				]}
+				size={104}
+				thickness={14}
+				title="Zapsané dny"
+			>
+				{#snippet centre()}
+					<span class="coverage__percent">{coverage.percent}&nbsp;%</span>
+				{/snippet}
+			</Doughnut>
+
+			<div class="coverage__facts">
+				<p class="coverage__count">
+					<strong>{coverage.covered}</strong> z {coverage.elapsed}
+					{plural(coverage.elapsed, DAYS)}
+				</p>
+
+				{#if streak}
+					<p class="coverage__streak" class:coverage__streak--risk={!streak.includesToday}>
+						{streakLine(streak.days, streak.includesToday)}
+					</p>
+				{/if}
+
+				{#if coverage.gaps.length > 0}
+					<p class="coverage__gaps">
+						{coverage.gaps.length}
+						{plural(coverage.gaps.length, DAYS)} bez zápisu. Ve výpisu se dají doplnit — nebo označit
+						jako den bez výdaje.
+					</p>
+				{:else if coverage.elapsed > 0}
+					<p class="coverage__gaps">Žádná díra. Čísla nahoře sedí na skutečnost.</p>
+				{/if}
+			</div>
+		</div>
+	</section>
+
+	{#if findings.length > 0}
 		<section class="card">
 			<h2 class="u-label">Kontrola</h2>
 			<ul class="findings">
-				{#each summary.findings as finding (finding.id)}
+				{#each findings as finding (finding.id)}
 					<li class="finding">
 						<span class="finding__dot" data-severity={finding.severity}></span>
 						<div class="finding__text">
 							<p class="finding__title">{finding.title}</p>
 							<p class="finding__detail">{finding.detail}</p>
+							<!--
+							  The only finding here that can be acted on from this screen.
+							  Everything else on the list is about rows already written, and
+							  the place to fix those is the tape.
+							-->
+							{#if finding.fix?.kind === 'value-holding'}
+								<a class="finding__fix" href={resolve('/jmeni')}>{finding.fix.label}</a>
+							{:else if finding.fix?.kind === 'drain-bucket'}
+								{@const fix = finding.fix}
+								<button
+									type="button"
+									class="finding__fix"
+									onclick={() => (draining = fix.categoryId)}
+								>
+									{fix.label}
+								</button>
+							{/if}
 						</div>
 					</li>
 				{/each}
@@ -378,6 +569,7 @@
 		{:else}
 			<ul class="buckets">
 				{#each summary.buckets as bucket (bucket.category?.id ?? 'none')}
+					{@const trend = trends.get(bucket.category?.id ?? null)}
 					<li class="bucket">
 						<div class="bucket__head">
 							<span class="bucket__name" class:bucket__name--none={!bucket.category}>
@@ -397,7 +589,23 @@
 						</div>
 						<div class="bucket__foot">
 							<span class="bucket__count">{bucket.count}×</span>
-							{#if bucket.oneOffTotal !== 0}
+
+							<!--
+							  Against its own normal, not against the other buckets. The
+							  biggest bucket is the rent every month, and saying so is worth
+							  nothing; what is worth something is that this month's JÍDLO is
+							  a third dearer than JÍDLO usually is.
+
+							  Silent when the move is small, and silent when there is no
+							  history — a percentage off one month is not a trend.
+							-->
+							{#if trend && trend.direction !== 'flat' && trend.changePercent !== null}
+								<span class="bucket__trend" data-direction={trend.direction}>
+									{trend.direction === 'up' ? '↑' : '↓'}
+									{Math.abs(trend.changePercent)} % oproti obvyklým
+									{formatMoney(trend.typical!, { sign: 'never' })}
+								</span>
+							{:else if bucket.oneOffTotal !== 0}
 								<span class="bucket__oneoff">
 									z toho 1× {formatMoney(bucket.oneOffTotal, { sign: 'never' })}
 								</span>
@@ -409,6 +617,15 @@
 		{/if}
 	</section>
 </main>
+
+<RefileSheet
+	open={draining !== null}
+	bucket={drainBucket}
+	candidates={drainCandidates}
+	categories={($categories ?? []) as Category[]}
+	onrefile={refile}
+	onclose={() => (draining = null)}
+/>
 
 <TabBar />
 
@@ -646,6 +863,66 @@
 		background: var(--danger);
 	}
 
+	/* ── coverage ─────────────────────────────────────────────────────────── */
+
+	.coverage__body {
+		display: flex;
+		align-items: center;
+		gap: var(--space-4);
+	}
+
+	/* `nowrap` is load-bearing: at 100 % the space before the sign is the only
+	   break opportunity in the hole, and without this the ring reads "100" over
+	   "%" on two lines. */
+	.coverage__percent {
+		font-family: var(--font-mono);
+		font-size: var(--text-lg);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: var(--track-tight);
+		white-space: nowrap;
+		color: var(--ink);
+	}
+
+	.coverage__facts {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.coverage__count {
+		font-size: var(--text-base);
+		color: var(--ink-2);
+	}
+
+	.coverage__count strong {
+		font-family: var(--font-mono);
+		font-size: var(--text-lg);
+		color: var(--ink);
+	}
+
+	/* The signal is earned: a streak that is alive *and* includes today. Anything
+	   else — at risk, or broken — is the flag. Never the danger colour; a missed
+	   day is a thing to notice, not an alarm. */
+	.coverage__streak {
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--signal);
+	}
+
+	.coverage__streak--risk {
+		color: var(--flag);
+	}
+
+	.coverage__gaps {
+		font-size: var(--text-xs);
+		line-height: var(--leading-base);
+		color: var(--ink-3);
+		text-wrap: pretty;
+	}
+
 	/* ── findings ────────────────────────────────────────────────────────
 	   Same vocabulary as the live checks on the entry screen: a tone dot, a
 	   title, a detail. Two screens, one grammar. */
@@ -693,6 +970,34 @@
 		color: var(--ink-2);
 		line-height: var(--leading-base);
 		text-wrap: pretty;
+	}
+
+	/* Drawn small and hit big: the ::after pushes the target back out to a thumb
+	   without the link itself taking a row's worth of height. */
+	.finding__fix {
+		position: relative;
+		display: inline-block;
+		align-self: flex-start;
+		padding: 0;
+		border: none;
+		background: none;
+		margin-block-start: var(--space-2);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		color: var(--signal);
+		text-decoration: none;
+	}
+
+	.finding__fix::after {
+		content: '';
+		position: absolute;
+		inset: calc((var(--touch) - 1lh) / -2) calc(var(--space-2) * -1);
+	}
+
+	@media (hover: hover) {
+		.finding__fix:hover {
+			text-decoration: underline;
+		}
 	}
 
 	.ok {
@@ -974,6 +1279,19 @@
 	.bucket__oneoff {
 		font-size: var(--text-xs);
 		color: var(--ink-3);
+	}
+
+	/* Amber for dearer than usual, and the ink for cheaper — never the signal
+	   green. Spending less is not an achievement the app gets to celebrate; it
+	   is a fact, and the flag colour is reserved for "look at this". */
+	.bucket__trend {
+		font-size: var(--text-xs);
+		font-variant-numeric: tabular-nums;
+		color: var(--ink-3);
+	}
+
+	.bucket__trend[data-direction='up'] {
+		color: var(--flag);
 	}
 
 	.empty {

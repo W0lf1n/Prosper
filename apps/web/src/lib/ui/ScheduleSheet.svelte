@@ -208,7 +208,7 @@
 		{#if onarchive}
 			{#if confirmingArchive}
 				<div class="archive">
-					<p class="archive__ask">Zrušit „{schedule?.payee}"? Zapsané platby zůstanou.</p>
+					<p class="archive__ask">Zrušit „{schedule?.payee}“? Zapsané platby zůstanou.</p>
 					<div class="archive__actions">
 						<button type="button" class="btn" onclick={() => (confirmingArchive = false)}>
 							Zpět

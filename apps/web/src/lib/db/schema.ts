@@ -121,6 +121,44 @@ export const migrations: Migration[] = [
 					if (row.scheduleId === undefined) row.scheduleId = null;
 				});
 		}
+	},
+	{
+		/**
+		 * `Holding.startDate` — the day a holding starts counting contributions.
+		 *
+		 * No index changes, so `holdings` is not restated. The backfill is the
+		 * interesting part: an existing holding has no record of when it was
+		 * written, and deriving it from the UUIDv7 timestamp is the trap Q27
+		 * already refused — the id would silently become a business-meaningful
+		 * field.
+		 *
+		 * So it is backfilled from the evidence that does exist: the first of the
+		 * month of the holding's **earliest reading**, falling back to the first
+		 * of the current month for one that has never been valued. Both are
+		 * guesses, both are conservative — they never claim a contribution the
+		 * holding might not have received — and both are one field away from
+		 * being corrected in Settings.
+		 */
+		version: 6,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			const valuations = await tx.table('valuations').toArray();
+			const earliest = new Map<string, string>();
+			for (const row of valuations) {
+				const current = earliest.get(row.holdingId);
+				if (current === undefined || row.date < current) earliest.set(row.holdingId, row.date);
+			}
+
+			const fallback = `${new Date().toISOString().slice(0, 7)}-01`;
+			await tx
+				.table('holdings')
+				.toCollection()
+				.modify((row: { id: string; startDate?: string }) => {
+					if (row.startDate !== undefined) return;
+					const seen = earliest.get(row.id);
+					row.startDate = seen ? `${seen.slice(0, 7)}-01` : fallback;
+				});
+		}
 	}
 ];
 

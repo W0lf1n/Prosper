@@ -213,7 +213,7 @@
 	async function removeGoal(goal: Goal) {
 		await deleteGoal(goal.id);
 		if (selectedId === goal.id) selectedId = null;
-		toast.show(`„${goal.name}" smazán`);
+		toast.show(`„${goal.name}“ smazán`);
 	}
 
 	// ── this month's number ─────────────────────────────────────────────────
@@ -309,7 +309,7 @@
 				dál: <strong>proč</strong>, <strong>kolik</strong> a <strong>do kdy</strong>.
 			</p>
 			<p class="hint prose">
-				Nejtěžší je to „proč". Vezmi si na to chvilku — je to jediná část cíle, která přežije první
+				Nejtěžší je to „proč“. Vezmi si na to chvilku — je to jediná část cíle, která přežije první
 				špatný měsíc.
 			</p>
 			<button type="button" class="btn btn--primary btn--block" onclick={openNew}>
@@ -633,7 +633,7 @@
 			{:else}
 				<p class="hint prose">
 					Nemáš žádnou spořicí kategorii. Založ ji v
-					<a href={resolve('/settings')}>nastavení</a> a nastav jí typ „spoření".
+					<a href={resolve('/settings')}>nastavení</a> a nastav jí typ „spoření“.
 				</p>
 			{/if}
 		</div>

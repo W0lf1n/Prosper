@@ -3,24 +3,34 @@
 	import { db, SCHEMA_VERSION } from '$lib/db/schema';
 	import {
 		archiveCategory,
+		archiveHolding,
 		archiveSchedule,
 		createCategory,
+		createHolding,
 		createSchedule,
 		exportBackup,
 		importBackup,
 		updateAccount,
 		updateCategory,
+		updateHolding,
 		updateSchedule,
 		type Backup
 	} from '$lib/db/repo';
 	import { formatMoney, parseAmount, type Minor } from '$lib/domain/money';
-	import { today } from '$lib/domain/datetime';
+	import { formatShortDate, today } from '$lib/domain/datetime';
 	import { MODE_LABEL, recurringCost, remainingPayments } from '$lib/domain/recurring';
-	import { PAYMENTS, counted } from '$lib/domain/czech';
-	import type { Category, Schedule, SpendType } from '$lib/domain/types';
+	import { summariseMonth } from '$lib/domain/checks';
+	import { DAYS, PAYMENTS, RECORDS, counted } from '$lib/domain/czech';
+	import { KIND_LABEL } from '$lib/domain/holdings';
+	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
+	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
+	import type { Category, Holding, Schedule, SpendType } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
+	import { pair, unpair } from '$lib/sync/pair';
+	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
+	import HoldingSheet, { type HoldingInput } from '$lib/ui/HoldingSheet.svelte';
 	import ScheduleSheet from '$lib/ui/ScheduleSheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
@@ -66,12 +76,49 @@
 		toast.show(editing ? 'Uloženo' : 'Pravidelná platba přidána');
 	}
 
+	// ── holdings ────────────────────────────────────────────────────────────
+	//
+	// `/jmeni` adds a holding and records values against it. Everything about the
+	// holding *itself* — its name, its cadence, which bucket feeds it — belongs
+	// here, next to the categories it points at, and until this existed a typo in
+	// a holding's name was permanent.
+	const holdings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
+
+	const liveHoldings = $derived(
+		(($holdings ?? []) as Holding[]).filter((h) => !h.isDeleted && !h.isArchived)
+	);
+
+	/** Buckets a holding may be fed from. An income category funds nothing. */
+	const fundingCategories = $derived(pickable.filter((c) => !c.isIncome));
+
+	let editingHolding = $state<Holding | null>(null);
+	let holdingSheetOpen = $state(false);
+
+	function openHolding(holding: Holding | null) {
+		editingHolding = holding;
+		holdingSheetOpen = true;
+	}
+
+	async function saveHolding(input: HoldingInput) {
+		if (editingHolding) await updateHolding(editingHolding.id, input);
+		else await createHolding(input);
+		holdingSheetOpen = false;
+	}
+
+	async function removeHolding() {
+		if (!editingHolding) return;
+		const name = editingHolding.name;
+		await archiveHolding(editingHolding.id);
+		holdingSheetOpen = false;
+		toast.show(`„${name}“ schováno`);
+	}
+
 	async function removeSchedule() {
 		if (!editing) return;
 		const name = editing.payee;
 		await archiveSchedule(editing.id);
 		sheetOpen = false;
-		toast.show(`„${name}" zrušeno`);
+		toast.show(`„${name}“ zrušeno`);
 	}
 
 	function categoryName(id: string): string {
@@ -151,6 +198,136 @@
 		URL.revokeObjectURL(url);
 	}
 
+	/**
+	 * The ledger as a spreadsheet — `PROJECT-PLAN.md` P5.
+	 *
+	 * The JSON backup above is for restoring the app; this is for reading the
+	 * data somewhere else, which is a different job and deserves a different
+	 * file. It is one-way on purpose: a spreadsheet edited by hand and imported
+	 * back is precisely the loop this app was written to end.
+	 *
+	 * Money goes out as an exact decimal built from the integer's own digits —
+	 * `domain/xlsx.ts` never divides — so a column of amounts sums in Excel to
+	 * the same figure the app shows.
+	 */
+	async function downloadWorkbook() {
+		const database = db();
+		const [rows, cats, goalRows, holdingRows, valuationRows] = await Promise.all([
+			data.accountId
+				? database.txns.where('accountId').equals(data.accountId).toArray()
+				: database.txns.toArray(),
+			database.categories.toArray(),
+			database.goals.toArray(),
+			database.holdings.toArray(),
+			database.valuations.toArray()
+		]);
+
+		const live = rows.filter((t) => !t.isDeleted);
+		const nameOf = (id: string | null) =>
+			id === null ? 'bez kategorie' : (cats.find((c) => c.id === id)?.name ?? 'bez kategorie');
+
+		const ledger: Sheet = {
+			name: 'Záznamy',
+			header: [
+				'Datum',
+				'Kategorie',
+				'Popis',
+				'Částka',
+				'Typ',
+				'Jednorázový',
+				'Dluží mi',
+				'Kdo',
+				'Vyrovnáno'
+			],
+			rows: [...live]
+				.sort((a, b) => a.date.localeCompare(b.date))
+				.map((t) => [
+					{ date: t.date },
+					nameOf(t.categoryId),
+					t.payee,
+					{ money: t.amount },
+					cats.find((c) => c.id === t.categoryId)?.spendType ?? '',
+					t.isOneOff ? 'ano' : '',
+					t.owedAmount ? { money: t.owedAmount } : null,
+					t.owedBy ?? '',
+					t.settledByTxnId ? 'ano' : ''
+				])
+		};
+
+		const months = monthsCovered(live);
+		const summary: Sheet = {
+			name: 'Měsíce',
+			header: ['Měsíc', 'Příjem', 'Výdaje', 'Čistý', 'Běžný chod', 'Jednorázové'],
+			rows: monthlyRows({ months, txns: live, categories: cats, today: today() }).map((m) => [
+				m.month,
+				{ money: m.income },
+				{ money: m.outflow },
+				{ money: m.net },
+				{ money: m.recurringOutflow },
+				{ money: m.oneOffOutflow }
+			])
+		};
+
+		// One row per bucket per month — the shape a pivot table wants, and the
+		// only one that answers "what has JÍDLO done since January" without
+		// rebuilding the ledger by hand.
+		const perCategory: Sheet = {
+			name: 'Kategorie po měsících',
+			header: ['Měsíc', 'Kategorie', 'Typ', 'Částka', 'Počet'],
+			rows: months.flatMap((m) =>
+				summariseMonth({ month: m, txns: live, categories: cats, today: today() })
+					.buckets.filter((b) => b.total !== 0)
+					.map((b) => [
+						m,
+						b.category?.name ?? 'bez kategorie',
+						b.category?.spendType ?? '',
+						{ money: b.total },
+						b.count
+					])
+			)
+		};
+
+		const goalsSheet: Sheet = {
+			name: 'Cíle',
+			header: ['Cíl', 'Proč', 'Cílová částka', 'Termín', 'Počítá se od', 'Kategorie'],
+			rows: goalRows
+				.filter((g) => !g.isDeleted)
+				.map((g) => [
+					g.name,
+					g.why,
+					{ money: g.targetAmount },
+					{ date: g.targetDate },
+					{ date: g.startDate },
+					nameOf(g.categoryId)
+				])
+		};
+
+		const wealthSheet: Sheet = {
+			name: 'Jmění',
+			header: ['Investice', 'Druh', 'Datum hodnoty', 'Hodnota'],
+			rows: holdingRows
+				.filter((h) => !h.isDeleted && !h.isArchived)
+				.flatMap((h) =>
+					valuationRows
+						.filter((v) => !v.isDeleted && v.holdingId === h.id)
+						.sort((a, b) => a.date.localeCompare(b.date))
+						.map((v) => [h.name, KIND_LABEL[h.kind], { date: v.date }, { money: v.value }])
+				)
+		};
+
+		const bytes = buildXlsx([ledger, summary, perCategory, goalsSheet, wealthSheet]);
+		const blob = new Blob([bytes as BlobPart], {
+			type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+		});
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `vydaje-${today()}.xlsx`;
+		link.click();
+		URL.revokeObjectURL(url);
+		toast.show(`Vyexportováno ${counted(live.length, RECORDS)}`);
+	}
+
 	async function runImport(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
@@ -167,6 +344,54 @@
 			input.value = '';
 		}
 	}
+
+	// ── sync ────────────────────────────────────────────────────────────────
+	//
+	// The only screen that mentions sync at all. Everything else in the app is
+	// built to work with the server permanently down, so a failed cycle belongs
+	// here, in a panel somebody chose to open — never as a banner over the
+	// keypad.
+	const sync = syncStatus();
+
+	let syncBaseUrl = $state('');
+	let syncCode = $state('');
+	let syncDeviceName = $state('');
+	let syncBusy = $state(false);
+	let syncError = $state('');
+
+	$effect(() => {
+		void initSync();
+	});
+
+	async function runPair() {
+		syncBusy = true;
+		syncError = '';
+		try {
+			await pair({
+				baseUrl: syncBaseUrl.trim(),
+				code: syncCode.trim(),
+				deviceName: syncDeviceName.trim() || 'Telefon'
+			});
+			syncCode = '';
+			toast.show('Spárováno');
+		} catch (error) {
+			syncError = error instanceof Error ? error.message : 'Spárovat se nepodařilo';
+		} finally {
+			syncBusy = false;
+		}
+	}
+
+	async function runUnpair() {
+		await unpair();
+		toast.show('Odpojeno');
+	}
+
+	const SYNC_LABEL: Record<string, string> = {
+		off: 'nepřipojeno',
+		idle: 'v pořádku',
+		running: 'probíhá',
+		error: 'chyba'
+	};
 
 	// ── storage ─────────────────────────────────────────────────────────────
 	let persisted = $state<boolean | null>(null);
@@ -368,6 +593,151 @@
 		</p>
 	</section>
 
+	<!--
+	  Jmění — the holdings themselves, not their values.
+
+	  A value is typed on `/jmeni`, where the keypad is. What a holding *is* — its
+	  name, how often it is worth asking about, and which bucket feeds it — is a
+	  setting, and it belongs next to the categories it points at.
+	-->
+	<section class="card">
+		<h2 class="u-label">Jmění</h2>
+
+		{#if liveHoldings.length === 0}
+			<p class="hint prose">
+				Nic tu zatím není. Investice se přidávají na obrazovce <strong>Jmění</strong>, kde se rovnou
+				zapíše i první hodnota.
+			</p>
+		{:else}
+			<ul class="schedules">
+				{#each liveHoldings as holding (holding.id)}
+					<li>
+						<button type="button" class="schedule" onclick={() => openHolding(holding)}>
+							<span class="schedule__head">
+								<span class="schedule__name">
+									<span class="kind-dot" data-kind={holding.kind}></span>
+									{holding.name}
+								</span>
+								<span class="schedule__amount">{KIND_LABEL[holding.kind]}</span>
+							</span>
+
+							<span class="schedule__foot">
+								<span class="schedule__where">
+									připomenout po {counted(holding.reminderDays, DAYS)}
+								</span>
+								<span class="schedule__year">
+									{holding.categoryId ? categoryName(holding.categoryId) : 'bez kategorie'}
+								</span>
+							</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
+		<div class="row-actions">
+			<button type="button" class="btn" onclick={() => openHolding(null)}>Přidat investici</button>
+		</div>
+
+		<p class="hint prose">
+			Kategorie u investice říká, odkud do ní posíláš peníze — z ní app spočítá, kolik jsi vložil a
+			kolik je růst. Dvě investice na jedné kategorii to spočítat nejdou, tak se u nich vklady
+			neukazují.
+		</p>
+	</section>
+
+	<!--
+	  Synchronizace — P2.
+
+	  The app is offline-first and stays that way: this panel adds a second copy
+	  of the ledger, it does not become the ledger. Nothing on any other screen
+	  waits for it, and a failed cycle is a line here rather than an interruption
+	  anywhere else.
+	-->
+	<section class="card">
+		<h2 class="u-label">Synchronizace</h2>
+
+		{#if sync.state === 'off'}
+			<p class="hint prose">
+				Zatím jen tenhle prohlížeč. Spáruj zařízení se serverem a záznamy se budou přenášet mezi
+				telefonem a počítačem — zapisovat půjde dál i offline, fronta se odešle, až bude signál.
+			</p>
+
+			<label class="field">
+				<span class="field__label">Adresa serveru</span>
+				<input
+					class="field__input"
+					bind:value={syncBaseUrl}
+					placeholder="https://vydaje.example.com"
+					autocomplete="off"
+					inputmode="url"
+				/>
+			</label>
+
+			<div class="pair-row">
+				<label class="field">
+					<span class="field__label">Párovací kód</span>
+					<input
+						class="field__input field__input--mono"
+						bind:value={syncCode}
+						autocomplete="off"
+						inputmode="numeric"
+					/>
+				</label>
+
+				<label class="field">
+					<span class="field__label">Název zařízení</span>
+					<input class="field__input" bind:value={syncDeviceName} placeholder="Telefon" />
+				</label>
+			</div>
+
+			{#if syncError}
+				<p class="error-text">{syncError}</p>
+			{/if}
+
+			<div class="row-actions">
+				<button
+					type="button"
+					class="btn btn--primary"
+					disabled={syncBusy || !syncBaseUrl.trim() || !syncCode.trim()}
+					onclick={runPair}
+				>
+					{syncBusy ? 'Páruji…' : 'Spárovat'}
+				</button>
+			</div>
+		{:else}
+			<dl class="facts">
+				<div>
+					<dt>Stav</dt>
+					<dd data-state={sync.state}>{SYNC_LABEL[sync.state] ?? sync.state}</dd>
+				</div>
+				<div>
+					<dt>Čeká na odeslání</dt>
+					<dd class="mono">{sync.pending}</dd>
+				</div>
+				<div>
+					<dt>Naposledy</dt>
+					<dd>{sync.lastSyncedAt ? formatShortDate(sync.lastSyncedAt.slice(0, 10)) : '—'}</dd>
+				</div>
+			</dl>
+
+			{#if sync.lastError}
+				<p class="error-text">{sync.lastError}</p>
+			{/if}
+
+			<p class="hint prose">
+				{sync.pending > 0
+					? `${counted(sync.pending, RECORDS)} zatím jen tady. Dokud fronta nedojede na nulu, druhá kopie sešitu neexistuje.`
+					: 'Fronta je prázdná — všechno je i na serveru.'}
+			</p>
+
+			<div class="row-actions">
+				<button type="button" class="btn" onclick={() => void syncNow()}>Synchronizovat teď</button>
+				<button type="button" class="btn btn--quiet" onclick={runUnpair}>Odpojit</button>
+			</div>
+		{/if}
+	</section>
+
 	<section class="card">
 		<h2 class="u-label">Vzhled</h2>
 		<div class="segments" role="group" aria-label="Motiv">
@@ -393,12 +763,14 @@
 
 		<p class="hint prose">
 			Dokud není synchronizace, žije celý sešit jen v tomhle prohlížeči. Vyexportuj si zálohu, než
-			na ni budeš spoléhat.
+			na ni budeš spoléhat. <strong>Záloha</strong> je JSON pro obnovu aplikace,
+			<strong>Excel</strong> je na čtení jinde — zpátky se načíst nedá.
 		</p>
 
 		<div class="row-actions">
 			<button type="button" class="btn" onclick={downloadBackup}>Export zálohy</button>
 			<button type="button" class="btn" onclick={() => importInput?.click()}>Načíst zálohu</button>
+			<button type="button" class="btn" onclick={downloadWorkbook}>Export do Excelu</button>
 			<input
 				bind:this={importInput}
 				type="file"
@@ -431,11 +803,20 @@
 			</div>
 			<div>
 				<dt>Synchronizace</dt>
-				<dd>zatím žádná (P2)</dd>
+				<dd>{SYNC_LABEL[sync.state] ?? sync.state}</dd>
 			</div>
 		</dl>
 	</section>
 </main>
+
+<HoldingSheet
+	open={holdingSheetOpen}
+	holding={editingHolding}
+	categories={fundingCategories}
+	onsave={saveHolding}
+	onarchive={editingHolding ? removeHolding : null}
+	onclose={() => (holdingSheetOpen = false)}
+/>
 
 <ScheduleSheet
 	open={sheetOpen}
@@ -660,6 +1041,50 @@
 		align-items: baseline;
 		justify-content: space-between;
 		gap: var(--space-3);
+	}
+
+	/* The same colour language the holding rows on /jmeni speak, so a kind is
+	   legible before its name is read. */
+	.pair-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-3);
+	}
+
+	@media (max-width: 360px) {
+		.pair-row {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.facts dd[data-state='error'] {
+		color: var(--danger);
+	}
+
+	.facts dd[data-state='idle'] {
+		color: var(--in);
+	}
+
+	.kind-dot {
+		display: inline-block;
+		width: 7px;
+		height: 7px;
+		margin-inline-end: var(--space-2);
+		border-radius: var(--radius-full);
+		background: var(--split-live);
+		vertical-align: middle;
+	}
+
+	.kind-dot[data-kind='investment'] {
+		background: var(--split-give);
+	}
+
+	.kind-dot[data-kind='savings'] {
+		background: var(--in);
+	}
+
+	.kind-dot[data-kind='crypto'] {
+		background: var(--flag);
 	}
 
 	.schedule__name {

@@ -9,6 +9,9 @@
 		"test": "pnpm --filter web test",
 		"check": "pnpm --filter web check",
 		"lint": "pnpm --filter web lint",
-		"format": "pnpm --filter web format"
+		"format": "pnpm --filter web format",
+		"budget": "node scripts/check-bundle.mjs",
+		"api": "dotnet run --project apps/api/src/Prosper.Api",
+		"api:test": "dotnet test apps/api"
 	}
 }

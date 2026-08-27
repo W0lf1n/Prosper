@@ -22,9 +22,11 @@
  * Pure (§11.6). No Dexie, no fetch, no DOM.
  */
 
-import { daysBetween, type IsoDate } from './datetime';
+import type { Finding } from './checks';
+import { DAYS, counted } from './czech';
+import { daysBetween, formatShortDate, type IsoDate } from './datetime';
 import { ZERO, add, sub, sum, type Minor } from './money';
-import type { Holding, Valuation } from './types';
+import type { Holding, Txn, Valuation } from './types';
 
 /** What each kind is called on screen. Liquid only — Q38. */
 export const KIND_LABEL: Record<Holding['kind'], string> = {
@@ -228,4 +230,128 @@ export function valuationWarning(next: Minor, previous: Valuation | null): strin
 	return move > 0
 		? `To je o ${move} % víc než minule. Sedí to?`
 		: `To je o ${Math.abs(move)} % míň než minule. Sedí to?`;
+}
+
+// ── the reminder, as a finding ──────────────────────────────────────────────
+
+/**
+ * A stale valuation, in the app's own vocabulary.
+ *
+ * The app already has a shape for "something you usually do has not happened":
+ * `findMissingRecurring`. This is the same shape and gets the same treatment,
+ * so a pension statement nobody has opened reads like every other finding
+ * rather than like a second kind of nag.
+ *
+ * It is deliberately **not** raised on the entry screen's check strip. That
+ * strip belongs to the row being typed, and a nag about a pension while a
+ * number is half-entered is exactly the friction that killed the spreadsheet.
+ * The launch route gets a flag dot on the `/jmeni` icon and nothing else.
+ *
+ * A holding that has never been valued is stale by definition — it is the state
+ * every holding starts in, and it is precisely what the reminder is for.
+ */
+export function staleValuationFindings(readings: readonly HoldingReading[]): Finding[] {
+	return readings
+		.filter((reading) => reading.isStale)
+		.map((reading) => {
+			const { holding, asOf, ageDays } = reading;
+
+			const title =
+				ageDays === null
+					? `${holding.name} — zatím bez hodnoty`
+					: `${holding.name} — hodnota je ${counted(ageDays, DAYS)} stará`;
+
+			const detail =
+				asOf === null
+					? 'Opiš první částku z výpisu, ať celkové jmění něco znamená.'
+					: `Naposledy ${formatShortDate(asOf)} Aktualizuj ji, ať celkové jmění něco znamená.`;
+
+			return {
+				id: `stale-valuation:${holding.id}`,
+				rule: 'stale-valuation',
+				// Past twice its own cadence it is not late any more, it is abandoned.
+				severity: reading.isOverdue ? ('warn' as const) : ('info' as const),
+				title,
+				detail,
+				fix: {
+					kind: 'value-holding' as const,
+					holdingId: holding.id,
+					label: 'Zapsat hodnotu'
+				}
+			};
+		});
+}
+
+// ── contributions and growth ────────────────────────────────────────────────
+
+/**
+ * Why there is no `vloženo` figure. `null` means there is one.
+ *
+ * `shared` is the Q37 ruling made visible: two live holdings pointing at the
+ * same bucket cannot have that bucket's outflows attributed between them, and
+ * an evenly split figure would be wrong in a way nobody would ever catch. A
+ * number you cannot check is worse than a blank, so the app shows the blank and
+ * says why.
+ */
+export type ContributionGap = 'no-category' | 'shared-category';
+
+export interface Contribution {
+	/** Outflows into the bucket since `startDate`. Null when unattributable. */
+	invested: Minor | null;
+	/** Current value minus what went in. Null for the same reason. */
+	growth: Minor | null;
+	gap: ContributionGap | null;
+}
+
+const UNATTRIBUTABLE = (gap: ContributionGap): Contribution => ({
+	invested: null,
+	growth: null,
+	gap
+});
+
+export interface ContributionInput {
+	reading: HoldingReading;
+	/** Every holding, so the Q37 clash can be detected. Archived ones do not count. */
+	holdings: readonly Holding[];
+	txns: readonly Txn[];
+}
+
+/**
+ * What went in, and what it did since.
+ *
+ * `invested` is read off the ledger exactly the way goal progress is — ordinary
+ * outflows into the holding's bucket, from `startDate` onwards. There is no
+ * second set of books, which is the only reason the figure can be trusted, and
+ * it is why a refund into that bucket nets against it rather than counting
+ * twice.
+ *
+ * **Growth is never income.** It is unrealised, it did not arrive in any
+ * account, and no allocation decision was made about it. It gets its own word
+ * and it stops there — when the holding is actually sold, the money arriving is
+ * an ordinary inflow and *that* is when the split hears about it.
+ */
+export function contributionOf({ reading, holdings, txns }: ContributionInput): Contribution {
+	const { holding } = reading;
+	const categoryId = holding.categoryId;
+	if (categoryId === null) return UNATTRIBUTABLE('no-category');
+
+	const sharing = holdings.filter(
+		(other) => !other.isDeleted && !other.isArchived && other.categoryId === categoryId
+	);
+	if (sharing.length > 1) return UNATTRIBUTABLE('shared-category');
+
+	const rows = txns.filter(
+		(txn) => !txn.isDeleted && txn.categoryId === categoryId && txn.date >= holding.startDate
+	);
+
+	// Outflows are negative, so the sum is negated to read as "put in". An
+	// inflow filed under the same bucket is a refund and nets against it, which
+	// is the §6.1 rule applied here rather than re-decided.
+	const invested = -sum(rows.map((txn) => txn.amount)) as Minor;
+
+	return {
+		invested,
+		growth: sub(reading.value, invested),
+		gap: null
+	};
 }

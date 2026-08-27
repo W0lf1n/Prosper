@@ -309,7 +309,7 @@ describe('summariseMonth()', () => {
 			]
 		});
 		expect(summary.findings.find((f) => f.rule === 'missing-recurring')?.title).toBe(
-			'„Spotify" tenhle měsíc chybí'
+			'„Spotify“ tenhle měsíc chybí'
 		);
 	});
 

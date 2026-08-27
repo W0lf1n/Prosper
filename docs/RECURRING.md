@@ -1,6 +1,7 @@
 # Recurring payments — declared, not detected
 
-**Status:** built 2026-08-25. Ruled as Q40 in `DECISIONS.md`.
+**Status:** **built and shipped** 2026-08-25. Ruled as Q40 in `DECISIONS.md`.
+What was deliberately left out is in `TODO.md` §4.4.
 **Audience:** Claude Code (implementation), Petr (decisions)
 **Reads with:** `PROJECT-PLAN.md` §2.3, §6.1, §7 and `TRIMMING-AND-TRAINING.md` T3
 
@@ -39,20 +40,20 @@ Petr's mortgage is set to `auto`. Everything else starts at `confirm`.
 ## 1. The model
 
 ```ts
-export type ScheduleMode = "confirm" | "auto";
+export type ScheduleMode = 'confirm' | 'auto';
 
 export interface Schedule extends Synced {
-  id: string;
-  payee: string; // goes into the rows it makes
-  categoryId: string;
-  amount: Minor; // signed, like Txn — the sheet takes the sign from the category
-  dayOfMonth: number; // 1–31, clamped into short months
-  startMonth: string; // YYYY-MM
-  endMonth: string | null; // inclusive; null for an open-ended subscription
-  mode: ScheduleMode;
-  lastPostedMonth: string | null;
-  isArchived: boolean;
-  sortOrder: number;
+	id: string;
+	payee: string; // goes into the rows it makes
+	categoryId: string;
+	amount: Minor; // signed, like Txn — the sheet takes the sign from the category
+	dayOfMonth: number; // 1–31, clamped into short months
+	startMonth: string; // YYYY-MM
+	endMonth: string | null; // inclusive; null for an open-ended subscription
+	mode: ScheduleMode;
+	lastPostedMonth: string | null;
+	isArchived: boolean;
+	sortOrder: number;
 }
 ```
 
@@ -199,16 +200,14 @@ screen disagreeing with another.
 
 ---
 
-## 6. What is next, and deliberately not now
+## 6. What is next
 
-- **Promotion to `auto`.** After three months confirmed at an identical amount,
-  offer to switch the schedule over. `Txn.scheduleId` is carried from day one so
-  this needs no migration — only the rule.
-- **Exact missing-payment detection.** A declared schedule that was skipped for
-  three months running is a better question than a statistical one.
-- **The T3 panel on `/mesic`.** The annual figure now lives in Settings, which
-  is where it is set. Whether it also belongs where the month is read is a
-  question for after fourteen days of use, not before.
-- **Weekly or yearly cadences.** Monthly only. Every payment in the workbook is
-  monthly, and a cadence engine for a case that does not exist is the kind of
-  generality §3 spent effort keeping out.
+Four things were named as "not now" when this shipped, and none has changed:
+promotion to `auto` after three identical confirmed months, exact
+missing-payment detection, the T3 subscriptions panel on `/mesic`, and cadences
+other than monthly.
+
+The reasoning for each is in `TODO.md` §4.4, which is the only place they are
+tracked. The short version: every payment in the workbook is monthly, and a
+cadence engine for a case that does not exist is the kind of generality
+`PROJECT-PLAN.md` §3 spent effort keeping out.

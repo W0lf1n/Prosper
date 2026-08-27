@@ -10,6 +10,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@vydaje/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       dexie:
         specifier: ^4.4.5
         version: 4.4.5
@@ -68,6 +71,8 @@ importers:
       vitest:
         specifier: ^4.1.8
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3))
+
+  packages/contracts: {}
 
 packages:
 

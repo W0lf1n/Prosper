@@ -15,8 +15,9 @@
 
 import { abs, percentOf, sum, type Minor } from './money';
 import { DAYS, RECORDS, counted, plural } from './czech';
-import { daysBetween, endOfMonth, monthKey, shiftMonth, type IsoDate } from './datetime';
-import type { Category, Txn } from './types';
+import { daysBetween, monthKey, shiftMonth, type IsoDate } from './datetime';
+import type { Category, DayMark, Txn } from './types';
+import { monthCoverage } from './coverage';
 import { isVagueDescription, normalize, numbersIn, suggestBucket } from './vocabulary';
 
 export type Severity = 'warn' | 'info';
@@ -25,7 +26,20 @@ export type Fix =
 	| { kind: 'set-category'; categoryId: string; label: string }
 	| { kind: 'mark-one-off'; label: string }
 	| { kind: 'switch-direction'; label: string }
-	| { kind: 'open-txn'; txnId: string; label: string };
+	| { kind: 'open-txn'; txnId: string; label: string }
+	/**
+	 * Raised by `domain/holdings.ts`, never by anything in this file — a stale
+	 * valuation is not a fact about the ledger and `summariseMonth` must stay
+	 * unable to see a holding (INVESTMENTS §1). The type lives here because
+	 * `Finding` does, and one shape of finding is worth more than two.
+	 */
+	| { kind: 'value-holding'; holdingId: string; label: string }
+	/**
+	 * Drain a bucket: open the month's rows in it and re-file them one tap at a
+	 * time. Raised only by `other-overflow`, which could state the problem and
+	 * do nothing about it from P1 until T4.
+	 */
+	| { kind: 'drain-bucket'; categoryId: string; label: string };
 
 export interface Finding {
 	/** Stable for the same problem, so a dismissal can stick. */
@@ -99,8 +113,8 @@ export function checkDraft(draft: Draft, context: CheckContext): Finding[] {
 					severity: 'warn',
 					title: chosen ? `Spíš ${target.name}?` : `Vypadá to na ${target.name}`,
 					detail: chosen
-						? `„${description}" jsi jindy dával do ${target.name}, teď to míří do ${chosen.name}.`
-						: `Podle popisu „${description}".`,
+						? `„${description}“ jsi jindy dával do ${target.name}, teď to míří do ${chosen.name}.`
+						: `Podle popisu „${description}“.`,
 					fix: { kind: 'set-category', categoryId: target.id, label: `Dát do ${target.name}` }
 				});
 			}
@@ -160,7 +174,7 @@ export function checkDraft(draft: Draft, context: CheckContext): Finding[] {
 				rule: 'refund-as-income',
 				severity: 'warn',
 				title: 'Příjem, nebo vrácení peněz?',
-				detail: `Vrácený podíl zapiš u toho výdaje jako „dluží mi" a odškrtni ho, až dorazí. Jako příjem ti nafoukne příjem i výdaje zároveň.`,
+				detail: `Vrácený podíl zapiš u toho výdaje jako „dluží mi“ a odškrtni ho, až dorazí. Jako příjem ti nafoukne příjem i výdaje zároveň.`,
 				fix: { kind: 'set-category', categoryId: target.id, label: `Dát do ${target.name}` }
 			});
 		}
@@ -212,7 +226,12 @@ export interface MonthContext {
 	txns: Txn[]; // every live transaction of the account
 	categories: Category[];
 	today: IsoDate;
+	/** Explicit "spent nothing" days. Optional: absent reads as none marked. */
+	marks?: DayMark[];
 }
+
+/** Below this share of elapsed days, the month's totals are worth doubting. */
+const COVERAGE_FLOOR = 0.6;
 
 export interface BucketTotal {
 	category: Category | null; // null = uncategorised
@@ -318,7 +337,12 @@ function checkMonth(
 				rule: 'other-overflow',
 				severity: 'warn',
 				title: `OSTATNÍ je ${bucket.recurringShare} % běžných výdajů`,
-				detail: `${counted(bucket.count, RECORDS)}. Co z toho patří do vlastní kategorie? Dokud to sedí tady, nejde s tím nic dělat.`
+				detail: `${counted(bucket.count, RECORDS)}. Co z toho patří do vlastní kategorie? Dokud to sedí tady, nejde s tím nic dělat.`,
+				fix: {
+					kind: 'drain-bucket',
+					categoryId: bucket.category.id,
+					label: 'Přebrat řádky'
+				}
 			});
 		}
 	}
@@ -337,16 +361,22 @@ function checkMonth(
 
 	// SUMA reported six months while the workbook held eight: ČERVENEC and SRPEN
 	// had data and no formula. The totals here are computed, never dragged.
-	const days = new Set(rows.map((t) => t.date));
-	const lastDay = month === monthKey(today) ? today : endOfMonth(month);
-	const covered = days.size;
-	const total = Number(lastDay.slice(8, 10));
-	if (total > 0 && covered / total < 0.6) {
+	// Coverage counts a day with an explicit `DayMark` as recorded, which is the
+	// entire reason `DayMark` exists: "I spent nothing" is an answer, and only a
+	// day nobody looked at is a hole. Counting transactions alone punished a
+	// frugal week, which this check did until R1.
+	const { covered, elapsed } = monthCoverage({
+		month,
+		txns: rows,
+		marks: context.marks ?? [],
+		today
+	});
+	if (elapsed > 0 && covered / elapsed < COVERAGE_FLOOR) {
 		findings.push({
 			id: `coverage:${month}`,
 			rule: 'coverage',
 			severity: 'info',
-			title: `Zapsáno ${covered} z ${total} ${plural(total, DAYS)}`,
+			title: `Zapsáno ${covered} z ${elapsed} ${plural(elapsed, DAYS)}`,
 			detail: 'Díry v zápisu znamenají, že měsíční čísla jsou nižší než skutečnost.'
 		});
 	}
@@ -402,7 +432,7 @@ export function findMissingRecurring(context: MonthContext): Finding[] {
 			id: `missing-recurring:${month}:${key}`,
 			rule: 'missing-recurring',
 			severity: 'info',
-			title: `„${label.get(key)}" tenhle měsíc chybí`,
+			title: `„${label.get(key)}“ tenhle měsíc chybí`,
 			detail: 'Platíš to každý měsíc. Zapomnělo se, nebo jsi to zrušil?'
 		});
 	}

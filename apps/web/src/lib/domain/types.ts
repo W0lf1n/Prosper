@@ -23,7 +23,13 @@ export type AccountKind = 'checking' | 'savings' | 'cash' | 'credit' | 'loan';
  */
 export type SpendType = 'need' | 'want' | 'give' | 'save' | 'debt';
 
-export type TxnSource = 'manual' | 'import-gpc' | 'bank-api' | 'recurring';
+/**
+ * `adjustment` is a row written by a reconciliation to close a gap between the
+ * ledger and a bank statement. It is a real transaction — it moves the balance
+ * like any other — but it is the one kind nobody typed on purpose, and the tape
+ * says so.
+ */
+export type TxnSource = 'manual' | 'import-gpc' | 'bank-api' | 'recurring' | 'adjustment';
 
 /** Fields every synced row carries. */
 export interface Synced {
@@ -229,11 +235,20 @@ export interface Holding extends Synced {
 	kind: HoldingKind;
 	currency: string; // 'CZK' — unused in v1, same contract as Account
 	/**
-	 * Which bucket funds it. Unused in v1: contributions and growth are a later
-	 * step, and Q37 already rules that two holdings sharing a category means the
+	 * Which bucket funds it. `null` means contributions are not attributed at
+	 * all — and Q37 rules that two live holdings sharing a category means the
 	 * app shows no contribution figure for either rather than a split guess.
 	 */
 	categoryId: string | null;
+	/**
+	 * The day it starts counting contributions, for the same reason
+	 * `Goal.startDate` exists (Q27): a holding written today must not open
+	 * already "funded" by four years of SPOŘENÍ it never received.
+	 *
+	 * Defaults to the first of the month it was created. Editable in Settings,
+	 * so a holding can deliberately claim an existing pot.
+	 */
+	startDate: IsoDate;
 	/** How often it is worth asking about. Per holding — a pension statement is
 	    quarterly and a crypto wallet takes ten seconds, and one global interval
 	    would nag hardest about the thing that cannot be answered. */

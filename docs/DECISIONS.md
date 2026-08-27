@@ -1,14 +1,16 @@
 # Decisions
 
 One entry per question from PROJECT-PLAN §2, plus anything the plan turned out to
-get wrong. Required by §11.12.
+get wrong. Required by §13.14.
 
-Laws 3 and 4 have their own design document, `TRIMMING-AND-TRAINING.md`; the
-rulings it needs are Q29–Q32 below.
+Laws 3 and 4 have their own design document, `TRIMMING-AND-TRAINING.md`.
 
 Status: **answered** — decided, implemented. **assumed** — the plan's own
-recommendation applied without confirmation; cheap to revisit. **open** — still
-needs Petr.
+recommendation applied without confirmation; cheap to revisit.
+
+> **Questions still open live in `TODO.md` §5, not here.** This file is the
+> record of what was decided; duplicating the open list in two places is how it
+> went stale the first time.
 
 ---
 
@@ -20,8 +22,9 @@ needs Petr.
 alternative.
 
 Bundle budget was the deciding factor and it held: the entry route ships
-**69 kB of JavaScript brotli-compressed**, checks engine included, against a
-150 kB budget. React + Vite
+**83.2 kB of JavaScript brotli-compressed** as of 2026-08-27 — checks engine,
+goals, holdings, schedules, trends and the sync layer included — against a
+150 kB budget, now enforced by `pnpm budget` rather than remembered. React + Vite
 would have spent roughly that much before any application code.
 
 Actual versions: SvelteKit 2.63, Svelte 5.56 (runes mode forced), Vite 8, TS 6.
@@ -30,7 +33,7 @@ Actual versions: SvelteKit 2.63, Svelte 5.56 (runes mode forced), Vite 8, TS 6.
 
 **Czech only.** Code, identifiers, comments and this document stay English.
 All money and dates go through `Intl` with the `cs-CZ` locale — never
-hand-rolled (§11.9).
+hand-rolled (PROJECT-PLAN §13.11).
 
 ### Q16 — Phone platform · answered 2026-08-23
 
@@ -40,9 +43,11 @@ it.
 
 ### Q12 — Client storage · answered 2026-08-23
 
-**Dexie 4.4.5.** Schema v1 lives in `apps/web/src/lib/db/schema.ts` behind a
+**Dexie 4.4.5.** The schema lives in `apps/web/src/lib/db/schema.ts` behind a
 `migrations` array — a schema change is a new entry in that array, never an edit
-to an existing one, because a released version is already on the phone.
+to an existing one, because a released version is already on the phone. It has
+moved v1 → **v6** since: monthTargets (Q28), the `give` re-file (Q33), holdings
+and valuations (Q36), schedules (Q40), `Holding.startDate` (contributions).
 
 One deviation from the plan's model, forced by IndexedDB rather than chosen:
 **booleans cannot be indexed**, so `isDeleted` and `isArchived` are stored but
@@ -68,8 +73,8 @@ Two things worth knowing:
 
 **Výdaje.** Carries the spreadsheet's own name, so the habit transfers with it.
 Set in `static/manifest.webmanifest`, `src/app.html`, the page titles and the
-service-worker cache key. Domain still to pick — `vydaje.petrbohac.eu` fits the
-plan's suggestion.
+service-worker cache key. The repository is `Prosper`, which is the book's word
+rather than the spreadsheet's — see Q18.
 
 ### Q7 — Excel history import · answered 2026-08-23
 
@@ -123,41 +128,56 @@ is untouched for the 95 % of entries that are nobody else's business.
 
 ## Assumed — the plan's own recommendation, applied without confirmation
 
-| #   | Question          | Applied                                                                                                | Revisit when |
-| --- | ----------------- | ------------------------------------------------------------------------------------------------------ | ------------ |
-| Q1  | Scope of tracking | (a) personal only; `Account` and `Category` already model more                                         | Before P2    |
-| Q2  | Currency          | CZK only; `currency` column present and unused on every account                                        | Before P2    |
-| Q3  | Budgeting method  | (a) pure ledger in P1; `Category.monthlyCap` exists and is null                                        | Before P3    |
-| Q8  | Receipt photos    | No                                                                                                     | Not in v1    |
-| Q10 | Backend           | ASP.NET Core 9 Minimal API — not yet written                                                           | P2           |
-| Q11 | Server database   | PostgreSQL 16 — not yet written                                                                        | P2           |
-| Q13 | Sync approach     | Hand-rolled outbox + LWW; the `outbox` table and the `enqueue()` seam exist, `SYNC_ENABLED` is `false` | P2           |
-| Q14 | Auth              | Device-bound JWT with pairing code                                                                     | P2           |
-| Q17 | Frontend hosting  | Same origin as the API                                                                                 | P2           |
+| #   | Question          | Applied                                                                                                                          | Revisit when |
+| --- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Q1  | Scope of tracking | (a) personal only; `Account` and `Category` already model more                                                                   | Before P2    |
+| Q2  | Currency          | CZK only; `currency` column present and unused on every account                                                                  | Before P2    |
+| Q3  | Budgeting method  | (a) pure ledger in P1; `Category.monthlyCap` exists and is null                                                                  | Before P3    |
+| Q8  | Receipt photos    | No                                                                                                                               | Not in v1    |
+| Q10 | Backend           | ASP.NET Core 9 Minimal API — **written**, `apps/api`                                                                             | done         |
+| Q11 | Server database   | PostgreSQL 16 — **written**; SQLite supported so it runs without Docker                                                          | done         |
+| Q13 | Sync approach     | Hand-rolled outbox + LWW — **built**, see Q41                                                                                    | done         |
+| Q14 | Auth              | Device-bound bearer token with a pairing code. **Not a JWT** — nothing needs to be stateless, and a hash in a table is revocable | done         |
+| Q17 | Frontend hosting  | Same origin as the API. A CORS allowlist exists for dev only, off by default                                                     | Deploy       |
 
 ---
 
-## Open
+## Answered, continued
 
-| #   | Question                                                                           | Blocks                               | Placeholder in the code                                                                                                              |
-| --- | ---------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Q0  | Name and domain                                                                    | PWA manifest, JWT audience           | Working name **Výdaje** ("the tape"), in `static/manifest.webmanifest`, `src/app.html` and three `<title>` tags                      |
-| Q4  | Real account list                                                                  | Whether transfers are a core flow    | One seeded account, `Běžný účet`, renameable in Settings                                                                             |
-| Q5  | Active debt                                                                        | `Loan` entity for the Trimming law   | None                                                                                                                                 |
-| Q6  | Bank import                                                                        | P4 shape                             | None                                                                                                                                 |
-| Q18 | Repository host                                                                    | Where this is pushed                 | `git init`, no remote, no commits yet                                                                                                |
-| Q19 | Timebox                                                                            | Whether the phase plan needs cutting | —                                                                                                                                    |
-| Q29 | Does a broken cap get raised automatically after two months, or stay?              | Trimming T2                          | Recommendation: offer once, with the real average beside it                                                                          |
-| Q30 | Is the health score dropped?                                                       | Training R4                          | Recommendation: **yes** — a compounded number is uninterpretable when it moves; keep coverage, want-share and caps-held separate     |
-| Q31 | Must the monthly close's written sentence be mandatory?                            | Training R2                          | Recommendation: yes, like `Goal.why`                                                                                                 |
-| Q32 | Nudge at 21:00 — right hour?                                                       | Training R3                          | Ask after the gate; the entry timestamps will answer it                                                                              |
-| Q35 | Is `DARY` really "given away, nothing expected back", or are gifts something else? | The give class in the split          | Recommendation: yes for now. If gifts to family read differently to you, add a separate `CHARITA` bucket and put DARY back to `want` |
+### Q18 — Repository and licence · answered 2026-08-27
+
+**`github.com/W0lf1n/Prosper`, public, MIT.**
+
+The repository was private with a remote set and two commits. Going public is a
+decision about the documents as much as the code: `PROJECT-PLAN.md` and this file
+address one reader by name and treat his spreadsheet as shared context, which is
+what makes them useful and also what makes them odd for a stranger. `README.md`
+carries the outside-facing version; nothing else changes to suit an audience.
+
+**MIT** rather than AGPL: the thing worth reading here is the reasoning, not the
+implementation, and a copyleft that reaches hosted forks defends against a
+scenario that does not exist for a single-user offline app.
+
+Three things had to be true before it could go public, and are tracked in
+`TODO.md` §2: the licence file, `.idea/` untracked, and a lint run that passes
+for somebody who has never opened the design tooling.
+
+### Q4 — Real account list · answered by default
+
+One seeded account, `Běžný účet`, renameable in Settings. `Account` and the
+transfer model exist for more; nothing has needed them. Revisit before P2 —
+transfers only become a core flow when there is a second account.
+
+### Q0 — Domain · still unpicked
+
+The name is settled (**Výdaje**). The domain is not, and blocks nothing until
+P2 needs a JWT audience. `vydaje.petrbohac.eu` fits.
 
 ---
 
 ## Deviations from the plan
 
-### Q21 — `Category.isIncome` · new, needs a ruling
+### Q21 — `Category.isIncome` · applied, shipped
 
 **The plan's `Category` has no way to say "this one is income."** `SpendType` is
 `need | want | save | debt`, all of which describe an outflow. That leaves a
@@ -531,7 +551,11 @@ it, but nothing migrates the old habit automatically.
 
 ---
 
-## Design pass · 2026-08-23
+## Design pass · 2026-08-23 — _superseded, see the graphite pass below_
+
+> The palette described in this section no longer exists. It is kept because the
+> second pass was an argument with it, and the argument does not read without it.
+> The live system is `tokens.css` and the entry below.
 
 The plan's §8 palette was cool grey paper. Replaced, at Petr's request, with a
 quiet blue and a floating treatment — the reference was the Svelte homepage: an
@@ -580,3 +604,168 @@ groceries and saving a settings change no longer look the same.
   everything else. Picking from the sheet keeps that bucket on the row.
 - `1×` became **jednorázový**, spelled out, next to **dluží mi**. Both are rare,
   so they sit below the payee line as ghost buttons rather than in the fast path.
+
+---
+
+## Design pass · graphite instrument — replaces the blue
+
+The quiet blue was replaced wholesale. The reference is no longer a homepage; it
+is a **machined instrument**: a graphite ground, surfaces raised by _luminance_
+rather than by boxes, hairlines only where an edge is load-bearing, and exactly
+one signal colour.
+
+**Dark first, and that is the actual argument.** The blue pass built a light
+theme and derived a dark one. This app is used one-handed, in bed, with the
+lights off — so graphite is the theme it is designed for and daylight is the
+counterpart. Both are still declared twice, once under `prefers-color-scheme` and
+once under `[data-theme]`, so the toggle wins in both directions.
+
+**Outflow lost its colour, and that is the change with the most reach.** The blue
+palette gave outflow a muted brick and inflow a teal. But most rows in a ledger
+are outflow, so the tape rendered as forty red numbers — which is noise, not
+information. Outflow is now the ink, `--signal` mint is the primary action and
+money coming in, and the asymmetry is the point: an expense is the normal case
+and does not need colour to announce itself.
+
+The one place the rule is deliberately suspended is the ambient pool behind the
+entry amount. There is exactly one number on that screen and the whole question
+is which way it points, so the light behind it answers before the sign is read.
+It stays a wash — seven per cent, tinting the ground rather than colouring the
+digits.
+
+**Elevation inverts between themes**, which is why `--raised` exists. In daylight
+a raised slab is lighter than what it sits on; on graphite it is also lighter,
+but the graphite scale runs the other way. A control that hard-codes `--surface`
+or `--surface-3` is raised in one theme and sunk in the other.
+
+**An explicit theme choice must move `color-scheme` with it.** Left at
+`light dark`, the browser keeps rendering its own surfaces — form controls,
+scrollbars, the canvas behind the page, the date picker — from the _system_
+preference, so choosing light on a phone in dark mode produced a light page
+wearing dark native controls.
+
+**The old token names are kept as aliases** (`--paper`, `--tape`, `--accent`…),
+mapping onto the new system, so a rule missed in the redesign degrades to
+something coherent instead of to an unstyled box.
+
+### Entry screen, restructured again
+
+- Direction became **the coin**: a disc beside the amount carrying an arrow,
+  tapped to flip. It replaced the segmented Výdaj / Příjem control, which had
+  replaced a `−` glyph nobody could read. The control is now beside the thing it
+  describes rather than above it, and the ambient hue says the same thing twice.
+- The header slab gained a third icon — `/jmeni` — between the tape and the
+  settings gear. That is the whole footprint investments were allowed on the
+  launch route.
+
+### A bottom tab bar was added
+
+The blue pass had every screen reached from the entry header. Four destinations
+now sit in a bar in the thumb zone — `/tape`, `/mesic`, `/cil`, `/settings` —
+with a record disc between them that returns to entry.
+
+Two things about it are deliberate:
+
+- **The entry screen does not carry the bar.** The keypad owns the bottom of the
+  phone and needs every pixel on a short screen. The centre disc is how you get
+  back, which makes recording one tap away from anywhere.
+- **`/jmeni` is not a tab.** It is the screen you open once a month, and a tab
+  bar that holds everything holds nothing.
+
+The bar is a flex child of the app column rather than a fixed overlay, so it
+cannot cover a row and no screen has to reserve padding for it. The toast reads
+`.app:has(.tabbar)` and lifts itself clear — a confirmation parked on top of the
+navigation is a confirmation you have to wait out before you can leave.
+
+---
+
+## Deviations, continued — the sync layer
+
+### Q41 — The server stores rows as JSON, not as ten typed tables · applied 2026-08-27
+
+**`PROJECT-PLAN.md` §6 says client and server mirror each other, C# for TS.**
+They do not. The server has one `changes` table: entity, id, `updatedAt`,
+`deviceId`, `isDeleted`, and the client's row verbatim as JSON.
+
+**The reason is the cursor.** §10.2 requires a server-assigned monotonic
+sequence across _every_ entity, because a pull is "everything past this number"
+and there is only one number. Ten typed tables cannot produce one without a log
+table beside them — and once that log exists, having it also be the storage is
+one moving part rather than eleven.
+
+**What it costs:** the server cannot validate a category or notice a malformed
+amount. It was never going to. The server is durable storage and a merge point
+(§5); every rule about what a transaction _means_ lives in `domain/`, on the
+client, where it is tested. A server that re-implemented those rules would be a
+second place for them to be wrong.
+
+**What it buys, beyond the cursor:** a schema change on the client is not a
+server deployment. Schema v6 added `Holding.startDate`; the server needed
+nothing.
+
+**Alternative rejected:** typed tables plus a separate `changes` log. It is the
+textbook shape and it stores everything twice, which for a single-user ledger
+buys validation nobody asked for at the price of a consistency problem between
+the two copies.
+
+### Q42 — A device joining an existing ledger gives up its seed · applied 2026-08-27
+
+**Found by the §11 acceptance test, not by reading.** Every device seeds itself
+on first launch — one account, the starter categories — because until it is
+paired it is the only device there is. Pair two and the ledger has two accounts
+and two of every bucket, and each device shows an **empty tape while holding the
+other device's rows**: they belong to an account it is not looking at.
+
+**Applied:** `repo.ts` → `adoptRemoteLedger`. A device soft-deletes an account
+it created and never wrote into, adopts the older one (UUIDv7 is time-sortable,
+so the smallest id is the one that existed first), and drops its unused
+duplicate buckets by name.
+
+**The guard is authorship, not emptiness**, and the first version got this
+wrong. By the time this runs the pull has already landed the _other_ device's
+rows, so "is the database empty" answers no on a device that has done nothing.
+The question is narrower: does an account **this device created** still have no
+transactions of its own?
+
+**It runs after every pull, not only at pairing.** Pairing two devices in quick
+succession is a race the protocol cannot order — the first has only _queued_ its
+seed when the second pairs, so the second pulls an empty ledger and sees no
+reason to stand down. Deciding it on every pull makes the timing irrelevant.
+
+**A device that has recorded something keeps its account**, and two accounts
+then stand. That is a genuine question for a human rather than something to
+guess at.
+
+### Q43 — Reporting shipped without a dependency · applied 2026-08-27
+
+§11 P5 says "XLSX export via ClosedXML", which is a server-side library, and
+there was no server when the reporting work started. The client-side option is
+SheetJS, which is several times the size of this entire application against a
+150 kB budget (rule 12).
+
+**Applied:** `domain/xlsx.ts`, hand-rolled. An .xlsx is a ZIP of five small XML
+files, and the parts this needs fit in one module with tests. The ZIP is
+**stored rather than deflated** — `CompressionStream` would shrink it, but it is
+async and not on every engine, and stored entries make the writer a pure
+function that can be tested. The file is a few hundred kilobytes either way.
+
+**Money never becomes a float on the way out.** A cell value is assembled from
+the integer's own digits, the same reason `formatMoney` splits rather than
+divides, so a column of amounts sums in Excel to the figure the app shows.
+
+**The export is one-way, deliberately.** A spreadsheet edited by hand and
+imported back is precisely the loop this app was written to end.
+
+### A trend against months that never existed · found 2026-08-27
+
+`categoryTrends` averaged the earlier months of its window to say what a bucket
+usually costs. With two months of real data and a six-month window, four of
+those months were before the ledger began — and they counted as zeroes. Every
+bucket in month two read as a catastrophe: POTRAVINY showed **+1594 %** against
+a "typical" of 381 Kč, which was one real month divided by five imaginary ones.
+
+**Rule this establishes:** a month before the first transaction is not a month
+you spent nothing in, it is a month that does not exist. This is the same
+distinction the tape already makes between a gap day and an explicit `DayMark`,
+one level up. A genuine zero month _inside_ the ledger still counts — spending
+nothing on JÍDLO in June is a fact.

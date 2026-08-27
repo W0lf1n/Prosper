@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+	contributionOf,
 	currentValuation,
 	readHolding,
 	readHoldings,
+	staleValuationFindings,
 	valuationWarning,
 	wealthTotal
 } from './holdings';
@@ -20,6 +22,7 @@ function holding(id: string, patch: Partial<Holding> = {}): Holding {
 		kind: 'investment',
 		currency: 'CZK',
 		categoryId: null,
+		startDate: '2026-01-01',
 		reminderDays: 30,
 		isArchived: false,
 		sortOrder: 0,
@@ -359,5 +362,139 @@ describe('holdings never reach the month summary or the split', () => {
 		// The 2 000 Kč contribution, not the 250 000 Kč the holding gained.
 		expect(split.slices.find((s) => s.cls === 'save')?.amount).toBe(2_000_00);
 		expect(split.left).toBe(58_000_00);
+	});
+});
+
+describe('staleValuationFindings', () => {
+	const anyTxn = (id: string, amount: number, categoryId: string | null, date: string): Txn => ({
+		id,
+		accountId: 'acc',
+		date,
+		amount: minor(amount),
+		categoryId,
+		payee: '',
+		note: null,
+		transferPairId: null,
+		source: 'manual',
+		isCleared: false,
+		createdAt: `${date}T10:00:00.000Z`,
+		isOneOff: false,
+		owedAmount: null,
+		owedBy: null,
+		settledByTxnId: null,
+		scheduleId: null,
+		...SYNCED
+	});
+
+	function reading(patch: Partial<Holding>, valuations: Valuation[]) {
+		return readHolding({ holding: holding('h', patch), valuations, today: TODAY });
+	}
+
+	it('says nothing about a reading that is current', () => {
+		const fresh = reading({ reminderDays: 30 }, [valuation('a', 'h', '2026-08-20', 100_00)]);
+
+		expect(staleValuationFindings([fresh])).toEqual([]);
+	});
+
+	it('raises info once the reading passes its own cadence', () => {
+		// 56 days old against a 30-day cadence: late, not abandoned.
+		const late = reading({ reminderDays: 30 }, [valuation('a', 'h', '2026-06-30', 100_00)]);
+
+		const [finding] = staleValuationFindings([late]);
+
+		expect(finding?.rule).toBe('stale-valuation');
+		expect(finding?.severity).toBe('info');
+		expect(finding?.title).toContain('56 dní');
+		// `formatShortDate` already ends in a full stop; the sentence must not
+		// add a second one.
+		expect(finding?.detail).not.toContain('..');
+		expect(finding?.fix).toEqual({
+			kind: 'value-holding',
+			holdingId: 'h',
+			label: 'Zapsat hodnotu'
+		});
+	});
+
+	it('escalates to warn past twice the cadence', () => {
+		// 56 days against a 20-day cadence is abandoned, not late.
+		const abandoned = reading({ reminderDays: 20 }, [valuation('a', 'h', '2026-06-30', 100_00)]);
+
+		expect(staleValuationFindings([abandoned])[0]?.severity).toBe('warn');
+	});
+
+	it('treats a holding that was never valued as the thing it exists to catch', () => {
+		const blank = reading({ name: 'Penzijko' }, []);
+
+		const [finding] = staleValuationFindings([blank]);
+
+		expect(finding?.title).toBe('Penzijko — zatím bez hodnoty');
+		expect(finding?.detail).toContain('první částku');
+	});
+
+	it('declines a holding a quarterly cadence has not caught up with yet', () => {
+		const quarterly = reading({ reminderDays: 90 }, [valuation('a', 'h', '2026-06-30', 100_00)]);
+
+		expect(staleValuationFindings([quarterly])).toEqual([]);
+	});
+
+	describe('contributionOf', () => {
+		const pension = holding('pension', { categoryId: 'save', startDate: '2026-07-01' });
+		const current = () =>
+			readHolding({
+				holding: pension,
+				valuations: [valuation('v', 'pension', '2026-08-20', 250_000_00)],
+				today: TODAY
+			});
+
+		it('reads what went in off the ledger, from startDate onwards', () => {
+			const txns = [
+				anyTxn('before', -50_000_00, 'save', '2026-06-15'), // predates the holding
+				anyTxn('july', -2_000_00, 'save', '2026-07-05'),
+				anyTxn('august', -2_000_00, 'save', '2026-08-05'),
+				anyTxn('elsewhere', -900_00, 'need', '2026-08-06')
+			];
+
+			const result = contributionOf({ reading: current(), holdings: [pension], txns });
+
+			expect(result.invested).toBe(4_000_00);
+			expect(result.growth).toBe(246_000_00);
+			expect(result.gap).toBeNull();
+		});
+
+		it('nets a refund into the bucket rather than counting it twice', () => {
+			const txns = [
+				anyTxn('in', -2_000_00, 'save', '2026-07-05'),
+				anyTxn('back', 500_00, 'save', '2026-07-20')
+			];
+
+			expect(contributionOf({ reading: current(), holdings: [pension], txns }).invested).toBe(
+				1_500_00
+			);
+		});
+
+		it('shows nothing when two live holdings share one bucket — Q37', () => {
+			const twin = holding('twin', { categoryId: 'save', startDate: '2026-07-01' });
+			const txns = [anyTxn('july', -2_000_00, 'save', '2026-07-05')];
+
+			const result = contributionOf({ reading: current(), holdings: [pension, twin], txns });
+
+			expect(result).toEqual({ invested: null, growth: null, gap: 'shared-category' });
+		});
+
+		it('ignores an archived twin — it cannot receive anything', () => {
+			const archived = holding('twin', { categoryId: 'save', isArchived: true });
+			const txns = [anyTxn('july', -2_000_00, 'save', '2026-07-05')];
+
+			const result = contributionOf({ reading: current(), holdings: [pension, archived], txns });
+
+			expect(result.invested).toBe(2_000_00);
+		});
+
+		it('has nothing to say without a bucket', () => {
+			const loose = holding('loose', { categoryId: null });
+			const reading = readHolding({ holding: loose, valuations: [], today: TODAY });
+
+			expect(contributionOf({ reading, holdings: [loose], txns: [] }).gap).toBe('no-category');
+		});
 	});
 });

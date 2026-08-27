@@ -22,13 +22,19 @@
 	import { db } from '$lib/db/schema';
 	import { archiveHolding, createHolding, recordValuation } from '$lib/db/repo';
 	import { balanceOf } from '$lib/domain/ledger';
-	import { readHoldings, wealthTotal, type HoldingReading } from '$lib/domain/holdings';
+	import {
+		contributionOf,
+		readHoldings,
+		wealthTotal,
+		type Contribution,
+		type HoldingReading
+	} from '$lib/domain/holdings';
 	import { formatShortDate, today } from '$lib/domain/datetime';
 	import { DAYS, plural } from '$lib/domain/czech';
 	import { ZERO, type Minor } from '$lib/domain/money';
-	import type { Account, Holding, Txn, Valuation } from '$lib/domain/types';
+	import type { Account, Category, Holding, Txn, Valuation } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
-	import HoldingSheet from '$lib/ui/HoldingSheet.svelte';
+	import HoldingSheet, { type HoldingInput } from '$lib/ui/HoldingSheet.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
@@ -53,6 +59,13 @@
 	const allHoldings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
 	const allValuations = liveQuery(() => db().valuations.toArray());
 
+	/** Buckets a holding may be fed from. Income categories cannot fund anything. */
+	const fundingCategories = liveQuery(async () =>
+		(await db().categories.orderBy('sortOrder').toArray()).filter(
+			(c: Category) => !c.isDeleted && !c.isArchived && !c.isIncome
+		)
+	);
+
 	/** Derived, and exact: the opening figure plus every row since. */
 	const cash = $derived(
 		balanceOf(($account as Account | null)?.openingBalance ?? ZERO, ($allTxns ?? []) as Txn[])
@@ -68,6 +81,26 @@
 
 	const wealth = $derived(wealthTotal({ cash, readings }));
 
+	/**
+	 * What went in, and what it did since — per holding, read off the ledger.
+	 *
+	 * Keyed rather than zipped so the markup can look one up without caring about
+	 * ordering. `gap` carries the reason there is no figure, which is the Q37
+	 * ruling made visible: two live holdings on one bucket means no number for
+	 * either, because a number you cannot check is worse than a blank.
+	 */
+	const contributions = $derived.by(() => {
+		const holdings = ($allHoldings ?? []) as Holding[];
+		const txns = ($allTxns ?? []) as Txn[];
+		return new Map<string, Contribution>(
+			readings.map((reading) => [reading.holding.id, contributionOf({ reading, holdings, txns })])
+		);
+	});
+
+	const anySharedBucket = $derived(
+		[...contributions.values()].some((c) => c.gap === 'shared-category')
+	);
+
 	let adding = $state(false);
 	let valuing = $state<string | null>(null);
 
@@ -75,7 +108,7 @@
 	   the same reading the row behind it is. */
 	const valuingReading = $derived(readings.find((r) => r.holding.id === valuing) ?? null);
 
-	async function addHolding(input: { name: string; kind: Holding['kind']; reminderDays: number }) {
+	async function addHolding(input: HoldingInput) {
 		const holding = await createHolding(input);
 		adding = false;
 		// Straight into the number: a holding with no value is the empty state
@@ -96,7 +129,7 @@
 		const name = valuingReading?.holding.name ?? '';
 		await archiveHolding(valuing);
 		valuing = null;
-		toast.show(`„${name}" schováno`);
+		toast.show(`„${name}“ schováno`);
 	}
 
 	/** "k 3. 6. · 47 dní" — or just "dnes", when there is nothing to explain. */
@@ -208,10 +241,35 @@
 								</span>
 							{/if}
 						</span>
+
+						<!--
+						  Two numbers that have never been next to each other before: what
+						  was put in, off the ledger, and what the value did on top of it.
+						  Growth is never income and never enters the month's split — it is
+						  unrealised, and nobody allocated it.
+						-->
+						{#if contributions.get(reading.holding.id)?.gap === null}
+							{@const own = contributions.get(reading.holding.id)!}
+							<span class="holding__split">
+								<span class="holding__leg">
+									vloženo <Money value={own.invested!} size="sm" currency={false} colour={false} />
+								</span>
+								<span class="holding__leg">
+									růst <Money value={own.growth!} size="sm" currency={false} />
+								</span>
+							</span>
+						{/if}
 					</button>
 				</li>
 			{/each}
 		</ul>
+
+		{#if anySharedBucket}
+			<p class="footnote prose">
+				Dvě investice míří do stejné kategorie, takže se nedá říct, kolik z ní šlo kam — vklady se
+				proto u nich neukazují. Dej každé vlastní kategorii v nastavení, nebo jedné žádnou.
+			</p>
+		{/if}
 
 		<p class="footnote prose">
 			Hodnoty jsou to, co jsi opsal z výpisu — nic se nikam nenačítá. Růst se nepočítá jako příjem a
@@ -220,7 +278,12 @@
 	{/if}
 </main>
 
-<HoldingSheet open={adding} onsave={addHolding} onclose={() => (adding = false)} />
+<HoldingSheet
+	open={adding}
+	categories={($fundingCategories ?? []) as Category[]}
+	onsave={addHolding}
+	onclose={() => (adding = false)}
+/>
 
 <ValuationSheet
 	reading={valuingReading}
@@ -429,6 +492,29 @@
 		align-items: baseline;
 		gap: var(--space-2);
 		flex: none;
+	}
+
+	/*
+	   The contribution pair, on its own line under the age.
+
+	   Below rather than beside: the row's top line is the number that matters and
+	   the foot already carries the as-of date, and three figures competing across
+	   one line is how a card stops being readable at a glance.
+	*/
+	.holding__split {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2) var(--space-4);
+		padding-block-start: var(--space-2);
+		border-block-start: 1px solid var(--hairline);
+		font-size: var(--text-sm);
+		color: var(--ink-3);
+	}
+
+	.holding__leg {
+		display: inline-flex;
+		align-items: baseline;
+		gap: var(--space-2);
 	}
 
 	.holding__percent {

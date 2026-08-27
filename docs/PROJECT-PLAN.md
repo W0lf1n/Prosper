@@ -1,16 +1,20 @@
 # Výdaje — Project Plan
 
-**Name:** Výdaje
+**Name:** Výdaje · repository `Prosper`
 **Owner:** Petr
-**Status:** P0 and P1 shipped — in daily use, 14-day gate running. Targeting
-(§2.2) shipped 2026-08-24. P2 (sync) not started.
+**Status:** P0, P1 and **P2 (sync)** shipped. Targeting, investments, recurring
+payments and P5 reporting shipped on top of P1. P3 designed, not built. The
+14-day gate (§11) is running.
 **Audience:** Claude Code (implementation), Petr (decisions)
-**Last revised:** 2026-08-24
+**Last revised:** 2026-08-27
 
 > This document describes the app **as it now stands**, not as it was first
 > imagined. Where reality and the original plan disagreed, reality won and the
 > reasoning is recorded here or in `DECISIONS.md`. Both are binding on future
 > work.
+>
+> **Unfinished work is not listed here.** It lives in `TODO.md`, which is the
+> only file in `docs/` that carries a backlog.
 
 ---
 
@@ -38,8 +42,8 @@ everything else exists to serve it.
 ## 2. The four laws — the spine of the product
 
 Each law answers a different question, and each one has a mechanism in the app
-rather than a page of advice. A feature that serves no law is a feature this
-project does not build.
+rather than a page of advice. **A feature that serves no law is a feature this
+project does not build.**
 
 ### 2.1 Tracking — _you cannot manage what you do not measure_
 
@@ -64,72 +68,79 @@ justifies most of this section.
 
 ### 2.2 Targeting — _unwritten goals are wishes_
 
-| Mechanism                                                                                                                                                                                                                                                                    | Where                                                              | Status  |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------- |
-| A `Goal` cannot be saved without **all three** of: a why (min 10 chars), an amount, and a date. The refusal is the mechanism, not a validation nicety — the save button names the missing piece rather than accepting the tap and complaining.                               | `domain/goals.ts` → `validateGoal`, `/cil`                         | shipped |
-| **The month is the horizon anybody acts on.** A `MonthTarget` is one month's written commitment. The app can always _compute_ what the month has to carry; that number becomes a target only once he says yes to it, and the screen shows which of the two it is looking at. | `domain/types.ts` → `MonthTarget`, `db/repo.ts` → `setMonthTarget` | shipped |
-| The goal is on the launch route, permanently: name, this month's bar, what is still missing.                                                                                                                                                                                 | `ui/GoalStrip.svelte`                                              | shipped |
-| Progress is read off the ledger that already exists — money that landed in the goal's bucket, nothing else. No second set of books, which is the only reason it can be trusted.                                                                                              | `domain/goals.ts` → `contributions`                                | shipped |
-| Saving into the goal's bucket makes the confirmation say where the month now stands. The cheapest place to put a target in front of somebody is the half-second after they moved towards it.                                                                                 | `/` → `goalLine`                                                   | shipped |
-| `SPOŘENÍ` is its own bucket, and is what a new goal points at by default. In the spreadsheet, "dlouhodobá investice" — 2 000 Kč every month without fail — was buried inside OSTATNÍ, so the one number this law needs could not be read.                                    | `db/seed.ts`, `domain/goals.ts` → `defaultGoalCategory`            | shipped |
-| Required monthly contribution, computed exactly and **rounded up** — a number that lands a few haléře short every month misses the date.                                                                                                                                     | `domain/goals.ts` → `requiredMonthly`                              | shipped |
-| The record of months, ✓ or ✗ against the number he committed to. This is where Targeting turns into Training.                                                                                                                                                                | `domain/goals.ts` → `monthHistory`                                 | shipped |
-| The month's net is the first thing on screen, every launch.                                                                                                                                                                                                                  | `ui/MonthTotals.svelte`                                            | shipped |
+Shipped 2026-08-24, ahead of its phase, because it was the only one of the four
+laws with no mechanism at all.
+
+| Mechanism                                                                                                                                                                                                                                                                    | Where                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A `Goal` cannot be saved without **all three** of: a why (min 10 chars), an amount, and a date. The refusal is the mechanism, not a validation nicety — the save button names the missing piece rather than accepting the tap and complaining.                               | `domain/goals.ts` → `validateGoal`, `/cil`                         |
+| **The month is the horizon anybody acts on.** A `MonthTarget` is one month's written commitment. The app can always _compute_ what the month has to carry; that number becomes a target only once he says yes to it, and the screen shows which of the two it is looking at. | `domain/types.ts` → `MonthTarget`, `db/repo.ts` → `setMonthTarget` |
+| The goal is on the launch route, permanently: name, this month's bar, what is still missing.                                                                                                                                                                                 | `ui/GoalStrip.svelte`                                              |
+| Progress is read off the ledger that already exists — money that landed in the goal's bucket, nothing else. No second set of books, which is the only reason it can be trusted.                                                                                              | `domain/goals.ts` → `contributions`                                |
+| Saving into the goal's bucket makes the confirmation say where the month now stands. The cheapest place to put a target in front of somebody is the half-second after they moved towards it.                                                                                 | `/` → `goalLine`                                                   |
+| `SPOŘENÍ` is its own bucket, and is what a new goal points at by default. In the spreadsheet, "dlouhodobá investice" — 2 000 Kč every month without fail — was buried inside OSTATNÍ, so the one number this law needs could not be read.                                    | `db/seed.ts`, `domain/goals.ts` → `defaultGoalCategory`            |
+| Required monthly contribution, computed exactly and **rounded up** — a number that lands a few haléře short every month misses the date.                                                                                                                                     | `domain/goals.ts` → `requiredMonthly`                              |
+| The record of months, ✓ or ✗ against the number he committed to. This is where Targeting turns into Training.                                                                                                                                                                | `domain/goals.ts` → `monthHistory`                                 |
+| The month's net is the first thing on screen, every launch.                                                                                                                                                                                                                  | `ui/MonthTotals.svelte`                                            |
 
 ### 2.3 Trimming — _"necessary" expenses expand to match income_
 
 Trimming is impossible when spending hides in the wrong bucket, so most of this
 law is enforced at entry time rather than at review time.
 
-| Mechanism                                                                                                                                                                                                                     | Where                                |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| Every category carries a `spendType`: `need` / `want` / `give` / `save` / `debt`. This is what both splits read; it is not cosmetic.                                                                                          | `domain/types.ts`                    |
-| Groceries (`POTRAVINY`, need) are separated from eating out (`JÍDLO`, want) — the discretionary half is the half you can act on.                                                                                              | `db/seed.ts`                         |
-| A description that looks like another bucket raises a one-tap correction **before** the row is saved.                                                                                                                         | `checks.ts` → `misfiled`             |
-| `OSTATNÍ` is watched: once it passes 15 % of the month's recurring outflow, the app says so and asks what belongs elsewhere.                                                                                                  | `checks.ts` → `other-overflow`       |
-| One-off spending is separated from the running cost of a month, so a single purchase cannot flatter or ruin the average.                                                                                                      | `Txn.isOneOff`, `/mesic`             |
-| A vague description on a large amount is challenged while it can still be fixed.                                                                                                                                              | `checks.ts` → `vague`                |
-| The **10 / 10 / 10 / 70 split**, measured against income rather than outflow — a share of outflow always sums to 100 % and can never say whether more went out than came in. Two rings: what you did, and what the book says. | `domain/prosperity.ts`, `/mesic`     |
-| `give` is a spend type of its own. Money given away with nothing expected back is not a want, and filed as one it vanishes into the discretionary pile.                                                                       | `domain/types.ts` — DECISIONS.md Q33 |
+| Mechanism                                                                                                                                                                                                                     | Where                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Every category carries a `spendType`: `need` / `want` / `give` / `save` / `debt`. This is what both splits read; it is not cosmetic.                                                                                          | `domain/types.ts`                                  |
+| Groceries (`POTRAVINY`, need) are separated from eating out (`JÍDLO`, want) — the discretionary half is the half you can act on.                                                                                              | `db/seed.ts`                                       |
+| A description that looks like another bucket raises a one-tap correction **before** the row is saved.                                                                                                                         | `checks.ts` → `misfiled`                           |
+| `OSTATNÍ` is watched: once it passes 15 % of the month's recurring outflow, the app says so — **and the finding opens the month's rows in that bucket, largest first, each with the bucket the vocabulary would move it to.** | `checks.ts` → `other-overflow`, `domain/refile.ts` |
+| One-off spending is separated from the running cost of a month, so a single purchase cannot flatter or ruin the average.                                                                                                      | `Txn.isOneOff`, `/mesic`                           |
+| A vague description on a large amount is challenged while it can still be fixed.                                                                                                                                              | `checks.ts` → `vague`                              |
+| The **10 / 10 / 10 / 70 split**, measured against income rather than outflow — a share of outflow always sums to 100 % and can never say whether more went out than came in. Two rings: what you did, and what the book says. | `domain/prosperity.ts`, `/mesic`                   |
+| `give` is a spend type of its own. Money given away with nothing expected back is not a want, and filed as one it vanishes into the discretionary pile.                                                                       | `domain/types.ts` — DECISIONS.md Q33               |
+| A recurring payment can be **declared** — what is owed, to whom, out of which bucket, on which day — with its annual cost stated where it is set.                                                                             | `domain/recurring.ts`, `/settings`                 |
 
 **Evidence this law needed teeth:** 25 286 Kč of food was filed under BYDLENÍ,
 LIFESTYLE, DARY and PROJEKTY across eight months while JÍDLO reported 13 083 Kč.
 The most controllable category in the book was under-reported threefold.
 
-**What is still missing:** the law now has enforcement and a target _shape_, but
-no _cap_. `Category.monthlyCap` is in the schema and null on every row. The
-design — one cap a month, chosen from evidence, visible on the entry chip — is in
-`TRIMMING-AND-TRAINING.md`.
+The law has enforcement and a target _shape_. It still has no _cap_ —
+`Category.monthlyCap` is in the schema and null on every row. The design is in
+`TRIMMING-AND-TRAINING.md` T2; the outstanding work is in `TODO.md` §4.2.
 
 ### 2.4 Training — _repetition until it is a habit_
 
-| Mechanism                                                                                                                               | Where                             | Status                                                        |
-| --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------- |
-| The checks run on **every keystroke** of every entry. Training is not a monthly event; it is a hundred small corrections.               | `checks.ts` → `checkDraft`        | shipped                                                       |
-| Nothing a check says ever blocks a save. A system that punishes recording is a system that stops being used.                            | `checks.ts` (contract)            | shipped                                                       |
-| A subscription seen in each of the last three months but missing from this one becomes a question.                                      | `checks.ts` → `missing-recurring` | shipped                                                       |
-| The record of months against a written target — ✓ or ✗, four in a row being the book's actual claim about training.                     | `/cil` → `monthHistory`           | shipped                                                       |
-| Monthly close ritual: empty the queue, reconcile, review the split, set one cap, write one sentence.                                    | —                                 | **P3** — designed in `TRIMMING-AND-TRAINING.md`               |
-| Coverage ring and streak.                                                                                                               | —                                 | **P3** — designed                                             |
-| ~~Health score~~ — a single compounded number is uninterpretable when it moves, which is the one thing a training signal must never be. | —                                 | **proposed for rejection**, see `TRIMMING-AND-TRAINING.md` R4 |
+| Mechanism                                                                                                                 | Where                                |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| The checks run on **every keystroke** of every entry. Training is not a monthly event; it is a hundred small corrections. | `checks.ts` → `checkDraft`           |
+| Nothing a check says ever blocks a save. A system that punishes recording is a system that stops being used.              | `checks.ts` (contract)               |
+| A subscription seen in each of the last three months but missing from this one becomes a question.                        | `checks.ts` → `findMissingRecurring` |
+| The record of months against a written target — ✓ or ✗, four in a row being the book's actual claim about training.       | `/cil` → `monthHistory`              |
+| Undo on every save.                                                                                                       | `ui/Toaster.svelte`                  |
+
+This is still the least finished of the four laws, though less so: the coverage
+ring and the streak shipped 2026-08-27. The monthly close ritual and the nudge
+are designed in `TRIMMING-AND-TRAINING.md` and not built. The **health score is proposed for rejection** (R4): a single compounded
+number is uninterpretable when it moves, which is the one thing a training
+signal must never be.
 
 ---
 
 ## 3. Success criteria
 
-| Metric                                                    | Target               | Actual                                                                      |
-| --------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------- |
-| Time from home screen tap to saved transaction            | ≤ 5 s                | 3 actions: type, tap bucket, save — **needs a real stopwatch on the phone** |
-| Cold start to interactive (mid-range Android, cache warm) | ≤ 1 s                | not yet measured on device                                                  |
-| JS bundle, brotli, initial route                          | ≤ 150 kB             | **74.7 kB**                                                                 |
-| CSS, brotli                                               | —                    | 5.1 kB                                                                      |
-| Self-hosted fonts                                         | —                    | 108 kB, cached once, offline-safe                                           |
-| Days-covered                                              | ≥ 90 % after month 2 | pending                                                                     |
-| Reconciliation delta vs bank, month end                   | 0 Kč                 | pending (P3)                                                                |
-| Still in daily use                                        | month 3              | **the real metric**                                                         |
+| Metric                                                    | Target               | Actual                                                          |
+| --------------------------------------------------------- | -------------------- | --------------------------------------------------------------- |
+| Time from home screen tap to saved transaction            | ≤ 5 s                | 3 actions: type, tap bucket, save — **untimed on a real phone** |
+| Cold start to interactive (mid-range Android, cache warm) | ≤ 1 s                | not yet measured on device                                      |
+| JS bundle, brotli, entry route                            | ≤ 150 kB             | **80.4 kB**                                                     |
+| CSS, brotli, entry route                                  | —                    | 9.5 kB                                                          |
+| Self-hosted fonts                                         | —                    | 96.9 kB, cached once, offline-safe                              |
+| Days-covered                                              | ≥ 90 % after month 2 | pending                                                         |
+| Reconciliation delta vs bank, month end                   | 0 Kč                 | pending (P3)                                                    |
+| Still in daily use                                        | month 3              | **the real metric**                                             |
 
 Excel failed on friction, not features. Every design decision defers to entry
-speed.
+speed. The three unmeasured rows are tracked in `TODO.md` §3.
 
 ### Non-goals (v1)
 
@@ -149,18 +160,19 @@ speed.
 
 Full reasoning, including every rejected alternative, is in `DECISIONS.md`.
 
-|                | Decision                                                                        |
-| -------------- | ------------------------------------------------------------------------------- |
-| Frontend       | **SvelteKit 2.63 + Svelte 5.56** (runes forced), Vite 8, TypeScript 6 strict    |
-| Client storage | **Dexie 4.4.5**, schema v1 behind a migration array                             |
-| Money          | `number` in minor units (haléře), branded `Minor`, all arithmetic in one module |
-| Ids            | Client-generated **UUIDv7**, hand-rolled, no dependency                         |
-| Hosting        | Static output (`adapter-static`), same origin as the API from P2                |
-| UI language    | **Czech.** Code, identifiers, comments and docs stay English                    |
-| Currency       | CZK only; `currency` column present and unused on every account                 |
-| Phone          | Android primary; iOS kept working as a degraded case                            |
-| History import | **None.** Clean start — the 2026 workbook has no dates to import                |
-| Backend / sync | ASP.NET Core 9 + Postgres 16, hand-rolled outbox + LWW — **P2, not written**    |
+|                | Decision                                                                         |
+| -------------- | -------------------------------------------------------------------------------- |
+| Frontend       | **SvelteKit 2.63 + Svelte 5.56** (runes forced), Vite 8, TypeScript 6 strict     |
+| Client storage | **Dexie 4.4.5**, schema **v6** behind a migration array                          |
+| Money          | `number` in minor units (haléře), branded `Minor`, all arithmetic in one module  |
+| Ids            | Client-generated **UUIDv7**, hand-rolled, no dependency                          |
+| Hosting        | Static output (`adapter-static`), same origin as the API from P2                 |
+| UI language    | **Czech.** Code, identifiers, comments and docs stay English                     |
+| Currency       | CZK only; `currency` column present and unused on every account                  |
+| Phone          | Android primary; iOS kept working as a degraded case                             |
+| History import | **None.** Clean start — the 2026 workbook has no dates to import                 |
+| Repository     | `github.com/W0lf1n/Prosper`, public, **MIT**                                     |
+| Backend / sync | ASP.NET Core 9 + Postgres 16, hand-rolled outbox + LWW — **written**, `apps/api` |
 
 ### The workbook
 
@@ -179,8 +191,8 @@ full analysis, including the eight distinct failure modes it exhibited, is in
 │                                                              │
 │  ┌─────────────┐   ┌──────────────┐   ┌───────────────────┐  │
 │  │ UI (Svelte) │──▶│ domain layer │──▶│ Dexie / IndexedDB │  │
-│  │  5 screens  │   │  PURE, no IO │   │ txns, categories, │  │
-│  └─────────────┘   │  148 tests   │   │ accounts, OUTBOX  │  │
+│  │  6 screens  │   │  PURE, no IO │   │ txns, categories, │  │
+│  └─────────────┘   │  283 tests   │   │ holdings, OUTBOX  │  │
 │         │          └──────────────┘   └─────────┬─────────┘  │
 │         │                  │                    │            │
 │         │          ┌───────▼────────┐           │            │
@@ -194,7 +206,7 @@ full analysis, including the eight distinct failure modes it exhibited, is in
 └─────────────────────────────────────────────────│────────────┘
                                                   │ HTTPS, JWT (P2)
                                                   ▼
-┌──────────────── CONTABO VPS (Docker) — P2 ───────────────────┐
+┌──────────────── CONTABO VPS (Docker) — apps/api ─────────────┐
 │  Caddy  →  ASP.NET Core 9 Minimal API  →  Postgres 16        │
 │                                        nightly pg_dump → NAS │
 └──────────────────────────────────────────────────────────────┘
@@ -202,125 +214,166 @@ full analysis, including the eight distinct failure modes it exhibited, is in
 
 **Client is the source of truth for authoring. Server is durable storage and a
 cross-device merge point.** The app must be fully functional with the server
-permanently down — which, today, it is, because there is no server.
+permanently down, and stays that way: a device that has never been paired never
+queues a row and never makes a request.
 
 ---
 
 ## 6. Data model
 
 Client and server mirror each other. Client TS shown; server mirrors in C# with
-`long` for money.
+`long` for money. The authoritative version is `domain/types.ts`.
 
 ```ts
 // All ids are client-generated UUIDv7 (time-sortable). Server never assigns ids.
 // All money is integer minor units (haléře). Signed: negative = outflow.
 
-type Minor = number & { __brand: "minor" };
+type Minor = number & { __brand: 'minor' };
 
-type AccountKind = "checking" | "savings" | "cash" | "credit" | "loan";
-type SpendType = "need" | "want" | "save" | "debt";
-type TxnSource = "manual" | "import-gpc" | "bank-api" | "recurring";
+type AccountKind = 'checking' | 'savings' | 'cash' | 'credit' | 'loan';
+type SpendType = 'need' | 'want' | 'give' | 'save' | 'debt'; // `give`: Q33
+type TxnSource = 'manual' | 'import-gpc' | 'bank-api' | 'recurring';
+type ScheduleMode = 'confirm' | 'auto';
+type HoldingKind = 'cash' | 'savings' | 'investment' | 'crypto';
 
 /** Fields every synced row carries, from day one. */
 interface Synced {
-  updatedAt: string; // ISO datetime, client clock
-  deviceId: string;
-  isDeleted: boolean; // soft delete only, always
+	updatedAt: string; // ISO datetime, client clock
+	deviceId: string;
+	isDeleted: boolean; // soft delete only, always
 }
 
 interface Account extends Synced {
-  id: string;
-  name: string;
-  kind: AccountKind;
-  openingBalance: Minor;
-  openingDate: string;
-  currency: string; // 'CZK'
-  isArchived: boolean;
-  sortOrder: number;
+	id: string;
+	name: string;
+	kind: AccountKind;
+	openingBalance: Minor;
+	openingDate: string;
+	currency: string; // 'CZK'
+	isArchived: boolean;
+	sortOrder: number;
 }
 
 interface Category extends Synced {
-  id: string;
-  parentId: string | null; // one level of nesting, no deeper
-  name: string;
-  spendType: SpendType; // drives Trimming — not cosmetic
-  monthlyCap: Minor | null; // null = untracked (P3)
-  sortOrder: number;
-  isArchived: boolean;
-  isIncome: boolean; // DEVIATION — DECISIONS.md Q21
+	id: string;
+	parentId: string | null; // one level of nesting, no deeper
+	name: string;
+	spendType: SpendType; // drives Trimming — not cosmetic
+	monthlyCap: Minor | null; // null = untracked (P3)
+	sortOrder: number;
+	isArchived: boolean;
+	isIncome: boolean; // DEVIATION — DECISIONS.md Q21
 }
 
 interface Txn extends Synced {
-  id: string;
-  accountId: string;
-  date: string; // ISO date, local, no timezone games
-  amount: Minor; // signed
-  categoryId: string | null; // null only for legacy rows — see §6.1
-  payee: string; // the spreadsheet's `popis`
-  note: string | null;
-  transferPairId: string | null;
-  source: TxnSource;
-  isCleared: boolean;
-  createdAt: string;
+	id: string;
+	accountId: string;
+	date: string; // ISO date, local, no timezone games
+	amount: Minor; // signed
+	categoryId: string | null; // null only for legacy rows — see §6.1
+	payee: string; // the spreadsheet's `popis`
+	note: string | null;
+	transferPairId: string | null;
+	source: TxnSource;
+	isCleared: boolean;
+	createdAt: string;
 
-  isOneOff: boolean; // DEVIATION — DECISIONS.md Q22
-  owedAmount: Minor | null; // DEVIATION — DECISIONS.md Q25
-  owedBy: string | null;
-  settledByTxnId: string | null;
+	isOneOff: boolean; // DEVIATION — DECISIONS.md Q22
+	owedAmount: Minor | null; // DEVIATION — DECISIONS.md Q25
+	owedBy: string | null;
+	settledByTxnId: string | null;
+	scheduleId: string | null; // DECISIONS.md Q40 — null for anything hand-typed
+}
+
+/** A payment that repeats: a declaration, not a detection. Q40. */
+interface Schedule extends Synced {
+	id: string;
+	payee: string;
+	categoryId: string;
+	amount: Minor; // signed
+	dayOfMonth: number; // 1–31, clamped into short months
+	startMonth: string; // YYYY-MM
+	endMonth: string | null; // null = open-ended
+	mode: ScheduleMode; // default 'confirm'
+	lastPostedMonth: string | null; // a watermark, not a derivation
+	isArchived: boolean;
+	sortOrder: number;
 }
 
 interface Reconciliation extends Synced {
-  id: string;
-  accountId: string;
-  date: string;
-  statementBalance: Minor; // what the bank says
-  computedBalance: Minor; // what the ledger says
-  adjustmentTxnId: string | null;
+	id: string;
+	accountId: string;
+	date: string;
+	statementBalance: Minor; // what the bank says
+	computedBalance: Minor; // what the ledger says
+	adjustmentTxnId: string | null;
 }
 
 interface Goal extends Synced {
-  // Targeting law
-  id: string;
-  name: string;
-  why: string; // REQUIRED, min 10 chars — enforced
-  targetAmount: Minor; // REQUIRED
-  targetDate: string; // REQUIRED
-  linkedAccountId: string | null;
-  categoryId: string | null; // DEVIATION — DECISIONS.md Q26
-  startDate: string; // DEVIATION — DECISIONS.md Q27
+	// Targeting law
+	id: string;
+	name: string;
+	why: string; // REQUIRED, min 10 chars — enforced
+	targetAmount: Minor; // REQUIRED
+	targetDate: string; // REQUIRED
+	linkedAccountId: string | null;
+	categoryId: string | null; // DEVIATION — DECISIONS.md Q26
+	startDate: string; // DEVIATION — DECISIONS.md Q27
 }
 
 interface MonthTarget extends Synced {
-  // one month's written commitment
-  id: string;
-  goalId: string;
-  month: string; // YYYY-MM
-  amount: Minor; // positive magnitude
+	// one month's written commitment
+	id: string;
+	goalId: string;
+	month: string; // YYYY-MM
+	amount: Minor; // positive magnitude
+}
+
+/** Something owned whose value is *stated*, not derived. Q36. */
+interface Holding extends Synced {
+	id: string;
+	name: string;
+	kind: HoldingKind;
+	currency: string; // 'CZK'
+	categoryId: string | null; // which bucket funds it — unused in v1, see Q37
+	reminderDays: number; // per holding: a pension is quarterly, a wallet is not
+	isArchived: boolean;
+	sortOrder: number;
+}
+
+/** One reading of a holding, on a day. A series, never a mutable column. */
+interface Valuation extends Synced {
+	id: string;
+	holdingId: string;
+	date: string; // the day the value was true, not the day it was typed
+	value: Minor; // positive magnitude
+	note: string | null;
+	createdAt: string; // tie-breaks two readings on the same date
 }
 
 interface DayMark {
-  // explicit "I spent nothing today"
-  date: string; // PK
-  deviceId: string;
-  updatedAt: string;
+	// explicit "I spent nothing today"
+	date: string; // PK
+	deviceId: string;
+	updatedAt: string;
 }
 
 interface OutboxEntry {
-  // client-only, never synced. Idle until P2.
-  seq?: number;
-  entity:
-    | "txn"
-    | "account"
-    | "category"
-    | "goal"
-    | "monthTarget"
-    | "reconciliation"
-    | "dayMark";
-  entityId: string;
-  payload: unknown; // full row, not a diff
-  queuedAt: string;
-  attempts: number;
-  lastError: string | null;
+	// client-only, never synced. Idle until P2.
+	seq?: number;
+	entity: SyncedEntity; // txn | account | category | goal | monthTarget
+	//                       | reconciliation | dayMark | holding | valuation | schedule
+	entityId: string;
+	payload: unknown; // full row, not a diff
+	queuedAt: string;
+	attempts: number;
+	lastError: string | null;
+}
+
+/** Local key/value: device id, active account. Not domain data, never synced. */
+interface MetaEntry {
+	key: string;
+	value: unknown;
 }
 ```
 
@@ -345,6 +398,27 @@ interface OutboxEntry {
 - **A computed monthly figure is not a target.** `MonthTarget` exists so the
   number he agreed to is distinguishable from the number the app worked out. The
   screen says which one it is showing.
+- **A valuation is not a transaction.** It never reaches `income`, `outflow`,
+  `net`, `recurringOutflow`, any `BucketTotal`, or `prosperitySplit`.
+  `summariseMonth` does not take holdings as input and must not be given them.
+- **Unrealised growth is not income.** Money from a holding enters the ledger
+  only when it is actually sold, as an ordinary inflow.
+- **Current value is the latest live reading, chosen in one place.**
+  `currentValuation()` is the only function allowed to pick it.
+- **A value is never shown without its date once it is older than its holding's
+  cadence** — including inside `celkem`, which names the oldest reading it rests
+  on.
+- **A day is covered by a transaction _or_ an explicit `DayMark`.** That is the
+  entire reason `DayMark` exists, and coverage is measured against days
+  **elapsed**, never days in the month — otherwise the 3rd reads as a 90 %
+  failure.
+- **A reconciliation delta is a missing transaction, not an error.** The bank is
+  right about the balance and the ledger is right about the reasons. The fix is
+  an ordinary row; the balance is never overwritten, and there is no tolerance —
+  nine haléře out is still out.
+- **`Schedule.lastPostedMonth` is a watermark, not a derivation.** Posting is
+  therefore idempotent, deleting a posted row does not resurrect it on the next
+  launch, and "we skipped July" is expressible at all.
 - `updatedAt` uses the client clock. Acceptable: single user, LWW, clock skew
   between one person's own devices is seconds.
 - Categories are archived, never hard-deleted, while transactions reference them.
@@ -370,9 +444,10 @@ rows only.
 
 ## 7. The checks
 
-`domain/checks.ts` — pure, 148 tests across the domain layer. Every rule exists
-because the spreadsheet already went wrong that way, and each carries the figure
-from the workbook in a comment so nobody later deletes it as theoretical.
+`domain/checks.ts` — pure, and covered by the 203 tests across the domain layer.
+Every rule exists because the spreadsheet already went wrong that way, and each
+carries the figure from the workbook in a comment so nobody later deletes it as
+theoretical.
 
 **Contract: no check ever blocks a save.** A check that stops you recording an
 expense is worse than the mistake it prevents.
@@ -405,30 +480,33 @@ KVĚTEN −45 937, ČERVENEC −10 048 — and no screen he looked at ever said 
 
 ## 8. Screens
 
-Five, all shipped.
+Six. Four of them sit in the tab bar — `/tape`, `/mesic`, `/cil`, `/settings` —
+with a record disc between them that returns to the entry screen. **The entry
+screen carries no tab bar**: the keypad owns the bottom of the phone and needs
+every pixel on a short screen. `/jmeni` is not a tab either, on purpose — it is
+the screen you open once a month, and it is reached from the `/` header.
 
 ### `/` — Entry (the launch route)
 
 ```
 ┌────────────────────────────────────┐
-│ SRPEN 2026            [tape] [gear]│  ← month totals, tap = /mesic
-│ Celkem                             │
-│ −27 861,00 Kč      ↑59 414 ↓87 275 │
+│ SRPEN 2026        [tape][jmění][⚙]│  ← the header slab
+│ −22 301,00 Kč      ↑59 400 ↓81 701 │  ← the month, tap = /mesic
+│ zůstatek měsíce                    │
 │ ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ │
-│ Rezerva  ▓▓▓▓░░░  2 800/4 285      │  ← the goal, always, tap = /cil
+│ Rezerva  ▬ 5 000,00/5 000  splněn  │  ← the goal, always, tap = /cil
 ├────────────────────────────────────┤
-│          [ Výdaj | Příjem ]        │  ← segmented, half-height
 │                                    │
-│            −249,00  Kč             │  ← the object, in a pool of light
-│                                    │
-│ [POTRAVINY][JÍDLO][BYDLENÍ][search]│  ← 3 most-used + search sheet
+│         (↓)  249  Kč               │  ← the object, in a pool of light
+│                                    │     the disc IS the direction toggle
+│ [POTRAVINY][JÍDLO][BYDLENÍ][ 🔍 ]  │  ← 3 most-used + search sheet
+│ [dnes] [komu / za co...........▾]  │
+│ mimořádný výdaj [ ○]    dluží mi › │
 │ ⚠ Spíš JÍDLO?          DÁT DO JÍDLO│  ← live check, one-tap fix
-│ [dnes] [komu / za co............]  │
-│ [mimořádný výdaj]      [dluží mi]  │
 │ ┌────────────────────────────────┐ │
-│ │  1    2    3                   │ │  ← floating slab
+│ │  7    8    9                   │ │  ← floating slab
 │ │  4    5    6                   │ │
-│ │  7    8    9                   │ │
+│ │  1    2    3                   │ │
 │ │  ,    0    ⌫                   │ │
 │ │  [        ULOŽIT        ]      │ │
 │ └────────────────────────────────┘ │
@@ -438,26 +516,54 @@ Five, all shipped.
 The month's standing is the first thing visible, every launch — the answer to
 "how am I doing" before anything is typed.
 
-### `/tape` — Ledger
+Direction is the **coin**: a disc beside the amount carrying an arrow, tapped to
+flip between výdaj and příjem. It replaced a two-word segmented control, which
+replaced a `−` glyph nobody could read. The ambient light behind the amount takes
+the direction's hue, so which way the money is going is answered before the sign
+is read.
 
-Reverse-chronological, one floating card per month, days separated by dashed
-perforations, running balance per row, gap days rendered as hatched holes, open
-receivables marked in amber. Tap a row to edit or delete.
+When a declared recurring payment is due, a strip appears above the keypad
+offering it: one tap accepts, the amount is editable first, and skipping needs no
+reason (`ui/DueStrip.svelte`).
 
-### `/mesic` — Month
+### `/tape` — Výpis
 
-The workbook's `SUMA` sheet, rebuilt: income / outflow / net, one-off spending
-separated from the running cost, the **Kontrola** panel listing the month's
-findings, buckets ranked by spend with spend-type colouring, and **Dluží mi** —
-everything outstanding, with a one-tap _Přijato_ that creates the repayment.
+Reverse-chronological, the account balance on a slab at the top, one floating
+card per month, days separated by score lines, running balance per row, gap days
+rendered as holes, explicit zero days marked, open receivables flagged. Tap a row
+to edit or delete.
 
-Plus **Rozdělení příjmu**: the 10 / 10 / 10 / 70 split as two rings, what you did
-above what the book says, sharing one set of colours so the comparison is made by
-eye. The centre of the first ring carries the remainder — what is left of the
-month's income, or how far past it you went. Each class shows its distance from
-its mark, and one line names the single class furthest below.
+The balance slab carries **Srovnat s bankou** and how long it has been since it
+was last done. The sheet shows the ledger's figure first and unprompted, takes
+the statement's figure under it, and computes the difference as you type — this
+is not a memory test, the two numbers are supposed to agree.
 
-### `/cil` — Goal
+**A difference is offered as a row to write, never as a balance to overwrite.**
+Overwriting would close the gap and destroy the evidence in one move. The
+adjustment is one-off by construction: a correction is not the running cost of a
+month. There is a second, quieter option — record the disagreement and write
+nothing — which is the right answer when the difference is a card payment that
+has not cleared.
+
+### `/mesic` — Měsíc
+
+The workbook's `SUMA` sheet, rebuilt, in this order: income / outflow / net; the
+one-off figure separated from the running cost of the month; the goal's month;
+the **Kontrola** panel listing the month's findings; **Dluží mi** — everything
+outstanding, with a one-tap _Přijato_ that creates the repayment; **Rozdělení
+příjmu**; and **Kam to šlo**, buckets ranked by spend with spend-type colouring.
+
+**Zápisy** sits above Kontrola: a ring of days recorded against days _elapsed_,
+the streak, and how many holes are left. It is placed there because coverage is a
+statement about whether every number above it can be believed.
+
+Rozdělení příjmu is the 10 / 10 / 10 / 70 split as two rings, what you did above
+what the book says, sharing one set of colours so the comparison is made by eye.
+The centre of the first ring carries the remainder — what is left of the month's
+income, or how far past it you went. Each class shows its distance from its mark,
+and one line names the single class furthest below.
+
+### `/cil` — Cíl
 
 The Targeting law, in three parts and that order: **the why** in his own words at
 the top, before any number; **this month's** figure, marked as committed or
@@ -470,58 +576,72 @@ the one place in the app where something blocks a save — a half-written goal
 records nothing, unlike a half-described expense, which at least holds the
 amount.
 
+### `/jmeni` — Jmění
+
+`celkem`: the ledger balance plus every holding's current value, with the two
+halves named separately underneath. Then one card per holding — its value, the
+day that value was true, and an amber age once the reading is older than that
+holding's own cadence. Tapping one opens the keypad sheet to record a new
+reading.
+
+Below it, a line that has to stay there: the values are what you copied off a
+statement, nothing is fetched, and growth is neither income nor part of the
+month's split.
+
 ### `/settings`
 
-Account name and opening balance, category management (rename, spend type,
-archive, add), theme, JSON export/import backup, storage-persistence status,
-schema version.
-
-Not yet built: **Monthly close** (P3), **Reconcile** (P3), and the Trimming and
-Training mechanisms designed in `TRIMMING-AND-TRAINING.md`.
+Account name and opening balance · category management (rename, spend type,
+archive, add) · **Pravidelné platby**, with each schedule's mode and the annual
+cost · theme · JSON export/import backup, storage-persistence status, schema
+version.
 
 ---
 
 ## 9. Design
 
-Grounded in the subject: a **receipt tape**, floating in light. Not a dashboard,
-not a fintech gradient.
-
-### Palette — quiet blue, both themes
-
-The original cool-grey paper palette was replaced on 2026-08-23. Tokens live in
+The system is called **graphite instrument**, and it replaced the "quiet blue
+paper" palette this document originally specified. Tokens live in
 `lib/styles/tokens.css` and are the only place colours are defined.
 
+**Dark first.** The app is used one-handed, in bed, with the lights off, so the
+graphite theme is the one it was designed for and the light theme is its daylight
+counterpart — not the other way round. Both palettes are declared twice, once for
+the system preference and once for an explicit `data-theme`, so the toggle wins
+in both directions. An explicit choice moves `color-scheme` with it, or the
+browser keeps painting native controls from the system preference.
+
+### The colour rules, and they are short
+
 ```css
-/* light */                    /* dark */
---paper:  #ECEFF7;             #0A1120   /* the ground */
---tape:   #FFFFFF;             #141D30   /* a floating surface */
---ink:    #101A2B;             #E7EDF9
---rule:   #DAE1EE;             #233149
---accent: #2F6BD8;             #6E9CF5   /* primary action, selection */
---out:    #B8403C;             #F0857E   /* outflow — muted brick */
---in:     #1B7A5F;             #55C6A2   /* inflow — teal-green */
---flag:   #8F5F05;             #EEBB55   /* amber: needs attention */
+/* light */                      /* dark */
+--ground:   #EEEFEC;             #0A0C0D   /* the ground */
+--surface:  #FBFCFA;             #15181A   /* a raised slab */
+--ink:      #101413;             #E8ECEC
+--hairline: #DCDFD9;             #232829
+--signal:   #007850;             #3DE0A0   /* the one accent */
+--out:      #101413;             #E8ECEC   /* outflow: no hue at all */
+--in:       #007850;             #3DE0A0
+--flag:     #7D5900;             #F3C563   /* amber: look at this */
+--danger:   #B93225;             #FF6B5B   /* destroy or refuse */
 ```
 
-Dark mode is required — this app is used one-handed, in bed, with the lights
-off. Both palettes are declared twice — once for the system preference, once for
-an explicit `data-theme` — so the toggle wins in both directions.
-
-**Contrast, verified in both themes:** every ink/surface pair used for body text
-meets **WCAG AA (4.5:1)** on `--tape`, `--tape-2`, `--paper` and on all three
-washes. The light amber and the tertiary ink were both darkened on 2026-08-23 to
-reach it.
-
-The one exception is deliberate: `--paper-2`, the far end of the background
-gradient, sits between 4.2:1 and 4.4:1 for the semantic colours. Nothing small is
-ever painted there — the only text over the bare ground is the entry amount at
-55 px, where the large-text threshold is 3:1. **Rule: no small text directly on
-the ground.** Text belongs on a slab.
+- **`--signal` is the primary action, the current selection, and money coming
+  in. Nothing else.** It is never decoration.
+- **Money going out has no hue.** It is the ink. Most rows in a ledger are
+  outflow, and forty red numbers is noise, not information. The one place this is
+  deliberately suspended is the ambient pool behind the entry amount, where there
+  is exactly one number on screen and the whole question is which way it points.
+- **Elevation is luminance.** Each step up is a step lighter; shadows only
+  confirm what luminance already said. The scale **inverts** between themes, so a
+  control uses `--raised` rather than hard-coding an end of it.
+- The 10/10/10/70 split has four colours of its own, chosen to stay apart at a
+  glance in a ring thirteen units thick.
 
 ### Form
 
-- **Slabs, not sheets.** Every surface has a hairline, a soft shadow and an 18 px
-  radius, and sits above a gradient ground.
+- **Slabs, not sheets.** Every surface has a hairline, a lit top edge, a soft
+  shadow and a 20 px radius, and sits above a graphite ground with a fine grain
+  over it. The grain is the difference between a flat fill and a material.
 - **The amount sits in light.** A radial glow behind it, nothing else near it —
   the one "object" on the screen. Pure CSS; there is no 3D asset to download.
 - **App shell.** The window never scrolls. Each screen is a fixed frame with its
@@ -535,25 +655,32 @@ the ground.** Text belongs on a slab.
   right-aligned. Columns of amounts align to the decimal. This is functional and
   it is the visual identity.
 - The largest type on any screen is a mono amount. No decorative display face.
-- Both faces are **self-hosted** (108 kB, latin + latin-ext). A font CDN would
+- Eight fixed sizes, never fluid. The single `clamp()` in the system is the
+  keypad amount, and that one is a hero rather than a heading.
+- Uppercase is allowed in exactly one place: `.u-label`, the micro-label. These
+  are machine labels on an instrument, not headings in a document.
+- Both faces are **self-hosted** (97 kB, latin + latin-ext). A font CDN would
   break the offline promise.
 
 ### Money toasts
 
 Saving money is not the same event as saving a setting, and does not look like
 one: the amount at 28 px in the direction's colour, an arrow badge, bucket and
-payee underneath, undo, and a spring-in landing.
+payee underneath, undo, and a spring-in landing. The toast lifts itself clear of
+the tab bar on screens that have one.
 
 ### Quality floor, unannounced
 
-Thumb-reachable primary actions, **44 px minimum touch targets** (the segmented
-direction control is visually half that and recovers the target with an
-invisible inset), visible keyboard focus, `prefers-reduced-motion` respected,
-works at 320 px width, keypad fully operable from a hardware keyboard.
+Thumb-reachable primary actions and a **44 px minimum touch target**. Small
+controls are drawn at 24 px and recover the target with a transparent inset,
+which is why rows of them keep a derived gutter — that gutter is where the hit
+areas live. Visible keyboard focus, `prefers-reduced-motion` respected, works at
+320 px width, keypad fully operable from a hardware keyboard, and text on the
+bare ground is never small (it belongs on a slab).
 
 ---
 
-## 10. Sync protocol — P2, not yet built
+## 10. Sync protocol — built
 
 Batched, idempotent, cursor-based. Six endpoints.
 
@@ -579,71 +706,65 @@ GET  /api/v1/export/xlsx?from&to                      → binary                
 7. Triggers: app foreground, connectivity regained, after write (debounced 10 s),
    manual pull-to-refresh.
 
-The `outbox` table and the `enqueue()` seam in `db/repo.ts` already exist and are
-called by every mutation. `SYNC_ENABLED` is `false`; flipping it on is where P2
-starts.
+The `outbox` table and the `enqueue()` seam in `db/repo.ts` are called by every
+mutation, and the seam is gated on whether this device has ever been paired — an
+unpaired device queues nothing.
+
+**One deviation from §6, recorded here and in `DECISIONS.md`:** the server does
+not mirror the domain model as ten typed tables. It stores each row as JSON in a
+single `changes` table, because §10.2 requires a monotonic cursor **across every
+entity** and ten tables cannot produce one without a log table beside them. That
+log is the storage. The server never computes a balance, validates a category or
+touches money — it merges rows and hands them back in order.
+
+**A device joining a ledger that already exists gives up its own seed.** Every
+device seeds itself on first launch, so pairing two produces two accounts and two
+of every bucket, each device showing an empty tape while holding the other's
+rows. `adoptRemoteLedger` soft-deletes a seed account this device never wrote
+into, and it runs after every pull rather than only at pairing — because pairing
+two devices in quick succession is a race the protocol cannot order.
 
 ---
 
 ## 11. Phases
 
-### P0 — Foundation ✅ _shipped_
+| Phase                         | State                                                                                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P0** Foundation             | ✅ TS strict, ESLint, Prettier, Vitest. `money.ts` written and tested first. Dexie schema behind a migration array. Design tokens                                     |
+| **P1** MVP, local only        | ✅ Six screens, the checks layer, category set seeded from the real workbook, service worker, installable, works fully in airplane mode. No backend, no sync, no auth |
+| **P2** Sync                   | Not started                                                                                                                                                           |
+| **P3** Reliability & guidance | Designed, not built                                                                                                                                                   |
+| **P4** Import                 | Not started                                                                                                                                                           |
+| **P5** Reporting              | Not started                                                                                                                                                           |
 
-Repo, TS strict, ESLint, Prettier, Vitest. `money.ts` written and tested first.
-Dexie schema v1 with a migration array. Design tokens.
+Targeting (§2.2), investments (`INVESTMENTS.md`), recurring payments
+(`RECURRING.md`), sync and reporting shipped on top of P1, ahead of their
+phases, each for a reason recorded in `DECISIONS.md`.
 
-**Done:** `money.test.ts` passes including negative amounts, rounding, and Czech
-formatting (`1 234,50 Kč`).
+### The gate
 
-### P1 — MVP, local only ✅ _shipped_
+P1 is **done when** the app has been installed on the phone and used for
+**14 consecutive days** without touching the code. ← _this is where the project
+is now._
 
-Entry screen, ledger tape, month view, settings. Category set seeded from the
-real workbook. One account. Service worker, installable, works fully in airplane
-mode. The checks layer. **No backend, no sync, no auth.**
-
-**Done when:** installed on the phone and used for **14 consecutive days**
-without touching the code. ← _this is where the project is now_
-
-> Stop here. Ship nothing further until those 14 days are done. Real usage will
+> Stop here. Ship no new feature until those 14 days are done. Real usage will
 > invalidate a meaningful share of the P3 assumptions in this document, and it is
 > cheaper to learn that before the sync layer exists.
 
-### P2 — Sync
+Defects and repository housekeeping are exempt — see `TODO.md` §1 and §2.
 
-ASP.NET Core API, Postgres, Docker Compose on Contabo. Device pairing, JWT.
-Outbox drain, push/pull, LWW merge. Sync status in Settings.
-
-**Done when:** a transaction entered offline on the phone appears in the desktop
-browser after reconnect, and vice versa, with the outbox draining to zero.
-
-### P3 — Reliability & guidance
-
-Reconciliation flow. Days-covered ring and streak. Category caps.
-**Monthly close ritual.** Nudge notification. Full design, with build order and
-the four questions it needs answered first, in `TRIMMING-AND-TRAINING.md`.
-
-_(The Goals screen moved out of this phase — it shipped 2026-08-24, ahead of the
-gate, because Targeting was the one law with no mechanism at all.)_
-
-**Done when:** the first month closes with a zero reconciliation delta.
-
-### P4 — Import
-
-GPC/ABO parser. Duplicate detection: date ± 3 days + exact amount + fuzzy payee.
-Review-before-apply screen. **Never auto-apply an import.**
-
-### P5 — Reporting
-
-Category trends month over month. XLSX export via ClosedXML. Goal progress.
+The scope of each unstarted phase, and everything left inside the shipped ones,
+is in `TODO.md` §4.
 
 ---
 
 ## 12. Repository layout
 
 ```
-financni prosperita/
+Prosper/
 ├─ apps/
 │  ├─ web/                          # SvelteKit PWA
+│  │  ├─ CLAUDE.md                  #   app-specific working rules
 │  │  ├─ src/lib/domain/            # PURE — no Dexie, no fetch, no DOM
 │  │  │  ├─ money.ts                #   the only place money is computed
 │  │  │  ├─ amount-input.ts         #   keypad state machine
@@ -654,21 +775,42 @@ financni prosperita/
 │  │  │  ├─ receivables.ts          #   money owed to you
 │  │  │  ├─ goals.ts                #   Targeting: targets, pace, the record
 │  │  │  ├─ prosperity.ts           #   the 10/10/10/70 split, against income
+│  │  │  ├─ holdings.ts             #   stated values, staleness, the total
+│  │  │  ├─ recurring.ts            #   declared schedules, catch-up, cost
+│  │  │  ├─ trends.ts               #   month over month, per bucket
+│  │  │  ├─ xlsx.ts                 #   a spreadsheet, without a dependency
 │  │  │  ├─ vocabulary.ts           #   Petr's own words, from the workbook
 │  │  │  └─ checks.ts               #   the four laws, enforced
 │  │  ├─ src/lib/db/                # schema + migrations; the only writer
+│  │  ├─ src/lib/sync/              # outbox drain, pull, pairing, status
 │  │  ├─ src/lib/ui/                # hand-rolled components, no UI kit
 │  │  ├─ src/lib/styles/            # tokens.css, app.css, self-hosted fonts
-│  │  ├─ src/routes/                # / · /tape · /mesic · /cil · /settings
-│  │  └─ src/service-worker.ts      # app shell cache, hand-rolled
-│  └─ api/                          # ASP.NET Core 9 — P2, not started
-├─ packages/contracts/              # shared TS sync types — P2
+│  │  ├─ src/routes/                # / · /tape · /mesic · /cil · /jmeni
+│  │  │                             #   · /settings
+│  │  ├─ src/service-worker.ts      # app shell cache, hand-rolled
+│  │  └─ vite.config.ts             # SvelteKit + adapter + Vitest, all inline
+│  └─ api/                          # ASP.NET Core 9 + EF Core + Postgres 16
+│     ├─ src/Prosper.Api/           #   pairing, push, pull, health
+│     ├─ tests/Prosper.Api.Tests/   #   32 tests against SQLite in memory
+│     └─ docker-compose.yml         #   the deployment
+├─ packages/contracts/              # the sync protocol, shared with the client
+├─ scripts/check-bundle.mjs         # the 150 kB budget, enforced
+├─ .github/workflows/ci.yml         # lint · check · test · build · budget · api
 ├─ docs/
-│  ├─ PROJECT-PLAN.md               # this file
+│  ├─ PROJECT-PLAN.md               # this file — the app as it stands
+│  ├─ TODO.md                       # the only backlog
+│  ├─ DECISIONS.md                  # ADR log — every answer, every deviation
 │  ├─ TRIMMING-AND-TRAINING.md      # laws 3 and 4 — design, not yet built
-│  └─ DECISIONS.md                  # ADR log — every answer, every deviation
+│  ├─ INVESTMENTS.md                # /jmeni — shipped, plus what is left
+│  ├─ RECURRING.md                  # declared recurring payments — shipped
+│  └─ screens/                      # README screenshots
+├─ CLAUDE.md                        # working rules for the whole repository
+├─ LICENSE                          # MIT
 └─ pnpm-workspace.yaml
 ```
+
+There is **no `svelte.config.js`** — the SvelteKit plugin, the adapter and
+Vitest are all configured inline in `apps/web/vite.config.ts`.
 
 ---
 
@@ -695,7 +837,7 @@ Non-negotiable. Violations are bugs regardless of test status.
 11. **Czech date and money formatting via `Intl`**, never hand-rolled. Czech
     plurals via `domain/czech.ts` — "3 záznamy", not "3 záznamů".
 12. **Ask before adding a dependency.** Every package is a bundle-size decision
-    against the 150 kB budget.
+    against the 150 kB budget. The app ships one: Dexie.
 13. **A schema change is a new entry in the `migrations` array**, never an edit
     to an existing one — a released version is already on the phone.
 14. **Update `DECISIONS.md`** whenever a question gets answered or an assumption
@@ -703,14 +845,32 @@ Non-negotiable. Violations are bugs regardless of test status.
 
 ### Testing
 
-- **Unit (Vitest):** `money.ts` exhaustively. Tape building. Keypad state.
-  Every check rule. Receivables. Goal validation, pace and history. Czech
-  plurals. Merge/LWW logic. Current valuation, staleness and the wealth total —
-  including the invariant that holdings never reach the month summary or the
-  split. Recurring due dates, month clamping, bounded catch-up and the annual
-  figure. — _203 tests_
-- **Integration (P2):** outbox drain against a mock API — happy path, 4xx, 5xx,
-  offline mid-flush, duplicate push.
+**333 unit tests, Vitest, eighteen files.** Most are against `domain/`, which is
+the whole point of the layer being pure. Three files are the exceptions, and each
+earns it: `db/repo.test.ts` and `db/schema.test.ts` test persistence and
+migrations, which _are_ the thing being tested, and `sync/engine.test.ts` drives
+the outbox against a stubbed server.
+
+The API has **32 tests of its own** (`dotnet test`), against SQLite in memory
+rather than the EF in-memory provider — that code opens transactions and relies
+on a unique index, and the in-memory provider honours neither.
+
+- `money.ts` exhaustively, including the magnitudes where a float would round
+  wrong. Tape building and gap days. Keypad state. Every check rule.
+  Receivables. Goal validation, pace and history. Czech plurals. Merge/LWW
+  logic. Current valuation, staleness and the wealth total. Recurring due dates,
+  month clamping, bounded catch-up and the annual figure.
+- **The one test that must never be deleted** is in `holdings.test.ts`:
+  `summariseMonth` and `prosperitySplit` asserted byte-identical with a full set
+  of holdings in the database. It fails if anyone ever wires unrealised growth
+  into income, which would make the 10/10/10/70 split fiction.
+- **Integration:** the outbox drain against a mock API — happy path, 4xx, 5xx,
+  offline mid-flush, duplicate push. All present in `sync/engine.test.ts`.
+- **Migrations are tested against a database built at the old version.** A
+  migration that has only ever run against an empty database has not been tested
+  at all, and a released version is already on the phone.
+- **The bundle budget is a test.** `pnpm budget` fails the build over 150 kB
+  brotli on the entry route. A budget nobody measures is a preference.
 - **Manual, mandatory before each phase ships:** airplane mode → enter 5
   transactions → force-close the app → reopen → reconnect → verify all 5 on the
   server, outbox at zero.
@@ -724,9 +884,10 @@ Non-negotiable. Violations are bugs regardless of test status.
 | ----------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Abandoned like the Excel sheet                              | **High**          | The 14-day P1 gate exists precisely for this. If it fails, the design is wrong — fix it or stop.                        |
 | Mandatory category adds enough friction to hurt entry speed | Medium            | New as of 2026-08-23. Watch it during the 14 days; the fallback is a default bucket, not a queue.                       |
-| Entry too slow, defeats the purpose                         | Medium            | Measure it. Actual stopwatch, from home screen tap. Not a vibe.                                                         |
+| Entry too slow, defeats the purpose                         | Medium            | Measure it. Actual stopwatch, from home screen tap. Not a vibe. Still outstanding — `TODO.md` §3.                       |
 | The checks become nagging and get ignored                   | Medium            | Nothing blocks; warnings are one line with a one-tap fix. If a rule fires constantly, the rule is wrong — fix the rule. |
 | Only copy of the ledger is one browser profile              | **High until P2** | Settings nags about JSON export. `navigator.storage.persist()` requested on every load.                                 |
+| A backup written by a newer build, imported by an older one | Low               | Currently unguarded — `TODO.md` §1.4.                                                                                   |
 | iOS PWA limitations bite                                    | Low               | Android is primary.                                                                                                     |
 | Sync merge corrupts the ledger                              | Low               | Soft delete + append-mostly + idempotency. Nightly `pg_dump` to NAS.                                                    |
 | Scope creep into a full accounting system                   | Medium            | The non-goals list in §3 is binding.                                                                                    |
@@ -735,18 +896,21 @@ Non-negotiable. Violations are bugs regardless of test status.
 
 ## 15. Handoff prompt for the next phase
 
-> Read `docs/PROJECT-PLAN.md` and `docs/DECISIONS.md` in full before writing any
-> code.
+> Read `docs/PROJECT-PLAN.md`, `docs/DECISIONS.md` and `docs/TODO.md` in full
+> before writing any code.
 >
 > P0 and P1 are shipped and in use. **Do not start P2 until the 14-day gate in
-> §11 has passed**, and when it has, expect some of §11's P3 assumptions to be
-> wrong — ask before building on them.
+> §11 has passed**, and when it has, expect some of the P3 assumptions in
+> `TRIMMING-AND-TRAINING.md` to be wrong — ask before building on them. The
+> defects in `TODO.md` §1 and the housekeeping in §2 are exempt from the gate
+> and can be done now.
 >
-> Implement **P2 only**: the ASP.NET Core 9 API, Postgres schema mirroring §6,
-> device pairing, and the outbox drain. The client seam already exists in
-> `db/repo.ts` — `enqueue()` and the `SYNC_ENABLED` flag.
+> P2 is built and verified two-device against a real server. What is left of it
+> is deployment rather than code: a run against actual Postgres, the nightly
+> `pg_dump`, and serving the client from the same origin.
+>
+> The next feature phase is **P3** — reconciliation, the coverage ring, category
+> caps, the monthly close ritual and the nudge. Most of it is blocked on Q29–Q32
+> in `TODO.md` §5; ask before building on them.
 >
 > Follow §13 without exception. The domain layer stays pure and stays tested.
->
-> When P2 is done, list what you found in this document that is wrong,
-> underspecified, or that you disagree with, before P3 starts.

@@ -5,6 +5,7 @@
 		clearZeroSpendDay,
 		deleteTxn,
 		markZeroSpendDay,
+		reconcileAccount,
 		restoreTxn,
 		updateTxn
 	} from '$lib/db/repo';
@@ -12,10 +13,13 @@
 	import { ZERO, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
 	import { buildTape } from '$lib/domain/ledger';
 	import { isOpenReceivable } from '$lib/domain/receivables';
-	import type { Category, Txn } from '$lib/domain/types';
+	import { daysSinceReconciled } from '$lib/domain/reconcile';
+	import { DAYS, counted } from '$lib/domain/czech';
+	import type { Category, Reconciliation, Txn } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
+	import ReconcileSheet from '$lib/ui/ReconcileSheet.svelte';
 	import Sheet from '$lib/ui/Sheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
@@ -51,6 +55,57 @@
 	);
 
 	const balance = $derived(months[0]?.days[0]?.balance ?? $account?.openingBalance ?? ZERO);
+
+	// ── reconciliation ──────────────────────────────────────────────────────
+	const reconciliations = liveQuery(() => db().reconciliations.toArray());
+
+	let reconciling = $state(false);
+
+	const sinceReconciled = $derived(
+		data.accountId
+			? daysSinceReconciled(($reconciliations ?? []) as Reconciliation[], data.accountId, today())
+			: null
+	);
+
+	/**
+	 * The balance handed to the sheet, captured *before* anything is written.
+	 *
+	 * A figure read after the adjustment lands already contains it, and the
+	 * reconciliation would then record a delta of zero against a balance that
+	 * never existed — the row would be right and the record of why would be a
+	 * lie.
+	 */
+	const computedBalance = $derived(balance);
+
+	/** Income buckets included: a difference can be money that arrived. */
+	const reconcileCategories = $derived(
+		(($categories ?? []) as Category[]).filter((c) => !c.isDeleted && !c.isArchived)
+	);
+
+	async function saveReconciliation(input: {
+		statementBalance: Minor;
+		date: string;
+		adjust: boolean;
+		categoryId: string | null;
+	}) {
+		if (!data.accountId) return;
+
+		const result = await reconcileAccount({
+			accountId: data.accountId,
+			statementBalance: input.statementBalance,
+			computedBalance,
+			date: input.date,
+			adjust: input.adjust,
+			categoryId: input.categoryId
+		});
+
+		reconciling = false;
+		toast.show(
+			result.adjustment
+				? `Vyrovnáno o ${formatMoney(result.adjustment.amount, { sign: 'never' })}`
+				: 'Srovnáno s bankou'
+		);
+	}
 
 	// ── edit sheet ──────────────────────────────────────────────────────────
 	let editing = $state<Txn | null>(null);
@@ -119,11 +174,41 @@
 
 <AppBar title="Výpis" />
 
+<!--
+  The balance, and the one thing you can do to it: check it against the bank.
+
+  The reconcile action lives here rather than in Settings because this is where
+  the number being checked is printed. Sending somebody to a settings screen to
+  verify a figure they are currently looking at is how a monthly habit becomes a
+  yearly one.
+-->
 <section class="balance">
 	<h2 class="balance__name u-label">{$account?.name ?? '—'}</h2>
 	<Money value={balance} colour={false} size="2xl" bold />
 	<span class="balance__caption">aktuální zůstatek</span>
+
+	<button type="button" class="balance__check" onclick={() => (reconciling = true)}>
+		<span class="balance__check-label">Srovnat s bankou</span>
+		<span class="balance__check-age">
+			{#if sinceReconciled === null}
+				zatím nikdy
+			{:else if sinceReconciled === 0}
+				dnes
+			{:else}
+				před {counted(sinceReconciled, DAYS)}
+			{/if}
+		</span>
+	</button>
 </section>
+
+<ReconcileSheet
+	open={reconciling}
+	computed={computedBalance}
+	accountName={$account?.name ?? 'Účet'}
+	categories={reconcileCategories}
+	onsave={saveReconciliation}
+	onclose={() => (reconciling = false)}
+/>
 
 <main class="tape">
 	{#each months as month (month.key)}
@@ -267,6 +352,32 @@
 		border: 1px solid var(--hairline);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--edge), var(--elev-1);
+	}
+
+	/* A full-width row rather than a corner button: it carries two pieces of
+	   information — the action and how long since it was last done — and the
+	   second one is the reason anybody taps the first. */
+	.balance__check {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		min-height: var(--touch);
+		margin-top: var(--space-3);
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--hairline);
+		text-align: left;
+	}
+
+	.balance__check-label {
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--signal);
+	}
+
+	.balance__check-age {
+		font-size: var(--text-xs);
+		color: var(--ink-3);
 	}
 
 	.balance__name {

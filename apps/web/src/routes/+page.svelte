@@ -16,6 +16,7 @@
 	import { addDays, formatDayHeading, monthKey, today } from '$lib/domain/datetime';
 	import {
 		CURRENCY_SYMBOL,
+		ZERO,
 		formatMoney,
 		neg,
 		parseAmount,
@@ -25,8 +26,19 @@
 	import { categoryRanking, recentPayees } from '$lib/domain/ledger';
 	import { checkDraft, summariseMonth, type Finding } from '$lib/domain/checks';
 	import { dueGroups, type DueGroup } from '$lib/domain/recurring';
+	import { readHoldings, wealthTotal } from '$lib/domain/holdings';
+	import { currentStreak } from '$lib/domain/coverage';
 	import { goalCategoryIds, goalStatus, pickPrimary } from '$lib/domain/goals';
-	import type { Category, Goal, MonthTarget, Schedule } from '$lib/domain/types';
+	import type {
+		Category,
+		DayMark,
+		Goal,
+		Holding,
+		MonthTarget,
+		Schedule,
+		Txn,
+		Valuation
+	} from '$lib/domain/types';
 	import CategoryPicker from '$lib/ui/CategoryPicker.svelte';
 	import DueStrip from '$lib/ui/DueStrip.svelte';
 	import GoalStrip from '$lib/ui/GoalStrip.svelte';
@@ -62,6 +74,44 @@
 	);
 
 	const allSchedules = liveQuery(() => db().schedules.orderBy('sortOrder').toArray());
+
+	const allDayMarks = liveQuery(() => db().dayMarks.toArray());
+
+	/**
+	 * The streak — one figure, in the corner of the totals slab, and that is R1's
+	 * whole footprint on this screen. Coverage is a review number; the amount and
+	 * the keypad own the primary column.
+	 */
+	const streak = $derived(
+		currentStreak({
+			txns: ($allTxns ?? []) as Txn[],
+			marks: ($allDayMarks ?? []) as DayMark[],
+			today: today()
+		})
+	);
+
+	const allHoldings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
+	const allValuations = liveQuery(() => db().valuations.toArray());
+
+	/**
+	 * How many readings have gone off — the whole footprint the reminder is
+	 * allowed on this screen (`INVESTMENTS.md` I5).
+	 *
+	 * It becomes one dot on the Jmění icon. It deliberately does NOT reach the
+	 * check strip below the payee field: that strip belongs to the row being
+	 * typed, and mixing "your pension statement is old" into it would make the
+	 * one thing this screen is for slower.
+	 */
+	const staleHoldings = $derived(
+		wealthTotal({
+			cash: ZERO,
+			readings: readHoldings({
+				holdings: ($allHoldings ?? []) as Holding[],
+				valuations: ($allValuations ?? []) as Valuation[],
+				today: today()
+			})
+		}).staleCount
+	);
 
 	/**
 	 * Standing orders whose day has come and which have not been settled.
@@ -271,7 +321,7 @@
 
 	async function skipDue(group: DueGroup) {
 		await skipScheduled(group.item);
-		toast.show(`„${group.item.schedule.payee}" tenhle měsíc přeskočeno`);
+		toast.show(`„${group.item.schedule.payee}“ tenhle měsíc přeskočeno`);
 	}
 
 	function setDirection(next: 'out' | 'in') {
@@ -352,6 +402,7 @@
 				outflow={summary.outflow}
 				net={summary.net}
 				href={resolve('/mesic')}
+				{streak}
 			>
 				{#snippet actions()}
 					<a class="icon-link" href={resolve('/tape')} aria-label="Výpis">
@@ -363,8 +414,22 @@
 					  no height at all on the screen that has none to spare, and it is one
 					  tap from launch.
 					-->
-					<a class="icon-link" href={resolve('/jmeni')} aria-label="Jmění">
+					<a
+						class="icon-link"
+						href={resolve('/jmeni')}
+						aria-label={staleHoldings > 0 ? 'Jmění — hodnota je stará' : 'Jmění'}
+					>
 						<Icon name="wealth" size={20} />
+						<!--
+						  A dot, and nothing else. No text, no count, no interruption: the
+						  entry screen's job is a five-second transaction, and a nag about a
+						  pension statement while a number is half-typed is precisely the
+						  friction that killed the spreadsheet. The month view says it in
+						  words; here it only has to be noticeable.
+						-->
+						{#if staleHoldings > 0}
+							<span class="icon-link__flag" aria-hidden="true"></span>
+						{/if}
 					</a>
 					<a class="icon-link" href={resolve('/settings')} aria-label="Nastavení">
 						<Icon name="settings" size={20} />
@@ -638,6 +703,7 @@
 
 <style>
 	.icon-link {
+		position: relative;
 		display: grid;
 		place-items: center;
 		width: var(--touch);
@@ -647,6 +713,19 @@
 		transition:
 			color var(--dur-fast) var(--ease-out),
 			background var(--dur-fast) var(--ease-out);
+	}
+
+	.icon-link__flag {
+		position: absolute;
+		top: 9px;
+		right: 9px;
+		width: 7px;
+		height: 7px;
+		border-radius: var(--radius-full);
+		background: var(--flag);
+		/* Ringed in the surface it sits on, so it reads as a dot on the glyph
+		   rather than as part of it at any zoom. */
+		box-shadow: 0 0 0 2px var(--surface);
 	}
 
 	.icon-link:active {

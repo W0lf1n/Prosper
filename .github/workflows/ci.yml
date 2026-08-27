@@ -1,0 +1,66 @@
+# The three commands that have to pass before anything lands, plus the API's
+# own tests. All of it runs in under a minute — a check that is slow enough to
+# be skipped is a check nobody keeps.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# A second push to the same branch cancels the first: the only result anybody
+# reads is the newest one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Lint first: it is the fastest and it fails on the most trivial things,
+      # so it is the one that should tell you before the clock has started.
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+
+      # The 150 kB brotli budget is a rule (§13.12), and a rule nobody measures
+      # is a preference. This fails the build rather than reporting a number
+      # into a log nobody opens.
+      - name: Bundle budget
+        run: node scripts/check-bundle.mjs
+
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - run: dotnet restore
+        working-directory: apps/api
+
+      # Warnings are errors in the csproj, so this is the style gate too.
+      - run: dotnet build --no-restore
+        working-directory: apps/api
+
+      - run: dotnet test --no-build --verbosity normal
+        working-directory: apps/api
