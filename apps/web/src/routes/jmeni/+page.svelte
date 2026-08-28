@@ -20,7 +20,7 @@
 	 */
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
-	import { archiveHolding, createHolding, recordValuation } from '$lib/db/repo';
+	import { archiveHolding, createHolding, recordValuation, updateHolding } from '$lib/db/repo';
 	import { balanceOf } from '$lib/domain/ledger';
 	import {
 		contributionOf,
@@ -101,16 +101,49 @@
 		[...contributions.values()].some((c) => c.gap === 'shared-category')
 	);
 
-	let adding = $state(false);
+	/**
+	 * Two sheets, and between them the whole of a holding.
+	 *
+	 * `ValuationSheet` is the number — the keypad, the previous reading, the
+	 * delta. `HoldingSheet` is everything the number is *about*: the name, the
+	 * kind, the cadence, the bucket it is fed from, and archiving it.
+	 *
+	 * The second one used to live on `/nastavení`, so a holding had two editors
+	 * on two screens and neither could do the other's job — a typo was fixed in
+	 * Settings and a value was typed here, and nothing said so. Both are now
+	 * reached from this screen: `+` in the bar opens a blank one, a row opens
+	 * its value, and `Upravit investici` inside that hands over to the other.
+	 */
+	let editingHolding = $state<Holding | null>(null);
+	let holdingSheetOpen = $state(false);
 	let valuing = $state<string | null>(null);
 
 	/* Read back out of the live list rather than held, so the sheet is looking at
 	   the same reading the row behind it is. */
 	const valuingReading = $derived(readings.find((r) => r.holding.id === valuing) ?? null);
 
-	async function addHolding(input: HoldingInput) {
+	function openNewHolding() {
+		editingHolding = null;
+		holdingSheetOpen = true;
+	}
+
+	/* From inside the valuation sheet: one closes as the other opens. */
+	function editHolding() {
+		editingHolding = valuingReading?.holding ?? null;
+		if (!editingHolding) return;
+		valuing = null;
+		holdingSheetOpen = true;
+	}
+
+	async function saveHolding(input: HoldingInput) {
+		if (editingHolding) {
+			await updateHolding(editingHolding.id, input);
+			holdingSheetOpen = false;
+			return;
+		}
+
 		const holding = await createHolding(input);
-		adding = false;
+		holdingSheetOpen = false;
 		// Straight into the number: a holding with no value is the empty state
 		// this screen exists to get out of.
 		valuing = holding.id;
@@ -124,11 +157,17 @@
 		valuing = null;
 	}
 
+	/**
+	 * Archived rather than deleted, like a category: the readings still point at
+	 * it, and a value with nothing to belong to is worse than a row that stopped
+	 * appearing.
+	 */
 	async function archive() {
-		if (!valuing) return;
-		const name = valuingReading?.holding.name ?? '';
-		await archiveHolding(valuing);
-		valuing = null;
+		if (!editingHolding) return;
+		const name = editingHolding.name;
+		await archiveHolding(editingHolding.id);
+		holdingSheetOpen = false;
+		editingHolding = null;
 		toast.show(`„${name}“ schováno`);
 	}
 
@@ -148,12 +187,7 @@
 
 <AppBar title="Jmění">
 	{#snippet trail()}
-		<button
-			type="button"
-			class="bar-action"
-			onclick={() => (adding = true)}
-			aria-label="Přidat investici"
-		>
+		<button type="button" class="bar-action" onclick={openNewHolding} aria-label="Přidat investici">
 			<Icon name="plus" size={22} stroke={1.9} />
 		</button>
 	{/snippet}
@@ -196,7 +230,7 @@
 				Přidej penzijko, ETF nebo spořicí účet a zapiš, kolik má dneska hodnotu. Kolik do toho
 				posíláš se počítá dál v běžných výdajích — sem patří jen to, na kolik to vyrostlo.
 			</p>
-			<button type="button" class="btn btn--primary" onclick={() => (adding = true)}>
+			<button type="button" class="btn btn--primary" onclick={openNewHolding}>
 				Přidat investici
 			</button>
 		</section>
@@ -267,7 +301,8 @@
 		{#if anySharedBucket}
 			<p class="footnote prose">
 				Dvě investice míří do stejné kategorie, takže se nedá říct, kolik z ní šlo kam — vklady se
-				proto u nich neukazují. Dej každé vlastní kategorii v nastavení, nebo jedné žádnou.
+				proto u nich neukazují. Ťukni na investici, dej si <em>Upravit investici</em> a přiřaď každé vlastní
+				kategorii, nebo jedné žádnou.
 			</p>
 		{/if}
 
@@ -279,16 +314,18 @@
 </main>
 
 <HoldingSheet
-	open={adding}
+	open={holdingSheetOpen}
+	holding={editingHolding}
 	categories={($fundingCategories ?? []) as Category[]}
-	onsave={addHolding}
-	onclose={() => (adding = false)}
+	onsave={saveHolding}
+	onarchive={editingHolding ? archive : null}
+	onclose={() => (holdingSheetOpen = false)}
 />
 
 <ValuationSheet
 	reading={valuingReading}
 	onsave={saveValuation}
-	onarchive={archive}
+	onedit={editHolding}
 	onclose={() => (valuing = null)}
 />
 

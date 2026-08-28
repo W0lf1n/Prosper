@@ -79,7 +79,8 @@ added as **schema v6** when contributions shipped. It exists for the same reason
 The v6 backfill takes the first of the month of the holding's earliest reading,
 falling back to the current month for one never valued. Both are guesses and
 both are conservative — they never claim a contribution the holding might not
-have received — and both are one field away from being corrected in Settings.
+have received — and both are one field away from being corrected: tap the
+holding, then `Upravit investici`.
 
 ### Why not an `Account` with `kind: 'investment'`
 

@@ -115,8 +115,8 @@ the bottom of the phone, and the bar's centre disc is how you get back there.
 | `/mesic`    | The month — totals, Kontrola, Dluží mi, the split, buckets ranked        |
 | `/platby`   | Pravidelné platby — what goes out, what comes in, the year net of shares |
 | `/cil`      | The goal — the why, this month's figure, the record of months            |
-| `/jmeni`    | Holdings and the `celkem` total                                          |
-| `/settings` | Account, categories, holdings, sync, theme, backup                       |
+| `/jmeni`    | Holdings and the `celkem` total — and the only place one is edited       |
+| `/settings` | Account, categories, theme, sync, backup, and `Začít znovu`              |
 
 Six of the seven are in the tab bar — everything but `/`, three each side of the
 record disc. That is the bar's ceiling: seven cells on a 320 px phone give each
@@ -128,7 +128,7 @@ in the header slab.
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Nineteen files, **349
+Vitest, node environment, `requireAssertions: true`. Twenty files, **361
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -136,7 +136,7 @@ Four files are the exceptions and each earns it:
 
 | File                  | Why it is not in `domain/`                                              |
 | --------------------- | ----------------------------------------------------------------------- |
-| `db/repo.test.ts`     | The backup **is** persistence; testing it in the abstract tests nothing |
+| `db/repo.test.ts`     | The backup and the wipe **are** persistence; in the abstract they test nothing |
 | `db/schema.test.ts`   | Migrations, run against a database actually built at the old version    |
 | `sync/engine.test.ts` | The outbox drain against a stubbed `fetch`                              |
 | `sync/pair.test.ts`   | The pre-flight probe — the sentence a wrong address produces            |
@@ -176,6 +176,11 @@ transactions per row on the main thread.
 Every mutation stamps `updatedAt` / `deviceId` and calls `enqueue()`, which is
 gated on whether this device has ever been paired. Adding a mutation means
 adding it there, not in a component.
+
+`resetLedger` is the only mutation that touches every table at once. It flags
+what was recorded, keeps what was configured, and puts the account's opening
+balance back to zero — the long version is `DECISIONS.md` under "Začít znovu".
+Soft, like every other delete, so the tombstones sync like ordinary rows.
 
 `exportBackup` / `importBackup` are the copy of the ledger that survives a
 cleared browser profile on an unpaired device. `importBackup` implements the same

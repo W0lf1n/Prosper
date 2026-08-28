@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
-	import { deleteTxn, reconcileAccount, restoreTxn, updateTxn } from '$lib/db/repo';
+	import {
+		deleteTxn,
+		getCollapsedMonths,
+		reconcileAccount,
+		restoreTxn,
+		setCollapsedMonths,
+		updateTxn
+	} from '$lib/db/repo';
 	import { formatDayHeading, formatMonthHeading, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
 	import { buildTape } from '$lib/domain/ledger';
@@ -43,6 +50,39 @@
 	);
 
 	const balance = $derived(months[0]?.days[0]?.balance ?? $account?.openingBalance ?? ZERO);
+
+	// ── folded months ───────────────────────────────────────────────────────
+	//
+	// Eight months of real entries is a scroll measured in screens, and most of
+	// the time only one of them is being read. A month folds to its own header,
+	// which already carries the two figures that answer "do I need to open
+	// this" — in and out — so the fold costs no information.
+	//
+	// The set is remembered in `meta` (`repo.ts`), because a fold that resets
+	// every time the app is opened is worse than no fold at all: the one thing
+	// this is for is not having to scroll past 2026-01 again tomorrow.
+	//
+	// `null` means the preference has not been read yet, and the tape waits for
+	// it. That is not caution about a slow read — it is one IndexedDB round trip
+	// on a screen already waiting for the ledger itself — it is to avoid every
+	// month rendering open and then snapping shut a frame later.
+	// A list rather than a `Set`: it is the shape `meta` stores, there are never
+	// more than a couple of dozen of them, and `$state` sees a reassignment
+	// where it does not see `Set.add`.
+	let collapsed = $state<string[] | null>(null);
+
+	$effect(() => {
+		void getCollapsedMonths()
+			.then((keys) => (collapsed = keys))
+			.catch(() => (collapsed = []));
+	});
+
+	function toggleMonth(key: string) {
+		if (!collapsed) return;
+		const next = collapsed.includes(key) ? collapsed.filter((k) => k !== key) : [...collapsed, key];
+		collapsed = next;
+		void setCollapsedMonths(next);
+	}
 
 	// ── reconciliation ──────────────────────────────────────────────────────
 	const reconciliations = liveQuery(() => db().reconciliations.toArray());
@@ -194,23 +234,34 @@
 />
 
 <main class="tape">
-	{#each months as month (month.key)}
-		<section class="month slab">
-			<header class="month__head">
-				<h2 class="u-label">{formatMonthHeading(month.firstDate)}</h2>
-				<div class="month__totals">
-					<span class="month__leg">
-						<Icon name="arrow-down" size={11} stroke={2.4} />
-						<Money value={month.outflow} size="sm" colour={false} sign="never" currency={false} />
+	{#each collapsed ? months : [] as month (month.key)}
+		{@const open = !collapsed?.includes(month.key)}
+		<section class="month slab" class:month--shut={!open}>
+			<h2 class="month__title">
+				<button
+					type="button"
+					class="month__head"
+					aria-expanded={open}
+					onclick={() => toggleMonth(month.key)}
+				>
+					<span class="month__name u-label">{formatMonthHeading(month.firstDate)}</span>
+					<span class="month__totals">
+						<span class="month__leg">
+							<Icon name="arrow-down" size={11} stroke={2.4} />
+							<Money value={month.outflow} size="sm" colour={false} sign="never" currency={false} />
+						</span>
+						<span class="month__leg month__leg--in">
+							<Icon name="arrow-up" size={11} stroke={2.4} />
+							<Money value={month.inflow} size="sm" colour={false} currency={false} />
+						</span>
 					</span>
-					<span class="month__leg month__leg--in">
-						<Icon name="arrow-up" size={11} stroke={2.4} />
-						<Money value={month.inflow} size="sm" colour={false} currency={false} />
+					<span class="month__caret" aria-hidden="true">
+						<Icon name="chevron-down" size={16} stroke={2} />
 					</span>
-				</div>
-			</header>
+				</button>
+			</h2>
 
-			{#each month.days as day (day.date)}
+			{#each open ? month.days : [] as day (day.date)}
 				<div class="day" class:day--quiet={day.rows.length === 0}>
 					<div class="day__head">
 						<span class="day__date">{formatDayHeading(day.date)}</span>
@@ -425,19 +476,70 @@
 		overflow: hidden;
 	}
 
+	/**
+	 * The header is the whole control: a full-bleed row, so it presses by
+	 * background luminance rather than by scale (§13.15) — `scale` on something
+	 * that spans the slab reads as the slab moving.
+	 *
+	 * `.month__title` is the heading the outline still needs; the button inside
+	 * it is what gets tapped, and it carries the padding so the target is the
+	 * full width of the card.
+	 */
+	.month__title {
+		margin: 0;
+		font: inherit;
+	}
+
 	.month__head {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
 		gap: var(--space-3);
+		width: 100%;
+		min-height: var(--touch);
 		padding: var(--space-3) var(--space-4);
 		border-bottom: 1px solid var(--hairline);
 		background: var(--surface-2);
+		text-align: left;
+		transition: background var(--dur-fast) var(--ease-out);
+	}
+
+	.month__head:active {
+		background: var(--surface-3);
+	}
+
+	@media (hover: hover) {
+		.month__head:hover {
+			background: var(--surface-3);
+		}
+	}
+
+	/* Shut, there is nothing under the rule for it to separate. */
+	.month--shut .month__head {
+		border-bottom: none;
+	}
+
+	.month__name {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.month__totals {
 		display: flex;
 		gap: var(--space-4);
+	}
+
+	/* Points down at what it will open, and turns to point at what it opened. */
+	.month__caret {
+		display: grid;
+		place-items: center;
+		flex: none;
+		color: var(--ink-3);
+		rotate: -90deg;
+		transition: rotate var(--dur-base) var(--ease-out);
+	}
+
+	.month__head[aria-expanded='true'] .month__caret {
+		rotate: 0deg;
 	}
 
 	.month__leg {

@@ -36,15 +36,15 @@
 		/** Null closes the sheet. The holding being valued when it is not. */
 		reading: HoldingReading | null;
 		onsave: (value: number, date: string) => void | Promise<void>;
-		onarchive: () => void | Promise<void>;
+		/** Hand over to `HoldingSheet` — what the holding *is*, rather than worth. */
+		onedit: () => void;
 		onclose: () => void;
 	}
 
-	let { reading, onsave, onarchive, onclose }: Props = $props();
+	let { reading, onsave, onedit, onclose }: Props = $props();
 
 	let amount = $state<AmountInput>(EMPTY);
 	let date = $state(today());
-	let confirmingArchive = $state(false);
 
 	/* A fresh sheet every time it opens onto a different holding. */
 	let opened = $state<string | null>(null);
@@ -54,7 +54,6 @@
 		opened = id;
 		amount = EMPTY;
 		date = today();
-		confirmingArchive = false;
 	});
 
 	const value = $derived(toMinor(amount));
@@ -139,31 +138,16 @@
 			</button>
 
 			<!--
-			  The way out of a holding typed wrong. Archived rather than deleted,
-			  like a category: the readings still point at it, and a value with
-			  nothing to belong to is worse than a row that stopped appearing.
+			  Everything that is not a number — the name, the cadence, the bucket
+			  it is fed from, and the way out of a holding typed wrong — is one
+			  sheet along. It used to be here *and* in Settings, as two different
+			  dialogs that could not do each other's job: this one could archive
+			  but not rename, and that one could rename but never saw a keypad.
+			  One holding, one editor, reached from the screen it lives on.
 			-->
-			{#if confirmingArchive}
-				<div class="archive">
-					<p class="archive__ask">Schovat „{reading.holding.name}“? Zápisy zůstanou.</p>
-					<div class="archive__actions">
-						<button type="button" class="btn" onclick={() => (confirmingArchive = false)}>
-							Zpět
-						</button>
-						<button type="button" class="btn btn--danger" onclick={() => void onarchive()}>
-							Schovat
-						</button>
-					</div>
-				</div>
-			{:else}
-				<button
-					type="button"
-					class="btn btn--quiet btn--block"
-					onclick={() => (confirmingArchive = true)}
-				>
-					Schovat investici
-				</button>
-			{/if}
+			<button type="button" class="btn btn--quiet btn--block" onclick={onedit}>
+				Upravit investici
+			</button>
 		</div>
 	{/if}
 </Sheet>
@@ -273,29 +257,5 @@
 		border-color: var(--signal);
 		color: var(--ink);
 		font-weight: 600;
-	}
-
-	.archive {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		padding: var(--space-3);
-		border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--hairline));
-		border-radius: var(--radius-sm);
-		background: var(--danger-wash);
-	}
-
-	.archive__ask {
-		font-size: var(--text-sm);
-		color: var(--ink);
-	}
-
-	.archive__actions {
-		display: flex;
-		gap: var(--space-2);
-	}
-
-	.archive__actions .btn {
-		flex: 1;
 	}
 </style>

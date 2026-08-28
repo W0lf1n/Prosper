@@ -1242,3 +1242,93 @@ case, so the one question it is asked ("just now, or this morning?") was the one
 it could not answer. `formatDateTime` in `domain/datetime.ts`, through `Intl`
 like everything else, local time because that is the clock in the hand holding
 the phone.
+
+### Začít znovu · 2026-08-28
+
+Asked for: a way to start from a blank page, behind a typed confirmation, with
+an optional backup first.
+
+**What it wipes, and what it does not.** Everything *recorded* — rows, goals,
+month targets, holdings and their readings, declared payments, reconciliations.
+Nothing *configured* — the account and the category set both took real work to
+get right and neither is history. Somebody starting over still spends on JÍDLO.
+The one exception is the account's opening balance, which goes back to zero as
+of today: it is the piece of configuration that is also a historical claim, and
+leaving it would open an empty ledger at a balance nothing on screen explains.
+
+**It is a soft delete**, like everything else (§13.2). `resetLedger` flags rows
+and queues them; the payloads stay intact on the device and on the server. That
+is also what makes the wipe safe to sync — a second device catches up rather
+than pushing the ledger back.
+
+**A typed phrase rather than a confirm dialog.** A confirm is dismissed by the
+same tap that opened it, and by the second time it is muscle memory. Thirteen
+characters cannot be. `domain/reset.ts` owns the phrase and folds case,
+diacritics and whitespace when matching: the deliberateness comes from typing it
+out, not from getting the accents right on a phone keyboard at midnight.
+
+**The backup box does not get its own server endpoint**, and the reason is worth
+recording. It was considered and rejected: `Program.cs` builds its schema with
+`EnsureCreated()`, which will not add a table to the database already running on
+the VPS, so a `backups` table would ship as a feature that silently does nothing
+there — and there would still be no restore-from-server screen to use it.
+
+What the box does instead is the honest version of the same promise. It always
+writes the JSON file to this device, and when the device is paired it first
+flushes the outbox and refuses to start the wipe unless the queue reached zero.
+Because deletes are soft and the server stores each row's payload verbatim, the
+history genuinely survives up there; the file is what makes it recoverable
+today. If a restore-from-server screen is ever built, this is the decision to
+revisit.
+
+### One editor per holding · 2026-08-28
+
+`/settings` and `/jmeni` each had a sheet for a holding and neither could do the
+other's job: Settings could rename it, change its cadence and point it at a
+bucket but had never seen a keypad; `/jmeni` could record a value and archive
+the row but not fix a typo in its name. Two dialogs, two screens, one object.
+
+Both now live on `/jmeni`, which is the screen the object is on. `ValuationSheet`
+is the number and `HoldingSheet` is everything the number is about, and
+`Upravit investici` hands over from the first to the second. Archiving went with
+it — it was duplicated markup in both sheets, down to the wording of the
+question — so there is now exactly one place a holding is edited and exactly one
+place it is put away. The Jmění card is gone from Settings.
+
+### The account card folds · 2026-08-28
+
+Asked, fairly: is there any point being able to change the opening balance after
+it has been set once?
+
+**Mostly no, and not quite never.** A wrong opening balance is precisely the
+thing reconciling finds out three months later, and a name is a name. So the
+card is not disabled — a setting nobody can reach is a bug report — it folds. It
+shows the name, the figure and the day it was true on one line, and `Upravit`
+opens it again.
+
+What decides the default is the ledger, not a stored flag: open while nothing
+has been recorded, folded once something has. That gives the setup state for
+free and puts the card back on screen after "začít znovu" without either feature
+knowing about the other.
+
+`txnCount` in Settings had to be corrected for this to work — it counted every
+row ever written, tombstones included, so it never went down. After a wipe the
+Data card would have reported a thousand records against an empty tape.
+
+### A month on the tape folds · 2026-08-28
+
+Eight months of real entries is a scroll measured in screens, and most of the
+time one of them is being read. The month header is now the control, and folded
+it still carries the two figures that decide whether to open it.
+
+Two details that are the whole feature. **It is remembered** — in `meta`, not
+`localStorage` (§13.10 keeps that for the theme), because a fold that resets on
+every launch buys nothing: the point is not scrolling past January again
+tomorrow. And **the tape waits for that preference before it draws**, which is
+not caution about a slow read — it is one IndexedDB round trip on a screen
+already waiting for the ledger — but to stop every month rendering open and
+snapping shut a frame later.
+
+Stored as the exception rather than the state: months are open unless named, so
+a month recorded for the first time is open and nothing has to be written when
+one scrolls into existence.

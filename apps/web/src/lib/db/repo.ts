@@ -36,6 +36,7 @@ const META_DEVICE_ID = 'deviceId';
 const META_ACTIVE_ACCOUNT = 'activeAccountId';
 const META_SYNC_BASE_URL = 'syncBaseUrl';
 const META_ADOPTED = 'ledgerAdopted';
+const META_TAPE_COLLAPSED = 'tapeCollapsedMonths';
 
 /**
  * Whether mutations are queued for the server.
@@ -86,6 +87,30 @@ export async function getActiveAccountId(): Promise<string | undefined> {
 
 export async function setActiveAccountId(id: string): Promise<void> {
 	await setMeta(META_ACTIVE_ACCOUNT, id);
+}
+
+/**
+ * Which months on `/vypis` are folded shut.
+ *
+ * A view preference, so it lives in `meta` rather than in a synced table — the
+ * phone and the laptop are looking at different amounts of screen and have no
+ * business agreeing about this. It is not `localStorage` either: §13.10 keeps
+ * that for the theme alone, and this is one read on a screen that is already
+ * waiting on IndexedDB for the ledger itself.
+ *
+ * Stored as the exception rather than the state: months are open unless named,
+ * so a month recorded for the first time is open, and nothing has to be written
+ * when one scrolls into existence.
+ */
+export async function getCollapsedMonths(): Promise<string[]> {
+	const stored = await getMeta<unknown>(META_TAPE_COLLAPSED);
+	return Array.isArray(stored)
+		? stored.filter((key): key is string => typeof key === 'string')
+		: [];
+}
+
+export async function setCollapsedMonths(keys: string[]): Promise<void> {
+	await setMeta(META_TAPE_COLLAPSED, keys);
 }
 
 // ── outbox seam ─────────────────────────────────────────────────────────────
@@ -1092,6 +1117,148 @@ export async function adoptRemoteLedger(): Promise<string | null> {
 	// Adopted. There is nothing left to decide, so no later pull re-asks.
 	await setMeta(META_ADOPTED, true);
 	return keep.id;
+}
+
+// ── starting over ───────────────────────────────────────────────────────────
+
+/** How many live rows the wipe flagged, per table. */
+export interface ResetResult {
+	txns: number;
+	goals: number;
+	monthTargets: number;
+	holdings: number;
+	valuations: number;
+	schedules: number;
+	reconciliations: number;
+}
+
+/**
+ * Empty the ledger and leave the app standing — `domain/reset.ts` owns the
+ * phrase that unlocks it.
+ *
+ * What goes is everything that was *recorded*: rows, goals, the month targets
+ * under them, holdings and their readings, declared payments, reconciliations.
+ * What stays is everything that was *configured*: the account and the category
+ * set, both of which took real work to get right and neither of which is
+ * history. Somebody starting over still spends on JÍDLO.
+ *
+ * The account's opening balance goes back to zero as of today, because it is
+ * the one piece of configuration that *is* a historical claim — leaving it
+ * would open the blank ledger at a balance nothing on screen explains. That is
+ * also what re-opens the Účet card in Settings: it collapses once there are
+ * rows and this is the thing that removes them.
+ *
+ * Soft, like every other delete (§13.2). The rows stay flagged and the
+ * tombstones queue for the server exactly like a row deleted by hand, so a
+ * second device catches up rather than pushing the ledger back.
+ *
+ * `dayMarks` is deliberately left alone: nothing has written to it since
+ * 2026-08-28 and no screen reads it, so there is nothing here to clear.
+ */
+export async function resetLedger(): Promise<ResetResult> {
+	const database = db();
+
+	// Both of these read `meta`, which is not one of the tables below — the
+	// same trap `importBackup` documents. Answered here so the writes inside
+	// the transaction do not have to go looking.
+	await refreshSyncEnabled();
+	const stamped = await stamp();
+
+	const result: ResetResult = {
+		txns: 0,
+		goals: 0,
+		monthTargets: 0,
+		holdings: 0,
+		valuations: 0,
+		schedules: 0,
+		reconciliations: 0
+	};
+
+	await database.transaction(
+		'rw',
+		[
+			database.accounts,
+			database.txns,
+			database.goals,
+			database.monthTargets,
+			database.holdings,
+			database.valuations,
+			database.schedules,
+			database.reconciliations,
+			database.outbox
+		],
+		async () => {
+			result.txns = await tombstone('txn', await database.txns.toArray(), stamped, (row) =>
+				database.txns.put(row)
+			);
+			result.goals = await tombstone('goal', await database.goals.toArray(), stamped, (row) =>
+				database.goals.put(row)
+			);
+			result.monthTargets = await tombstone(
+				'monthTarget',
+				await database.monthTargets.toArray(),
+				stamped,
+				(row) => database.monthTargets.put(row)
+			);
+			result.holdings = await tombstone(
+				'holding',
+				await database.holdings.toArray(),
+				stamped,
+				(row) => database.holdings.put(row)
+			);
+			result.valuations = await tombstone(
+				'valuation',
+				await database.valuations.toArray(),
+				stamped,
+				(row) => database.valuations.put(row)
+			);
+			result.schedules = await tombstone(
+				'schedule',
+				await database.schedules.toArray(),
+				stamped,
+				(row) => database.schedules.put(row)
+			);
+			result.reconciliations = await tombstone(
+				'reconciliation',
+				await database.reconciliations.toArray(),
+				stamped,
+				(row) => database.reconciliations.put(row)
+			);
+
+			// The accounts survive; only what they opened at is forgotten.
+			for (const account of await database.accounts.toArray()) {
+				if (account.isDeleted) continue;
+				const next: Account = {
+					...account,
+					openingBalance: ZERO,
+					openingDate: today(),
+					...stamped
+				};
+				await database.accounts.put(next);
+				await enqueue('account', next.id, next);
+			}
+		}
+	);
+
+	return result;
+}
+
+/** Flag every live row in one table and queue it. Returns how many there were. */
+async function tombstone<T extends Versioned>(
+	entity: SyncedEntity,
+	rows: T[],
+	stamped: { updatedAt: string; deviceId: string },
+	write: (row: T) => Promise<unknown>
+): Promise<number> {
+	let flagged = 0;
+	for (const row of rows) {
+		if (row.isDeleted) continue;
+		const next = { ...row, isDeleted: true, ...stamped };
+		await write(next);
+		await enqueue(entity, next.id, next);
+		flagged += 1;
+	}
+	return flagged;
 }
 
 // ── backup ──────────────────────────────────────────────────────────────────

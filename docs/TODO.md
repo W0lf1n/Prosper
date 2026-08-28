@@ -17,10 +17,10 @@
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 349 pass, 19 files              |
-| `pnpm check`               | 0 errors, 0 warnings, 409 files |
+| `pnpm test`                | 361 pass, 20 files              |
+| `pnpm check`               | 0 errors, 0 warnings, 412 files |
 | `pnpm lint`                | passes                          |
-| `pnpm budget`              | 85.3 kB of 150 kB brotli        |
+| `pnpm budget`              | 85.7 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
 | Schema · backup format     | **v7** · **5**                  |
 
@@ -29,13 +29,19 @@ recurring payments, no-spend days and the streak, reconciliation, and draining
 OSTATNÍ. **Everything left in P3 is blocked on a question below.** P4 has not
 been started.
 
-**Five changes landed on 2026-08-28, all of them asked for out of use rather
-than planned** (`DECISIONS.md`, the last section). The sync line now carries a
+**Nine changes landed on 2026-08-28, all of them asked for out of use rather
+than planned** (`DECISIONS.md`, the last sections). The sync line now carries a
 clock; Pravidelné platby is a screen (`/platby`) and, with `/jmeni`, is in the
 tab bar; a standing payment can declare the share somebody pays back, and a
 payment that *arrives* every month can be declared at all; and an empty day is a
 no-spend day, which retired `DayMark`, `closePreviousDay`, the `coverage` check
 and the days-covered success metric.
+
+Four more went in later the same day, all of them tidying `/settings`:
+**Začít znovu** — the wipe, behind a typed phrase and an optional backup; a
+holding now has **one editor**, on `/jmeni`, and the Jmění card is gone from
+Settings; the **account card folds** once the ledger has a row in it; and a
+**month on the tape folds**, remembered per device.
 
 The app was renamed **Výdaje → Prosper** on 2026-08-27 (`DECISIONS.md`, Q0 —
 Name). The IndexedDB database is still called `finance` and stays that way:

@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-08-28 · schema v7 · 349 web tests · 50 API tests
+**Last revised:** 2026-08-28 · schema v7 · 361 web tests · 50 API tests
 
 ---
 
@@ -122,6 +122,7 @@ The runbook is `docs/DEPLOYMENT.md`.
 | `coverage.ts`     | Days without an expense, against days elapsed, and the run       |
 | `reconcile.ts`    | The ledger against a bank statement                             |
 | `refile.ts`       | Draining a bucket — the month's rows, and where they belong     |
+| `reset.ts`        | Starting over — the phrase typed to unlock the wipe              |
 | `xlsx.ts`         | A spreadsheet, hand-rolled, no dependency                       |
 
 ---
@@ -195,6 +196,12 @@ into 422 and silently truncated. Any card inside a scrolling flex column needs
 
 **IndexedDB cannot index booleans.** `isDeleted`, `isArchived` and `isOneOff` are
 stored but not indexed, and filtered in memory.
+
+**A count that includes tombstones only ever goes up.** Settings printed
+`txns.count()` as "Záznamů", which counts soft-deleted rows — invisible until
+`resetLedger` shipped, at which point the card would have reported a thousand
+records against an empty tape. Any figure a person reads as "how much is in
+here" filters `isDeleted` first.
 
 **A day with nothing on it is a day nothing was spent on.** `DayMark`,
 `closePreviousDay` and the `coverage` check were retired on 2026-08-28: the app

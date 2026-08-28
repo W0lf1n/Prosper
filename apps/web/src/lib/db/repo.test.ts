@@ -14,11 +14,18 @@ import type { Minor } from '$lib/domain/money';
 import type { Reconciliation } from '$lib/domain/types';
 import {
 	BACKUP_VERSION,
+	createGoal,
+	createHolding,
 	createTxn,
 	deleteTxn,
 	ensureSeeded,
 	exportBackup,
+	getCollapsedMonths,
 	importBackup,
+	recordValuation,
+	resetLedger,
+	setCollapsedMonths,
+	updateAccount,
 	type Backup
 } from './repo';
 import { FinanceDb, setDb } from './schema';
@@ -178,5 +185,108 @@ describe('importBackup — the merge', () => {
 		await importBackup(backup);
 
 		expect((await db.txns.get(txn.id))?.payee).toBe('Oběd');
+	});
+});
+
+/**
+ * The wipe. It is the only place in the app that touches every table at once,
+ * and the only one where getting it wrong is unrecoverable for the person
+ * holding the phone — so what it spares is asserted as hard as what it clears.
+ */
+describe('resetLedger', () => {
+	it('flags every recorded row and counts what it flagged', async () => {
+		await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
+		await createTxn({ accountId, amount: -11000 as Minor, payee: 'Kafe' });
+		const goal = await createGoal({
+			name: 'Rezerva',
+			why: 'Abych nemusel řešit každou rozbitou pračku půjčkou.',
+			targetAmount: 100000 as Minor,
+			targetDate: '2027-01-31'
+		});
+		const holding = await createHolding({ name: 'Penzijko', kind: 'investment' });
+		await recordValuation({ holdingId: holding.id, value: 50000 as Minor });
+
+		const result = await resetLedger();
+
+		expect(result.txns).toBe(2);
+		expect(result.goals).toBe(1);
+		expect(result.holdings).toBe(1);
+		expect(result.valuations).toBe(1);
+
+		expect((await db.txns.toArray()).every((t) => t.isDeleted)).toBe(true);
+		expect((await db.goals.get(goal.id))?.isDeleted).toBe(true);
+		expect((await db.holdings.get(holding.id))?.isDeleted).toBe(true);
+		expect((await db.valuations.toArray()).every((v) => v.isDeleted)).toBe(true);
+	});
+
+	it('soft-deletes — nothing is actually removed (§13.2)', async () => {
+		const txn = await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
+
+		await resetLedger();
+
+		const row = await db.txns.get(txn.id);
+		expect(row).toBeDefined();
+		expect(row?.payee).toBe('Oběd');
+		expect(row?.amount).toBe(-24900);
+	});
+
+	it('keeps the categories, which are configuration rather than history', async () => {
+		const before = await db.categories.count();
+		expect(before).toBeGreaterThan(0);
+
+		await resetLedger();
+
+		const live = (await db.categories.toArray()).filter((c) => !c.isDeleted);
+		expect(live).toHaveLength(before);
+	});
+
+	it('keeps the account but forgets what it opened at', async () => {
+		await updateAccount(accountId, { openingBalance: 500000 as Minor, openingDate: '2026-01-01' });
+
+		await resetLedger();
+
+		const account = await db.accounts.get(accountId);
+		expect(account?.isDeleted).toBe(false);
+		expect(account?.name).toBe('Běžný účet');
+		expect(account?.openingBalance).toBe(0);
+	});
+
+	it('counts a row only once, however many times it is run', async () => {
+		await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
+
+		expect((await resetLedger()).txns).toBe(1);
+		expect((await resetLedger()).txns).toBe(0);
+	});
+
+	it('leaves the ledger exportable, so the backup taken before it still merges back', async () => {
+		await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
+		const backup = await exportBackup();
+
+		await resetLedger();
+		expect((await db.txns.toArray()).every((t) => t.isDeleted)).toBe(true);
+
+		// A restore is last-write-wins and a delete is never un-set by a merge
+		// (§13.2) — so the rows come back only if the backup is newer, which is
+		// exactly what a fresh import of an older file must *not* do.
+		await importBackup(backup);
+		expect((await db.txns.toArray()).every((t) => t.isDeleted)).toBe(true);
+	});
+});
+
+describe('the folded months on /vypis', () => {
+	it('starts with nothing folded', async () => {
+		expect(await getCollapsedMonths()).toEqual([]);
+	});
+
+	it('round-trips the set it was given', async () => {
+		await setCollapsedMonths(['2026-01', '2026-02']);
+
+		expect(await getCollapsedMonths()).toEqual(['2026-01', '2026-02']);
+	});
+
+	it('shrugs off a stored value it does not recognise', async () => {
+		await db.meta.put({ key: 'tapeCollapsedMonths', value: 'nonsense' });
+
+		expect(await getCollapsedMonths()).toEqual([]);
 	});
 });

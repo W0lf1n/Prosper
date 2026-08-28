@@ -567,6 +567,11 @@ card per month, days separated by score lines, running balance per row, days wit
 nothing on them reading `bez výdaje` on a recessed surface, open receivables
 flagged. Tap a row to edit or delete.
 
+**A month folds.** Its header is the control, and folded it still carries the two
+figures that decide whether to open it — in and out. Which months are shut is
+remembered in `meta`, per device, because a fold that resets on every launch
+buys nothing: the whole point is not scrolling past January again tomorrow.
+
 The balance slab carries **Srovnat s bankou** and how long it has been since it
 was last done. The sheet shows the ledger's figure first and unprompted, takes
 the statement's figure under it, and computes the difference as you type — this
@@ -620,6 +625,13 @@ day that value was true, and an amber age once the reading is older than that
 holding's own cadence. Tapping one opens the keypad sheet to record a new
 reading.
 
+**Everything about a holding is on this screen**, in two sheets that hand over
+to each other: `ValuationSheet` is the number, and `Upravit investici` inside it
+opens `HoldingSheet` — the name, the kind, the cadence, the bucket that feeds it,
+and archiving. The second one lived in `/settings` until 2026-08-28, which meant
+a holding had two editors on two screens and neither could do the other's job: a
+typo was fixed in Settings and a value was typed here, and nothing said so.
+
 Below it, a line that has to stay there: the values are what you copied off a
 statement, nothing is fetched, and growth is neither income nor part of the
 month's split.
@@ -643,12 +655,29 @@ with* standing orders.
 ### `/settings`
 
 Account name and opening balance · category management (rename, spend type,
-archive, add) · **Jmění**, the holdings themselves rather than their values ·
-theme · sync pairing and the last cycle, to the minute · JSON export/import
-backup, storage-persistence status, schema version.
+archive, add) · theme · sync pairing and the last cycle, to the minute · JSON
+export/import backup, storage-persistence status, schema version · **Začít
+znovu**.
 
-Pravidelné platby lived here until 2026-08-28 and is now `/platby`: a standing
-order is not a setting, it is the part of the ledger that has not happened yet.
+**The account card is setup, not maintenance.** Three fields typed once, and it
+folds to a single line — name, opening balance, the day it was true — the moment
+the ledger has a row in it. It is not disabled: a wrong opening balance is
+precisely what reconciling finds out three months later, and a setting nobody can
+reach is a bug report. `Upravit` opens it again.
+
+**Začít znovu** is the app's only destructive action and the only place friction
+is the point. A sheet, a list of what goes and what stays, a backup box ticked by
+default, and the phrase `začínám znovu` typed out before the button will fire —
+a confirm dialog is dismissed by the same tap that opened it, and thirteen
+characters cannot be muscle memory. The wipe itself is `resetLedger` in
+`repo.ts`: soft-deletes every recorded row, keeps the categories and the account,
+and puts the opening balance back to zero as of today, which is what re-opens the
+account card. `domain/reset.ts` owns the phrase.
+
+Two things moved out. Pravidelné platby lived here until 2026-08-28 and is now
+`/platby`: a standing order is not a setting, it is the part of the ledger that
+has not happened yet. **Jmění** went the same day, to `/jmeni`, for the reason
+above it.
 
 ---
 

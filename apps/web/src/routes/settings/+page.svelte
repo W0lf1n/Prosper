@@ -3,30 +3,28 @@
 	import { db, SCHEMA_VERSION } from '$lib/db/schema';
 	import {
 		archiveCategory,
-		archiveHolding,
 		createCategory,
-		createHolding,
 		exportBackup,
 		importBackup,
+		resetLedger,
 		updateAccount,
 		updateCategory,
-		updateHolding,
 		type Backup
 	} from '$lib/db/repo';
-	import { formatMoney, parseAmount } from '$lib/domain/money';
-	import { formatDateTime, today } from '$lib/domain/datetime';
+	import { ZERO, formatMoney, parseAmount } from '$lib/domain/money';
+	import { formatDateTime, formatShortDate, today } from '$lib/domain/datetime';
 	import { summariseMonth } from '$lib/domain/checks';
-	import { DAYS, RECORDS, counted } from '$lib/domain/czech';
+	import { RECORDS, counted } from '$lib/domain/czech';
 	import { KIND_LABEL } from '$lib/domain/holdings';
 	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
-	import type { Category, Holding, SpendType } from '$lib/domain/types';
+	import type { Category, SpendType } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
 	import { defaultBaseUrl, pair, unpair } from '$lib/sync/pair';
 	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
-	import HoldingSheet, { type HoldingInput } from '$lib/ui/HoldingSheet.svelte';
+	import ResetSheet from '$lib/ui/ResetSheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
@@ -37,52 +35,19 @@
 		data.accountId ? ((await db().accounts.get(data.accountId)) ?? null) : null
 	);
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
-	const txnCount = liveQuery(() => db().txns.count());
-
-	const pickable = $derived(
-		(($categories ?? []) as Category[]).filter((c) => !c.isDeleted && !c.isArchived)
+	/**
+	 * Live rows, not every row ever written.
+	 *
+	 * It was `txns.count()`, which includes tombstones — so the figure never
+	 * went down, and after "začít znovu" the card would have reported a
+	 * thousand records against an empty tape. The scan is over one small table
+	 * on a screen nobody opens in a hurry.
+	 */
+	const txnCount = liveQuery(() =>
+		db()
+			.txns.filter((t) => !t.isDeleted)
+			.count()
 	);
-
-	// ── holdings ────────────────────────────────────────────────────────────
-	//
-	// `/jmeni` adds a holding and records values against it. Everything about the
-	// holding *itself* — its name, its cadence, which bucket feeds it — belongs
-	// here, next to the categories it points at, and until this existed a typo in
-	// a holding's name was permanent.
-	const holdings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
-
-	const liveHoldings = $derived(
-		(($holdings ?? []) as Holding[]).filter((h) => !h.isDeleted && !h.isArchived)
-	);
-
-	/** Buckets a holding may be fed from. An income category funds nothing. */
-	const fundingCategories = $derived(pickable.filter((c) => !c.isIncome));
-
-	let editingHolding = $state<Holding | null>(null);
-	let holdingSheetOpen = $state(false);
-
-	function openHolding(holding: Holding | null) {
-		editingHolding = holding;
-		holdingSheetOpen = true;
-	}
-
-	async function saveHolding(input: HoldingInput) {
-		if (editingHolding) await updateHolding(editingHolding.id, input);
-		else await createHolding(input);
-		holdingSheetOpen = false;
-	}
-
-	async function removeHolding() {
-		if (!editingHolding) return;
-		const name = editingHolding.name;
-		await archiveHolding(editingHolding.id);
-		holdingSheetOpen = false;
-		toast.show(`„${name}“ schováno`);
-	}
-
-	function categoryName(id: string): string {
-		return (($categories ?? []) as Category[]).find((c) => c.id === id)?.name ?? '—';
-	}
 
 	const SPEND_TYPES: { value: SpendType; label: string }[] = [
 		{ value: 'need', label: 'nutné' },
@@ -102,6 +67,22 @@
 	let openingDate = $derived($account?.openingDate ?? today());
 	let accountError = $state('');
 
+	/**
+	 * Setup, not maintenance — so the card folds down to one line.
+	 *
+	 * Three fields typed once, and then a permanent invitation to edit the
+	 * number every other figure in the app is measured from. It is not disabled
+	 * outright, because a wrong opening balance is precisely what reconciling
+	 * finds out three months later, and a setting nobody can reach is a bug
+	 * report. It just stops shouting.
+	 *
+	 * `null` means "whatever the ledger says": open while there is nothing
+	 * recorded, folded once there is. That is also what puts the card back on
+	 * screen after "začít znovu" — the wipe removes the rows that closed it.
+	 */
+	let accountOpen = $state<boolean | null>(null);
+	const accountExpanded = $derived(accountOpen ?? ($txnCount ?? 0) === 0);
+
 	async function saveAccount() {
 		if (!data.accountId) return;
 		const parsed = parseAmount(openingBalance);
@@ -115,6 +96,8 @@
 			openingBalance: parsed.value,
 			openingDate
 		});
+		// Back to automatic: folds if there is a ledger, stays put if there is not.
+		accountOpen = null;
 		toast.show('Účet uložen');
 	}
 
@@ -356,6 +339,35 @@
 		error: 'chyba'
 	};
 
+	// ── starting over ───────────────────────────────────────────────────────
+	//
+	// The sheet owns the gate and the ordering; this owns the three things only
+	// the app can do. `resetLedger` is the whole of the wipe — every rule about
+	// what survives it lives in `repo.ts`, not here.
+	let resetOpen = $state(false);
+
+	/**
+	 * Did everything actually reach the server?
+	 *
+	 * `syncNow` never throws (that is rule 5 — nothing waits on sync), so the
+	 * answer has to be read off the status afterwards. An empty outbox and no
+	 * error is the only reading that lets the wipe start.
+	 */
+	async function pushBeforeReset(): Promise<{ ok: boolean; error: string | null }> {
+		await syncNow();
+		if (sync.state === 'error') return { ok: false, error: sync.lastError };
+		if (sync.pending > 0) {
+			return { ok: false, error: `${counted(sync.pending, RECORDS)} zatím čeká ve frontě` };
+		}
+		return { ok: true, error: null };
+	}
+
+	async function runReset() {
+		const result = await resetLedger();
+		resetOpen = false;
+		toast.show(result.txns > 0 ? `Smazáno ${counted(result.txns, RECORDS)}` : 'Sešit je prázdný');
+	}
+
 	// ── storage ─────────────────────────────────────────────────────────────
 	let persisted = $state<boolean | null>(null);
 
@@ -375,40 +387,58 @@
 <AppBar title="Nastavení" />
 
 <main class="page">
-	<section class="card">
+	<section class="card card--account">
 		<h2 class="u-label">Účet</h2>
 
-		<label class="field">
-			<span class="field__label">Název</span>
-			<input class="field__input" bind:value={accountName} />
-		</label>
+		{#if accountExpanded}
+			<label class="field">
+				<span class="field__label">Název</span>
+				<input class="field__input" bind:value={accountName} />
+			</label>
 
-		<label class="field">
-			<span class="field__label">Počáteční zůstatek</span>
-			<input
-				class="field__input field__input--mono"
-				bind:value={openingBalance}
-				inputmode="decimal"
-			/>
-		</label>
+			<label class="field">
+				<span class="field__label">Počáteční zůstatek</span>
+				<input
+					class="field__input field__input--mono"
+					bind:value={openingBalance}
+					inputmode="decimal"
+				/>
+			</label>
 
-		<label class="field">
-			<span class="field__label">Ke dni</span>
-			<input class="field__input field__input--mono" type="date" bind:value={openingDate} />
-		</label>
+			<label class="field">
+				<span class="field__label">Ke dni</span>
+				<input class="field__input field__input--mono" type="date" bind:value={openingDate} />
+			</label>
 
-		{#if accountError}
-			<p class="error-text">{accountError}</p>
+			{#if accountError}
+				<p class="error-text">{accountError}</p>
+			{/if}
+
+			<button type="button" class="btn btn--primary btn--block" onclick={saveAccount}>
+				Uložit účet
+			</button>
+
+			<p class="hint prose">
+				Zůstatek se počítá z počátečního stavu a všech záznamů. Zadej ho přesně tak, jak ho
+				ukazovala banka k uvedenému dni — jinak nebude sedět nikdy.
+			</p>
+		{:else}
+			<!--
+			  Folded, but it still says everything the fields would: the whole
+			  point of collapsing this is that the answer stops needing checking,
+			  and a summary that hides the number would not deliver that.
+			-->
+			<button type="button" class="summary" onclick={() => (accountOpen = true)}>
+				<span class="summary__lines">
+					<span class="summary__name">{$account?.name ?? 'Účet'}</span>
+					<span class="summary__detail">
+						začal na <span class="mono">{formatMoney($account?.openingBalance ?? ZERO)}</span>
+						{formatShortDate(openingDate)}
+					</span>
+				</span>
+				<span class="summary__go">Upravit</span>
+			</button>
 		{/if}
-
-		<button type="button" class="btn btn--primary btn--block" onclick={saveAccount}>
-			Uložit účet
-		</button>
-
-		<p class="hint prose">
-			Zůstatek se počítá z počátečního stavu a všech záznamů. Zadej ho přesně tak, jak ho ukazovala
-			banka k uvedenému dni — jinak nebude sedět nikdy.
-		</p>
 	</section>
 
 	<section class="card">
@@ -477,56 +507,23 @@
 		<p class="hint prose">Kategorie se archivují, nemažou — staré záznamy musí zůstat čitelné.</p>
 	</section>
 
-	<!--
-	  Jmění — the holdings themselves, not their values.
-
-	  A value is typed on `/jmeni`, where the keypad is. What a holding *is* — its
-	  name, how often it is worth asking about, and which bucket feeds it — is a
-	  setting, and it belongs next to the categories it points at.
-	-->
 	<section class="card">
-		<h2 class="u-label">Jmění</h2>
-
-		{#if liveHoldings.length === 0}
-			<p class="hint prose">
-				Nic tu zatím není. Investice se přidávají na obrazovce <strong>Jmění</strong>, kde se rovnou
-				zapíše i první hodnota.
-			</p>
-		{:else}
-			<ul class="tiles">
-				{#each liveHoldings as holding (holding.id)}
-					<li>
-						<button type="button" class="tile" onclick={() => openHolding(holding)}>
-							<span class="tile__head">
-								<span class="tile__name">
-									<span class="kind-dot" data-kind={holding.kind}></span>
-									{holding.name}
-								</span>
-								<span class="tile__figure tile__figure--word">{KIND_LABEL[holding.kind]}</span>
-							</span>
-
-							<span class="tile__foot">
-								<span class="tile__where">
-									připomenout po {counted(holding.reminderDays, DAYS)}
-								</span>
-								<span class="tile__note tile__note--word">
-									{holding.categoryId ? categoryName(holding.categoryId) : 'bez kategorie'}
-								</span>
-							</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-
-		<div class="row-actions">
-			<button type="button" class="btn" onclick={() => openHolding(null)}>Přidat investici</button>
+		<h2 class="u-label">Vzhled</h2>
+		<div class="segments" role="group" aria-label="Motiv">
+			{#each [{ value: 'system', label: 'systém' }, { value: 'light', label: 'světlý' }, { value: 'dark', label: 'tmavý' }] as option (option.value)}
+				<button
+					type="button"
+					class="segment"
+					class:segment--on={theme === option.value}
+					aria-pressed={theme === option.value}
+					onclick={() => chooseTheme(option.value as Theme)}
+				>
+					{option.label}
+				</button>
+			{/each}
 		</div>
-
 		<p class="hint prose">
-			Kategorie u investice říká, odkud do ní posíláš peníze — z ní app spočítá, kolik jsi vložil a
-			kolik je růst. Dvě investice na jedné kategorii to spočítat nejdou, tak se u nich vklady
-			neukazují.
+			Tmavý je výchozí. Tahle appka se používá jednou rukou, v posteli, se zhasnutým světlem.
 		</p>
 	</section>
 
@@ -625,26 +622,6 @@
 	</section>
 
 	<section class="card">
-		<h2 class="u-label">Vzhled</h2>
-		<div class="segments" role="group" aria-label="Motiv">
-			{#each [{ value: 'system', label: 'systém' }, { value: 'light', label: 'světlý' }, { value: 'dark', label: 'tmavý' }] as option (option.value)}
-				<button
-					type="button"
-					class="segment"
-					class:segment--on={theme === option.value}
-					aria-pressed={theme === option.value}
-					onclick={() => chooseTheme(option.value as Theme)}
-				>
-					{option.label}
-				</button>
-			{/each}
-		</div>
-		<p class="hint prose">
-			Tmavý je výchozí. Tahle appka se používá jednou rukou, v posteli, se zhasnutým světlem.
-		</p>
-	</section>
-
-	<section class="card">
 		<h2 class="u-label">Data</h2>
 
 		<p class="hint prose">
@@ -692,16 +669,34 @@
 				<dd>{SYNC_LABEL[sync.state] ?? sync.state}</dd>
 			</div>
 		</dl>
+
+		<!--
+		  The way out of a sešit that is not worth keeping — a month of testing
+		  the app, an import that went wrong, a year that is over.
+
+		  Last thing on the last card, under a rule, and it is the only button in
+		  the app that opens onto a typed confirmation. Everything it needs to
+		  say is said in the sheet: down here it is one line, so that reading the
+		  Data card top to bottom never arrives at a wall of red.
+		-->
+		<div class="danger">
+			<button type="button" class="btn btn--danger btn--block" onclick={() => (resetOpen = true)}>
+				Začít znovu
+			</button>
+			<p class="hint prose">
+				Smaže celý sešit a nechá ti kategorie a nastavení. Zálohu si to nabídne uložit předtím.
+			</p>
+		</div>
 	</section>
 </main>
 
-<HoldingSheet
-	open={holdingSheetOpen}
-	holding={editingHolding}
-	categories={fundingCategories}
-	onsave={saveHolding}
-	onarchive={editingHolding ? removeHolding : null}
-	onclose={() => (holdingSheetOpen = false)}
+<ResetSheet
+	open={resetOpen}
+	paired={sync.state !== 'off'}
+	onbackup={downloadBackup}
+	onpush={pushBeforeReset}
+	onreset={runReset}
+	onclose={() => (resetOpen = false)}
 />
 
 <TabBar />
@@ -887,45 +882,6 @@
 		color: var(--in);
 	}
 
-	/* The same colour language the holding rows on /jmeni speak, so a kind is
-	   legible before its name is read. */
-	.kind-dot {
-		display: inline-block;
-		width: 7px;
-		height: 7px;
-		margin-inline-end: var(--space-2);
-		border-radius: var(--radius-full);
-		background: var(--split-live);
-		vertical-align: middle;
-	}
-
-	.kind-dot[data-kind='investment'] {
-		background: var(--split-give);
-	}
-
-	.kind-dot[data-kind='savings'] {
-		background: var(--in);
-	}
-
-	.kind-dot[data-kind='crypto'] {
-		background: var(--flag);
-	}
-
-	/* A holding's kind and its bucket are words, not figures: the tile's own
-	   two slots are mono because most screens put money in them. */
-	.tile__figure--word {
-		font-family: inherit;
-		font-size: var(--text-xs);
-		font-weight: 400;
-		letter-spacing: 0;
-		color: var(--ink-3);
-	}
-
-	.tile__note--word {
-		font-family: inherit;
-		letter-spacing: 0;
-	}
-
 	/* ── theme ───────────────────────────────────────────────────────────
 	   A three-position switch, built from the same parts as the direction
 	   switch on the entry screen.
@@ -965,7 +921,73 @@
 		}
 	}
 
+	/* ── account ─────────────────────────────────────────────────────────
+	   Folded, the card is a single full-bleed row. It presses by background
+	   luminance rather than by scale, like every other row in the app that
+	   runs edge to edge. */
+
+	.card--account:has(.summary) {
+		gap: var(--space-3);
+	}
+
+	.summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		width: 100%;
+		min-height: var(--touch);
+		padding: var(--space-2) var(--space-3);
+		margin-inline: calc(var(--space-3) * -1);
+		width: calc(100% + var(--space-3) * 2);
+		border-radius: var(--radius-md);
+		text-align: left;
+		transition: background var(--dur-fast) var(--ease-out);
+	}
+
+	.summary:active {
+		background: var(--surface-2);
+	}
+
+	@media (hover: hover) {
+		.summary:hover {
+			background: var(--surface-2);
+		}
+	}
+
+	.summary__lines {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.summary__name {
+		font-size: var(--text-md);
+		color: var(--ink);
+	}
+
+	.summary__detail {
+		font-size: var(--text-xs);
+		color: var(--ink-3);
+	}
+
+	.summary__go {
+		flex: none;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--signal);
+	}
+
 	/* ── data ────────────────────────────────────────────────────────────── */
+
+	.danger {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		padding-top: var(--space-4);
+		border-top: 1px solid var(--hairline);
+	}
 
 	.row-actions {
 		display: flex;
