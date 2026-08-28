@@ -17,12 +17,12 @@
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 361 pass, 20 files              |
+| `pnpm test`                | 375 pass, 20 files              |
 | `pnpm check`               | 0 errors, 0 warnings, 412 files |
 | `pnpm lint`                | passes                          |
-| `pnpm budget`              | 85.7 kB of 150 kB brotli        |
+| `pnpm budget`              | 86.1 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v7** · **5**                  |
+| Schema · backup format     | **v8** · **5**                  |
 
 P0, P1, P2 (sync) and P5 (reporting) ship, along with targeting, investments,
 recurring payments, no-spend days and the streak, reconciliation, and draining
@@ -42,6 +42,14 @@ Four more went in later the same day, all of them tidying `/settings`:
 holding now has **one editor**, on `/jmeni`, and the Jmění card is gone from
 Settings; the **account card folds** once the ledger has a row in it; and a
 **month on the tape folds**, remembered per device.
+
+And four after that, all of them out of the first real session with the app:
+**Dluží mi is on the row** — the tape's edit sheet marks it received and can
+fix the share, which could until now only be set once; the **month target
+writes itself** and the Potvrdit step is gone, leaving the override that was
+the real reason for it; **which goal is `na očích` is chosen** rather than
+guessed from the nearest deadline (schema **v8**); and a **sheet is pulled
+down to close**, with the `✕` gone from every one of them.
 
 The app was renamed **Výdaje → Prosper** on 2026-08-27 (`DECISIONS.md`, Q0 —
 Name). The IndexedDB database is still called `finance` and stays that way:

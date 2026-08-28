@@ -76,6 +76,7 @@ function goal(extra: Partial<Goal> = {}): Goal {
 		linkedAccountId: null,
 		categoryId: SAVE,
 		startDate: '2026-08-01',
+		isPinned: false,
 		updatedAt: '2026-08-01T00:00:00.000Z',
 		deviceId: 'dev-1',
 		isDeleted: false,
@@ -330,6 +331,38 @@ describe('which goal gets the strip', () => {
 
 	it('has nothing to show without a goal', () => {
 		expect(pickPrimary([])).toBeNull();
+	});
+
+	it('a pin beats the nearest deadline — that is the whole point of it', () => {
+		const near = goal({ id: 'goal-near', targetDate: '2026-10-31' });
+		const far = goal({ id: 'goal-far', targetDate: '2027-06-30', isPinned: true });
+		expect(pickPrimary([statusFor(near), statusFor(far)])?.goal.id).toBe('goal-far');
+	});
+
+	it('keeps a finished goal on screen when it was pinned on purpose', () => {
+		const done = goal({
+			id: 'goal-done',
+			targetDate: '2026-09-30',
+			targetAmount: minor(1_000_00),
+			isPinned: true
+		});
+		const live = goal({ id: 'goal-live', targetDate: '2027-06-30' });
+		const picked = pickPrimary([statusFor(done, [txn(-1_000_00, '2026-08-02')]), statusFor(live)]);
+		expect(picked?.goal.id).toBe('goal-done');
+	});
+
+	it('keeps an overdue pinned goal on screen — it is what most needs looking at', () => {
+		const late = goal({ id: 'goal-late', targetDate: '2026-06-30', isPinned: true });
+		const live = goal({ id: 'goal-live', targetDate: '2027-06-30' });
+		expect(pickPrimary([statusFor(live), statusFor(late)])?.goal.id).toBe('goal-late');
+	});
+
+	/* Not a state the app can write — `pinGoal` clears the rest — but a merge
+	   from a second device can produce it for one cycle. */
+	it('breaks a two-pin tie the same way it breaks any other', () => {
+		const near = goal({ id: 'goal-near', targetDate: '2026-10-31', isPinned: true });
+		const far = goal({ id: 'goal-far', targetDate: '2027-06-30', isPinned: true });
+		expect(pickPrimary([statusFor(far), statusFor(near)])?.goal.id).toBe('goal-near');
 	});
 });
 

@@ -210,3 +210,38 @@ describe('v6 → v7 — the share of a schedule that comes back', () => {
 		upgraded.close();
 	});
 });
+
+describe('v7 → v8 — which goal is na očích', () => {
+	it('backfills false on a goal written before the field existed', async () => {
+		const name = `mig-pin-${Date.now()}`;
+		const old = await openAtVersion(name, 7);
+		await old.table('goals').put({
+			id: 'g1',
+			name: 'Rezerva na půl roku',
+			why: 'Abych mohl dát výpověď, aniž bych panikařil.',
+			targetAmount: 180_000_00,
+			targetDate: '2027-06-30',
+			linkedAccountId: null,
+			categoryId: 'cat-sporeni',
+			startDate: '2026-02-01',
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const goal = await upgraded.goals.get('g1');
+
+		// Absent is not false: `pickPrimary` asks `goal.isPinned` of every row,
+		// and an undefined would read the same as "not chosen" right up until
+		// something tried to un-choose it.
+		expect(goal).toHaveProperty('isPinned');
+		expect(goal?.isPinned).toBe(false);
+		// The goal itself is untouched — this migration adds, it does not decide.
+		expect(goal).toMatchObject({
+			targetAmount: 180_000_00,
+			targetDate: '2027-06-30',
+			startDate: '2026-02-01'
+		});
+		upgraded.close();
+	});
+});

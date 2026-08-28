@@ -14,11 +14,12 @@
 	import { resolve } from '$app/paths';
 	import { db } from '$lib/db/schema';
 	import {
-		clearMonthTarget,
+		catchUpGoalTargets,
 		contributeToGoal,
 		createGoal,
 		deleteGoal,
 		deleteTxn,
+		pinGoal,
 		setMonthTarget,
 		updateGoal
 	} from '$lib/db/repo';
@@ -205,6 +206,9 @@
 				startDate: startOfMonth(today())
 			});
 			selectedId = goal.id;
+			// The layout writes this month's number on launch; a goal written
+			// *during* a session would otherwise sit without one until the next.
+			await catchUpGoalTargets();
 			toast.show('Cíl je napsaný. Teď ho měj na očích.');
 		}
 		formOpen = false;
@@ -232,9 +236,24 @@
 		toast.show(`${formatMonthHeading(`${month}-01`)}: ${formatMoney(amount)}`);
 	}
 
-	async function dropTarget(status: GoalStatus) {
-		await clearMonthTarget(status.goal.id, month);
+	/**
+	 * Back to what the arithmetic says.
+	 *
+	 * Not "no target this month" any more — that state stopped existing when the
+	 * number started committing itself. It rewrites the suggestion over whatever
+	 * was typed, which is what somebody means by undoing an override.
+	 */
+	async function resetTarget(status: GoalStatus) {
+		await setMonthTarget(status.goal.id, month, status.suggestedMonthly);
 		targetSheetOpen = false;
+		toast.show(`Zpátky na ${formatMoney(status.suggestedMonthly)}`);
+	}
+
+	// ── na očích ────────────────────────────────────────────────────────────
+	async function togglePin(status: GoalStatus) {
+		const next = status.goal.isPinned ? null : status.goal.id;
+		await pinGoal(next);
+		toast.show(next ? `„${status.goal.name}“ máš na očích` : 'Sundáno z očí');
 	}
 
 	const parsedTargetInput = $derived.by(() => {
@@ -323,10 +342,30 @@
 		<section class="card">
 			<div class="goal__head">
 				<h2 class="goal__name">{status.goal.name}</h2>
-				{#if status.goal.id === primaryId}
-					<span class="badge">na očích</span>
-				{/if}
+
+				<!--
+				  The choice, not a label. It used to be a badge printed on
+				  whichever goal had the nearest deadline — a reasonable guess and
+				  the wrong answer whenever the goal you actually think about is not
+				  the one expiring soonest.
+				-->
+				<button
+					type="button"
+					class="pin"
+					class:pin--on={status.goal.isPinned}
+					aria-pressed={status.goal.isPinned}
+					onclick={() => togglePin(status)}
+				>
+					<Icon name="eye" size={15} stroke={1.8} />
+					{status.goal.isPinned ? 'na očích' : 'mít na očích'}
+				</button>
 			</div>
+
+			{#if !status.goal.isPinned && status.goal.id === primaryId}
+				<p class="hint prose">
+					Zatím si žádný cíl nevybral, tak je na úvodní obrazovce tenhle — má nejbližší termín.
+				</p>
+			{/if}
 
 			<!-- Set apart as the thing he wrote, not as a field the app filled in. -->
 			<blockquote class="why">{status.goal.why}</blockquote>
@@ -365,25 +404,9 @@
 		<section class="card" class:card--flag={status.pace === 'behind'}>
 			<h2 class="u-label">{formatMonthHeading(`${month}-01`)}</h2>
 
-			{#if !status.isCommitted && !status.isComplete}
-				<div class="propose">
-					<p class="propose__text prose">
-						Aby to do termínu vyšlo, musí tenhle měsíc unést
-						<strong>{formatMoney(status.suggestedMonthly)}</strong>. Spočítat se to dá vždycky —
-						cílem se to stane, až to potvrdíš.
-					</p>
-					<div class="row-actions">
-						<button
-							type="button"
-							class="btn btn--primary"
-							onclick={() => commitTarget(status, status.suggestedMonthly)}
-						>
-							Potvrdit
-						</button>
-						<button type="button" class="btn" onclick={() => openTargetSheet(status)}>
-							Jinou částku
-						</button>
-					</div>
+			{#if status.isComplete}
+				<div class="month">
+					<p class="month__pace" data-pace="done">Cíl je doma. Tenhle měsíc už nic nemusí.</p>
 				</div>
 			{:else}
 				<div class="month">
@@ -402,12 +425,10 @@
 				</div>
 
 				<div class="row-actions">
-					{#if !status.isComplete}
-						<button type="button" class="btn btn--primary" onclick={() => openPutSheet(status)}>
-							Odložit
-							{status.monthRemaining > 0 ? formatMoney(status.monthRemaining) : ''}
-						</button>
-					{/if}
+					<button type="button" class="btn btn--primary" onclick={() => openPutSheet(status)}>
+						Odložit
+						{status.monthRemaining > 0 ? formatMoney(status.monthRemaining) : ''}
+					</button>
 					<button type="button" class="btn" onclick={() => openTargetSheet(status)}>
 						Upravit cíl měsíce
 					</button>
@@ -476,6 +497,11 @@
 						{#if other.goal.id !== status.goal.id}
 							<li>
 								<button type="button" class="other" onclick={() => (selectedId = other.goal.id)}>
+									{#if other.goal.isPinned}
+										<span class="other__pin" aria-label="na očích">
+											<Icon name="eye" size={14} stroke={1.8} />
+										</span>
+									{/if}
 									<span class="other__name">{other.goal.name}</span>
 									<span class="other__pct">{other.percent} %</span>
 								</button>
@@ -569,8 +595,10 @@
 		{@const status = current}
 		<div class="form">
 			<p class="hint prose">
-				Výpočet říká <strong>{formatMoney(status.suggestedMonthly)}</strong>. Napiš, na co se
-				zavazuješ ty — nižší číslo, které dodržíš, je lepší než vyšší, které nedodržíš.
+				Výpočet říká <strong>{formatMoney(status.suggestedMonthly)}</strong> — tolik měsíc unese, aby
+				to do termínu vyšlo, a tolik si app napsala sama. Přepiš to, když víš, že tenhle měsíc bude jiný:
+				nižší číslo, které dodržíš, je lepší než vyšší, které nedodržíš. Podle téhle částky se měsíc pak
+				odškrtne.
 			</p>
 
 			<label class="field">
@@ -589,12 +617,12 @@
 				disabled={parsedTargetInput === null}
 				onclick={() => parsedTargetInput && commitTarget(status, parsedTargetInput)}
 			>
-				Potvrdit
+				Uložit
 			</button>
 
-			{#if status.isCommitted}
-				<button type="button" class="btn btn--quiet" onclick={() => dropTarget(status)}>
-					Zrušit cíl na tenhle měsíc
+			{#if status.monthTarget !== status.suggestedMonthly}
+				<button type="button" class="btn btn--quiet" onclick={() => resetTarget(status)}>
+					Zpátky na {formatMoney(status.suggestedMonthly)}
 				</button>
 			{/if}
 		</div>
@@ -723,15 +751,50 @@
 		text-wrap: balance;
 	}
 
-	.badge {
+	/**
+	 * The pin. Off it is a quiet outline; on it is the signal, because "this is
+	 * the one" is a selection and selection is what `--signal` means.
+	 *
+	 * Not a pill — `--radius-full` on a control is reserved for the primary
+	 * action of a screen (§13.16), and putting money aside is that action here.
+	 */
+	.pin {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
 		flex: none;
-		padding: 3px var(--space-2);
-		border-radius: var(--radius-full);
-		background: var(--signal-wash);
-		color: var(--signal);
+		min-height: var(--touch);
+		padding-inline: var(--space-3);
+		border: 1px solid var(--hairline);
+		border-radius: var(--radius-sm);
+		background: var(--surface-2);
+		color: var(--ink-3);
 		font-size: var(--text-2xs);
 		font-weight: 600;
-		line-height: 1.4;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		transition:
+			background var(--dur-fast) var(--ease-out),
+			border-color var(--dur-fast) var(--ease-out),
+			color var(--dur-fast) var(--ease-out),
+			transform var(--dur-press) var(--ease-out);
+	}
+
+	.pin:active {
+		transform: scale(0.95);
+	}
+
+	.pin--on {
+		background: var(--signal-wash);
+		border-color: color-mix(in srgb, var(--signal) 45%, var(--hairline));
+		color: var(--signal);
+	}
+
+	@media (hover: hover) {
+		.pin:not(.pin--on):hover {
+			border-color: var(--hairline-2);
+			color: var(--ink-2);
+		}
 	}
 
 	/**
@@ -803,24 +866,11 @@
 
 	/* ── this month ──────────────────────────────────────────────────────── */
 
-	.propose__text {
-		font-size: var(--text-md);
-		line-height: var(--leading-base);
-		color: var(--ink-2);
-	}
-
-	.propose__text strong,
 	.hint strong {
 		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
 		font-weight: 600;
 		color: var(--ink);
-	}
-
-	.propose {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
 	}
 
 	.row-actions {
@@ -957,6 +1007,18 @@
 			background: var(--surface-2);
 			color: var(--ink);
 		}
+	}
+
+	.other__pin {
+		display: grid;
+		place-items: center;
+		flex: none;
+		color: var(--signal);
+	}
+
+	.other__name {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.other__pct {

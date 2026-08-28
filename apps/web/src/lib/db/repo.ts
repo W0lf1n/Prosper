@@ -8,7 +8,7 @@
  */
 
 import { monthKey, nowIso, startOfMonth, today } from '$lib/domain/datetime';
-import { validateGoal, validateGoalShape } from '$lib/domain/goals';
+import { goalStatus, validateGoal, validateGoalShape } from '$lib/domain/goals';
 import { DEFAULT_REMINDER_DAYS } from '$lib/domain/holdings';
 import { dueSchedules, partitionByMode, type DueItem } from '$lib/domain/recurring';
 import { newDeviceId, uuidv7 } from '$lib/domain/ids';
@@ -845,6 +845,7 @@ export async function createGoal(
 		// A goal starts counting the month it was written, not from whatever
 		// happened to be in the savings bucket beforehand.
 		startDate: input.startDate ?? startOfMonth(today()),
+		isPinned: false,
 		updatedAt,
 		deviceId,
 		isDeleted: false
@@ -857,6 +858,35 @@ export async function createGoal(
 export type GoalPatch = Partial<
 	Pick<Goal, 'name' | 'why' | 'targetAmount' | 'targetDate' | 'categoryId' | 'startDate'>
 >;
+
+/**
+ * "Na očích" — put this goal on the entry screen, and take it off the others.
+ *
+ * Exclusive by construction rather than by the caller remembering: there is one
+ * strip on that screen, so there is one pin. Passing the id of the goal that
+ * already holds it clears it and hands the choice back to `pickPrimary`'s
+ * fallback.
+ *
+ * Every row it changes is stamped and queued — the pin travels between devices
+ * like anything else, because "the goal I am thinking about" is a fact about
+ * the person, not about the phone.
+ */
+export async function pinGoal(id: string | null): Promise<void> {
+	const database = db();
+	const stamped = await stamp();
+
+	await database.transaction('rw', [database.goals, database.outbox], async () => {
+		for (const goal of await database.goals.toArray()) {
+			if (goal.isDeleted) continue;
+			const shouldPin = goal.id === id;
+			if (goal.isPinned === shouldPin) continue;
+
+			const next: Goal = { ...goal, isPinned: shouldPin, ...stamped };
+			await database.goals.put(next);
+			await enqueue('goal', next.id, next);
+		}
+	});
+}
 
 export async function updateGoal(id: string, patch: GoalPatch): Promise<Goal | undefined> {
 	const database = db();
@@ -917,6 +947,58 @@ export async function setMonthTarget(
 	await database.monthTargets.put(target);
 	await enqueue('monthTarget', target.id, target);
 	return target;
+}
+
+/**
+ * Write this month's number for every goal that has not got one yet.
+ *
+ * Called from the layout load, next to `catchUpSchedules`, because it is the
+ * same kind of job: something that should have happened while the app was shut,
+ * and there is no server to have done it.
+ *
+ * **Why this exists at all.** Until 2026-08-28 the number was only a
+ * *suggestion* until somebody pressed Potvrdit, and a month nobody confirmed
+ * scored neither ✓ nor ✗ — it read `bez cíle`. That put a monthly ritual in
+ * front of the record, and the case it was protecting against turned out to be
+ * thin: not wanting a goal this month is expressed by not putting anything in
+ * it. So the arithmetic commits itself and the record means something without
+ * being asked. Overriding it is still one tap on `/cil` — that is the case the
+ * confirmation was really for, and it is the only one left.
+ *
+ * Two things it deliberately does not do. It never touches a month that already
+ * has a written target, so an override survives every launch. And it never
+ * backfills a past month: a target invented today, out of a remaining balance
+ * that has moved since, is not what that month was aiming at, and stamping ✗ on
+ * it retroactively would be the app making something up.
+ */
+export async function catchUpGoalTargets(): Promise<number> {
+	const database = db();
+	const month = monthKey(today());
+	const goals = (await database.goals.toArray()).filter((g) => !g.isDeleted);
+	if (goals.length === 0) return 0;
+
+	const [txns, categories, targets] = await Promise.all([
+		database.txns.toArray(),
+		database.categories.toArray(),
+		database.monthTargets.toArray()
+	]);
+	const live = txns.filter((t) => !t.isDeleted);
+
+	let written = 0;
+	for (const goal of goals) {
+		const already = targets.find((t) => !t.isDeleted && t.goalId === goal.id && t.month === month);
+		if (already) continue;
+
+		const status = goalStatus({ goal, txns: live, categories, month });
+		// A goal already reached has nothing left to aim at this month, and a
+		// zero target would score ✓ every month for ever.
+		if (status.isComplete || status.suggestedMonthly <= 0) continue;
+
+		await setMonthTarget(goal.id, month, status.suggestedMonthly);
+		written += 1;
+	}
+
+	return written;
 }
 
 /** Take the commitment back. The month falls back to the computed suggestion. */

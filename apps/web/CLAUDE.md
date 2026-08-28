@@ -20,12 +20,15 @@ has nothing useful to render on a server, and Dexie must not be constructed
 where `indexedDB` does not exist. That is also why `db()` in `lib/db/schema.ts`
 is lazy.
 
-The layout's `load` runs two things on every launch, in this order:
-`ensureSeeded()` → `catchUpSchedules()`, then requests storage persistence.
-Anything that must happen "when the app opens" belongs there — there is no server
-and no background worker to do it anywhere else. It was three until 2026-08-28:
-`closePreviousDay()` sat in the middle and marked yesterday as a zero-spend day,
-and it went with the day mark itself.
+The layout's `load` runs three things on every launch, in this order:
+`ensureSeeded()` → `catchUpSchedules()` → `catchUpGoalTargets()`, then requests
+storage persistence. Anything that must happen "when the app opens" belongs
+there — there is no server and no background worker to do it anywhere else.
+
+The cast has turned over twice. `closePreviousDay()` sat in the middle until
+2026-08-28, marking yesterday as a zero-spend day, and went with the day mark
+itself; `catchUpGoalTargets()` arrived the same day, writing this month's figure
+for every goal that has not got one.
 
 ---
 
@@ -86,6 +89,7 @@ controls from the system preference.
 | `.u-label`             | The micro-label. The only place uppercase is allowed                  |
 | `.perforation`         | The score line separating two parts of one slab                       |
 | `.field`, `.btn`       | Form and button primitives, with `--primary` / `--quiet` / `--danger` |
+| `Sheet`                | The modal sheet. Pull the grip down, tap outside or Esc — no `✕`      |
 | `.visually-hidden`     | Screen-reader-only                                                    |
 
 ### Layout
@@ -128,18 +132,18 @@ in the header slab.
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty files, **361
+Vitest, node environment, `requireAssertions: true`. Twenty files, **375
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
 Four files are the exceptions and each earns it:
 
-| File                  | Why it is not in `domain/`                                              |
-| --------------------- | ----------------------------------------------------------------------- |
+| File                  | Why it is not in `domain/`                                                     |
+| --------------------- | ------------------------------------------------------------------------------ |
 | `db/repo.test.ts`     | The backup and the wipe **are** persistence; in the abstract they test nothing |
-| `db/schema.test.ts`   | Migrations, run against a database actually built at the old version    |
-| `sync/engine.test.ts` | The outbox drain against a stubbed `fetch`                              |
-| `sync/pair.test.ts`   | The pre-flight probe — the sentence a wrong address produces            |
+| `db/schema.test.ts`   | Migrations, run against a database actually built at the old version           |
+| `sync/engine.test.ts` | The outbox drain against a stubbed `fetch`                                     |
+| `sync/pair.test.ts`   | The pre-flight probe — the sentence a wrong address produces                   |
 
 The first three use `fake-indexeddb/auto`.
 
@@ -159,7 +163,7 @@ force-close → reopen → reconnect → verify.
 
 ## Data layer
 
-`lib/db/schema.ts` holds the `migrations` array, currently at **v7**. Add a new
+`lib/db/schema.ts` holds the `migrations` array, currently at **v8**. Add a new
 entry; never edit an existing one, even in development — a released version is
 already on the phone. `schema.test.ts` builds a database at the _old_ version
 and opens it with the current code: a migration that has only ever run against

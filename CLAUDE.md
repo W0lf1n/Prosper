@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-08-28 · schema v7 · 361 web tests · 50 API tests
+**Last revised:** 2026-08-28 · schema v8 · 375 web tests · 50 API tests
 
 ---
 
@@ -19,7 +19,7 @@ not get built.** Before adding anything, name which law it serves.
 | Law           | Mechanism in the app                                                         |
 | ------------- | ---------------------------------------------------------------------------- |
 | **Tracking**  | Launch straight into the keypad; a day with no expense says so, and stays fixable |
-| **Targeting** | A goal needs a why, an amount and a date; a month gets a written target      |
+| **Targeting** | A goal needs a why, an amount and a date; a month gets a target it writes itself |
 | **Trimming**  | `spendType` on every bucket; the 10/10/10/70 split measured against income   |
 | **Training**  | Checks on every keystroke; the record of months; days without an expense     |
 
@@ -163,7 +163,12 @@ Violations are bugs regardless of test status. The long version is
     to an existing one — a released version is already on the phone.
 14. **Update `docs/DECISIONS.md`** whenever a question gets answered or an
     assumption turns out wrong.
-15. **Elevation is luminance; recession is a pocket.** A card is raised because
+15. **A sheet is closed by pulling it down**, tapping the blurred app behind
+    it, or Esc — never by a button. `Sheet.svelte` owns all three, and the only
+    close *control* left is `visually-hidden`, for assistive technology that
+    cannot produce a drag. A `✕` in the top-right corner of a one-handed app is
+    a target the thumb cannot reach.
+16. **Elevation is luminance; recession is a pocket.** A card is raised because
     it is lighter than the ground, not because it throws a shadow — real shadow
     survives only under `Sheet` and `Toaster`, which genuinely float over
     content. Inside a card, recessed is `--ground-2` and raised is `--raised`;

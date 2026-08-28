@@ -213,6 +213,15 @@ export interface Goal extends Synced {
 	 * put aside for this".
 	 */
 	startDate: IsoDate;
+	/**
+	 * "Na očích" — this is the goal the entry screen puts a line about.
+	 *
+	 * At most one goal carries it, and it is a decision rather than a ranking:
+	 * the app used to pick the nearest deadline, which is a reasonable guess and
+	 * the wrong answer whenever the one you actually think about is not the one
+	 * expiring soonest. Nothing pinned falls back to that guess.
+	 */
+	isPinned: boolean;
 }
 
 /**

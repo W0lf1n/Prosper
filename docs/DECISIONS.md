@@ -1332,3 +1332,101 @@ snapping shut a frame later.
 Stored as the exception rather than the state: months are open unless named, so
 a month recorded for the first time is open and nothing has to be written when
 one scrolls into existence.
+
+### Dluží mi is on the row, not only in the report · 2026-08-28
+
+Reported, and fair: *"I add something to Dluží mi, I can see it, and there is
+nowhere to mark it received."*
+
+The one-tap **Přijato** existed and had since P1 — on `/mesic`, in a card
+listing everything outstanding. That card is right and it stays. What was wrong
+is that it was the *only* place: the tape row is where the app tells you Honza
+owes you 420, so the tape row is what gets tapped when Honza pays. Opening it
+and finding five fields about the expense and nothing about the debt is the
+screen refusing to discuss the thing it just brought up.
+
+The edit sheet now carries the whole of it — mark received, change the share,
+change the name, or clear it and the row stops being a receivable. That last
+one closed a smaller hole nobody had hit yet: the share could only ever be set
+once, at entry, so a figure typed wrong was permanent.
+
+Outflows only. A share of money that came *in* is not a receivable, and the
+entry screen does not offer it either.
+
+### A month target that writes itself · 2026-08-28
+
+Asked: *"Why do I have to confirm the month? If I don't want to put anything in
+the goal, I just don't."*
+
+Correct, and that was the whole of the case for the confirmation. The suggestion
+existed from the moment the goal did; pressing **Potvrdit** turned it into the
+number the ✓/✗ record measures against, and a month nobody confirmed scored
+neither — it read `bez cíle`. So the mechanism bought one thing, a monthly
+ritual, and protected against a case that does not need protecting: *not*
+contributing already expresses itself perfectly well as not contributing.
+
+`catchUpGoalTargets` in `repo.ts` now writes this month's figure on launch, next
+to `catchUpSchedules` and for the same reason — something that should have
+happened while the app was shut, with no server to have done it. The record is
+therefore against the arithmetic, which recomputes every month from what is left
+and how long there is, so a bad month raises the next one by itself.
+
+**Overriding is what survives, because that was the real case.** "This month I
+can do 2 000, not 4 500" is a decision, and `Upravit cíl měsíce` records it;
+the month is then marked against 2 000. `clearMonthTarget` is no longer reached
+from the screen — "no target this month" stopped being a state — and the button
+in its place puts the arithmetic back.
+
+Two things it deliberately will not do: overwrite a figure set by hand, and
+backfill a month that is already over. A target invented today out of a
+remaining balance that has moved since is not what that month was aiming at, and
+stamping ✗ on it retroactively would be the app making something up.
+
+### The goal on the entry screen is chosen, not computed · 2026-08-28
+
+`pickPrimary` picked the nearest open deadline. That is a reasonable guess and
+the wrong answer whenever the goal actually being thought about is not the one
+expiring soonest — which is most of the time, because the nearest deadline is
+usually the smallest goal.
+
+`Goal.isPinned` (schema **v8**, backfilled `false`) and a `mít na očích` toggle
+on `/cil`. It is exclusive by construction — `pinGoal` clears the rest, because
+there is one strip on that screen — and it is on the goal rather than in `meta`,
+so it travels between devices: which goal somebody is thinking about is a fact
+about the person, not about the phone.
+
+**A pin wins absolutely**, including over a finished or overdue goal. Those two
+step aside in the fallback ordering, and they must not step aside from an
+explicit choice: "keep this one in front of me" is exactly the sentence somebody
+says about a goal that is going badly. Un-pinning is one tap, and with nothing
+pinned the old guess runs, now with a line on screen saying that is what is
+happening.
+
+### The sheet closes by being pulled down · 2026-08-28
+
+Asked for: drag-to-dismiss on the grip, the way iOS does it, and the `✕` gone
+from every sheet.
+
+The `✕` was wrong twice over. It sat at the top-right of a phone held one-handed
+— the one corner a thumb cannot reach, on an app whose whole premise is one hand
+— and it drew a second exit immediately next to the grip, which is already a
+picture of how the thing opens and shuts. The grip now does what it looks like
+it does.
+
+**The whole top of the sheet is the handle**, not the bar itself: 38 × 4 px is a
+picture, not a target. `touch-action: none` on it is load-bearing — without it
+the browser reads the same drag as a scroll or a pull-to-refresh, and the
+gesture works on a mouse and does nothing on the phone it was built for.
+
+The threshold is a **share of the sheet** (30 %, floor 72 px) rather than a
+fixed distance, because these range from a four-line confirmation to a full
+keypad and 100 px is most of the first and a twitch on the second. A flick beats
+the distance outright — 0.5 px/ms from anywhere — which is what makes it feel
+light rather than heavy. Upwards is rubber-banded at a sixth rather than
+refused: an overshoot should feel like resistance, not like the sheet came off
+its hinge.
+
+Four ways out now, and only one of them is a thing to aim at. Pull it down, tap
+the blurred app behind it, press Esc — and a `visually-hidden` button at the end
+of every sheet, because a drag gesture is not something every assistive
+technology can produce and Esc is not something a touch screen reader has.

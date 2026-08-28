@@ -10,10 +10,12 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { monthKey, today } from '$lib/domain/datetime';
 import type { Minor } from '$lib/domain/money';
 import type { Reconciliation } from '$lib/domain/types';
 import {
 	BACKUP_VERSION,
+	catchUpGoalTargets,
 	createGoal,
 	createHolding,
 	createTxn,
@@ -22,6 +24,7 @@ import {
 	exportBackup,
 	getCollapsedMonths,
 	importBackup,
+	pinGoal,
 	recordValuation,
 	resetLedger,
 	setCollapsedMonths,
@@ -288,5 +291,115 @@ describe('the folded months on /vypis', () => {
 		await db.meta.put({ key: 'tapeCollapsedMonths', value: 'nonsense' });
 
 		expect(await getCollapsedMonths()).toEqual([]);
+	});
+});
+
+/** The goal fixture the two blocks below share. Valid, and always in future. */
+async function aGoal(name = 'Rezerva', targetDate = '2027-06-30') {
+	return createGoal({
+		name,
+		why: 'Abych nemusel řešit každou rozbitou pračku půjčkou.',
+		targetAmount: 120000 as Minor,
+		targetDate
+	});
+}
+
+describe('pinGoal', () => {
+	it('starts with nothing on screen by choice', async () => {
+		const goal = await aGoal();
+
+		expect(goal.isPinned).toBe(false);
+	});
+
+	it('is exclusive — one strip, one pin', async () => {
+		const first = await aGoal('Rezerva');
+		const second = await aGoal('Dovolená');
+
+		await pinGoal(first.id);
+		await pinGoal(second.id);
+
+		expect((await db.goals.get(first.id))?.isPinned).toBe(false);
+		expect((await db.goals.get(second.id))?.isPinned).toBe(true);
+	});
+
+	it('hands the choice back when nothing is pinned', async () => {
+		const goal = await aGoal();
+		await pinGoal(goal.id);
+
+		await pinGoal(null);
+
+		expect((await db.goals.get(goal.id))?.isPinned).toBe(false);
+	});
+
+	it('leaves a goal it did not have to change alone', async () => {
+		const goal = await aGoal();
+		await pinGoal(goal.id);
+		const stamped = (await db.goals.get(goal.id))!.updatedAt;
+
+		await pinGoal(goal.id);
+
+		expect((await db.goals.get(goal.id))?.updatedAt).toBe(stamped);
+	});
+});
+
+/**
+ * The month writes its own number now. What is worth pinning down is the two
+ * things it must never do: overwrite a figure set by hand, and invent one for a
+ * month that is already over.
+ */
+describe('catchUpGoalTargets', () => {
+	it('writes this month for a goal that has none', async () => {
+		const goal = await aGoal();
+
+		expect(await catchUpGoalTargets()).toBe(1);
+
+		const written = await db.monthTargets.where({ goalId: goal.id }).toArray();
+		expect(written).toHaveLength(1);
+		expect(written[0]!.month).toBe(monthKey(today()));
+		expect(written[0]!.amount).toBeGreaterThan(0);
+	});
+
+	it('is a no-op the second time — an override survives every launch', async () => {
+		const goal = await aGoal();
+		await catchUpGoalTargets();
+		const first = (await db.monthTargets.where({ goalId: goal.id }).first())!;
+
+		expect(await catchUpGoalTargets()).toBe(0);
+
+		const after = (await db.monthTargets.where({ goalId: goal.id }).first())!;
+		expect(after.id).toBe(first.id);
+		expect(after.amount).toBe(first.amount);
+	});
+
+	it('writes only the current month, never a past one', async () => {
+		await aGoal();
+		await catchUpGoalTargets();
+
+		const months = (await db.monthTargets.toArray()).map((t) => t.month);
+		expect(months).toEqual([monthKey(today())]);
+	});
+
+	it('leaves a goal that is already reached alone', async () => {
+		const goal = await createGoal({
+			name: 'Skoro doma',
+			why: 'Abych nemusel řešit každou rozbitou pračku půjčkou.',
+			targetAmount: 10000 as Minor,
+			targetDate: '2027-06-30'
+		});
+		const saving = (await db.categories.toArray()).find((c) => c.spendType === 'save')!;
+		await createTxn({
+			accountId,
+			amount: -10000 as Minor,
+			categoryId: saving.id,
+			payee: 'Odloženo'
+		});
+
+		await catchUpGoalTargets();
+
+		expect(await db.monthTargets.where({ goalId: goal.id }).count()).toBe(0);
+	});
+
+	it('has nothing to do without a goal', async () => {
+		expect(await catchUpGoalTargets()).toBe(0);
 	});
 });

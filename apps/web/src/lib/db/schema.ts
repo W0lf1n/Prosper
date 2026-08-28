@@ -186,6 +186,33 @@ export const migrations: Migration[] = [
 					if (row.owedBy === undefined) row.owedBy = null;
 				});
 		}
+	},
+	{
+		/**
+		 * `Goal.isPinned` — which goal gets the strip on the entry screen.
+		 *
+		 * No index changes, so `goals` is not restated: Dexie replaces a table's
+		 * whole declaration and restating it wrongly is how indexes get dropped.
+		 * IndexedDB cannot index a boolean anyway, and one person has a handful
+		 * of goals.
+		 *
+		 * Backfilled to `false` rather than left absent, for the reason v5 did
+		 * the same to `scheduleId` and v7 to `owedAmount`: `row.isPinned ===
+		 * false` would otherwise answer false for every goal written before
+		 * today. The pin then goes to whichever goal the old rule would have
+		 * chosen anyway — nothing, so the fallback keeps running until somebody
+		 * picks one.
+		 */
+		version: 8,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			await tx
+				.table('goals')
+				.toCollection()
+				.modify((row: { isPinned?: boolean }) => {
+					if (row.isPinned === undefined) row.isPinned = false;
+				});
+		}
 	}
 ];
 

@@ -33,6 +33,9 @@
 			'<path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"/><circle cx="10.7" cy="7.6" r="2.2"/><circle cx="13.7" cy="16.4" r="2.2"/>',
 
 		plus: '<path d="M12 6.4v11.2M6.4 12h11.2"/>',
+
+		/** Na očích — the goal the entry screen keeps a line about. */
+		eye: '<path d="M2.9 12S6.6 5.9 12 5.9 21.1 12 21.1 12 17.4 18.1 12 18.1 2.9 12 2.9 12Z"/><circle cx="12" cy="12" r="2.7"/>',
 		search: '<circle cx="11" cy="11" r="6.3"/><path d="m15.7 15.7 3.8 3.8"/>',
 		close: '<path d="m6.6 6.6 10.8 10.8M17.4 6.6 6.6 17.4"/>',
 

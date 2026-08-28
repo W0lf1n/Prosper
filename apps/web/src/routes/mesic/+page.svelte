@@ -331,9 +331,6 @@
 			<div class="goal__numbers">
 				<Money value={goal.monthSaved} size="lg" bold colour={false} />
 				<span class="goal__of">z {formatMoney(goal.monthTarget)}</span>
-				{#if !goal.isCommitted}
-					<span class="badge badge--flag">nepotvrzeno</span>
-				{/if}
 			</div>
 
 			<div class="meter meter--thick">
@@ -772,19 +769,6 @@
 
 	.goal__pace[data-pace='done'] {
 		color: var(--in);
-	}
-
-	.badge {
-		padding: 2px var(--space-2);
-		border-radius: var(--radius-full);
-		font-size: var(--text-2xs);
-		font-weight: 600;
-		line-height: 1.5;
-	}
-
-	.badge--flag {
-		background: var(--flag-wash);
-		color: var(--flag);
 	}
 
 	/* ── the shared meter ────────────────────────────────────────────────

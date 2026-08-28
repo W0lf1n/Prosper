@@ -7,6 +7,8 @@
 		reconcileAccount,
 		restoreTxn,
 		setCollapsedMonths,
+		settleReceivable,
+		unsettleReceivable,
 		updateTxn
 	} from '$lib/db/repo';
 	import { formatDayHeading, formatMonthHeading, today } from '$lib/domain/datetime';
@@ -144,6 +146,23 @@
 	let editNote = $state('');
 	let editError = $state('');
 
+	/**
+	 * Dluží mi, on the row it came out of.
+	 *
+	 * `/mesic` has had the one-tap **Přijato** since P1, and it is the right
+	 * place for the list of everything outstanding. It was the *only* place, and
+	 * that was the bug: the row is what you tap when you remember Honza paid you
+	 * back, because the row is where the app shows you he owes. Opening it and
+	 * finding no way to say so — and no way to fix a share typed wrong, which
+	 * could until now only ever be set once, at entry — is the screen refusing
+	 * to talk about the thing it just brought up.
+	 */
+	let editOwed = $state('');
+	let editOwedBy = $state('');
+
+	const editingOpenOwed = $derived(editing !== null && isOpenReceivable(editing));
+	const editingSettled = $derived(editing !== null && editing.settledByTxnId !== null);
+
 	function openEdit(txn: Txn) {
 		editing = txn;
 		editAmount = formatMoney(txn.amount, { currency: false, sign: 'never' });
@@ -151,7 +170,27 @@
 		editCategory = txn.categoryId ?? '';
 		editPayee = txn.payee;
 		editNote = txn.note ?? '';
+		editOwed = txn.owedAmount
+			? formatMoney(txn.owedAmount, { currency: false, sign: 'never' })
+			: '';
+		editOwedBy = txn.owedBy ?? '';
 		editError = '';
+	}
+
+	/**
+	 * The money arrived. Captured before the write, because the toast reads a
+	 * figure the live query is about to change underneath it.
+	 */
+	async function receive() {
+		if (!editing) return;
+		const txnId = editing.id;
+		editing = null;
+		const repayment = await settleReceivable(txnId);
+		if (!repayment) return;
+		toast.money(repayment.amount, {
+			message: repayment.payee,
+			undo: () => unsettleReceivable(txnId)
+		});
 	}
 
 	async function saveEdit() {
@@ -172,12 +211,30 @@
 		const magnitude = Math.abs(parsed.value) as Minor;
 		const amount = editing.amount < 0 ? neg(magnitude) : magnitude;
 
+		// An outflow only. A share of money that came *in* is not a receivable,
+		// and the entry screen does not offer it either.
+		let owed: Minor | null = null;
+		if (amount < 0 && editOwed.trim()) {
+			const share = parseAmount(editOwed);
+			if (!share.ok || share.value <= 0) {
+				editError = 'Dlužná částka není částka.';
+				return;
+			}
+			if (share.value > magnitude) {
+				editError = 'Vrátit ti nemůže víc, než kolik to stálo.';
+				return;
+			}
+			owed = share.value;
+		}
+
 		await updateTxn(editing.id, {
 			amount,
 			date: editDate,
 			categoryId: editCategory || null,
 			payee: editPayee,
-			note: editNote
+			note: editNote,
+			owedAmount: owed,
+			owedBy: owed === null ? null : editOwedBy.trim() || null
 		});
 		editing = null;
 	}
@@ -361,6 +418,54 @@
 			<input class="field__input" bind:value={editNote} />
 		</label>
 
+		<!--
+		  Dluží mi. Only on an outflow — a share of money that came in is not a
+		  receivable — and it is the whole of it: mark it received, fix the
+		  figure, fix the name, or take it off the row entirely by clearing it.
+		-->
+		{#if editing && editing.amount < 0}
+			<fieldset class="owed">
+				<legend class="field__label">Dluží mi</legend>
+
+				{#if editingSettled}
+					<p class="owed__done">
+						<Icon name="check" size={15} stroke={2.4} />
+						Vráceno{editing.owedBy ? ` — ${editing.owedBy}` : ''}. Příjem je na výpisu.
+					</p>
+				{:else}
+					<div class="owed__row">
+						<label class="field owed__amount">
+							<span class="field__label">Kolik ti vrátí</span>
+							<input
+								class="field__input field__input--mono"
+								bind:value={editOwed}
+								inputmode="decimal"
+								placeholder="0"
+							/>
+						</label>
+						<label class="field owed__who">
+							<span class="field__label">Kdo</span>
+							<input class="field__input" bind:value={editOwedBy} placeholder="kdo ti to vrátí" />
+						</label>
+					</div>
+
+					{#if editingOpenOwed}
+						<button type="button" class="btn owed__ok btn--block" onclick={receive}>
+							Přijato — {formatMoney(editing.owedAmount!)}
+						</button>
+						<p class="field__hint">
+							Zapíše příjem na dnešek. Do té doby tyhle peníze v zůstatku nejsou, protože jsi
+							zaplatil celou částku.
+						</p>
+					{:else}
+						<p class="field__hint">
+							Prázdné pole znamená, že ti nikdo nic nevrací. Uloží se to spolu se záznamem.
+						</p>
+					{/if}
+				{/if}
+			</fieldset>
+		{/if}
+
 		{#if editError}
 			<p class="error-text">{editError}</p>
 		{/if}
@@ -478,7 +583,7 @@
 
 	/**
 	 * The header is the whole control: a full-bleed row, so it presses by
-	 * background luminance rather than by scale (§13.15) — `scale` on something
+	 * background luminance rather than by scale (§13.16) — `scale` on something
 	 * that spans the slab reads as the slab moving.
 	 *
 	 * `.month__title` is the heading the outline still needs; the button inside
@@ -706,5 +811,63 @@
 
 	.form__actions .btn {
 		flex: 1;
+	}
+
+	/* ── dluží mi ────────────────────────────────────────────────────────
+	   Set into the sheet rather than floating in it: this is a part of the row
+	   rather than another field alongside the amount, and recessed inside a
+	   surface is `--ground-2` here as everywhere. */
+
+	.owed {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		margin: 0;
+		padding: var(--space-3);
+		border: none;
+		border-radius: var(--radius-md);
+		background: var(--ground-2);
+	}
+
+	.owed__row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-3);
+	}
+
+	@media (max-width: 360px) {
+		.owed__row {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.owed__amount,
+	.owed__who {
+		min-width: 0;
+	}
+
+	/* The one green button in the app: money arriving is the only thing
+	   `--in` ever means. */
+	.owed__ok {
+		border-color: color-mix(in srgb, var(--in) 50%, var(--hairline));
+		background: var(--in-wash);
+		color: var(--in);
+		font-weight: 600;
+	}
+
+	@media (hover: hover) {
+		.owed__ok:hover {
+			border-color: var(--in);
+			background: var(--in-wash);
+		}
+	}
+
+	.owed__done {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: var(--text-sm);
+		line-height: var(--leading-base);
+		color: var(--in);
 	}
 </style>

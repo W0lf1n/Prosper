@@ -577,6 +577,12 @@ was last done. The sheet shows the ledger's figure first and unprompted, takes
 the statement's figure under it, and computes the difference as you type — this
 is not a memory test, the two numbers are supposed to agree.
 
+**Dluží mi is on the row.** Tapping a row opens the edit sheet, and an outflow's
+sheet carries the whole of its receivable: mark it received, change the share,
+change who owes it, or clear it. `/mesic` keeps the list of everything
+outstanding — that is the report — but the action lives where the app shows you
+the debt, which is here.
+
 **A difference is offered as a row to write, never as a balance to overwrite.**
 Overwriting would close the gap and destroy the evidence in one move. The
 adjustment is one-off by construction: a correction is not the running cost of a
@@ -607,9 +613,23 @@ and one line names the single class furthest below.
 ### `/cil` — Cíl
 
 The Targeting law, in three parts and that order: **the why** in his own words at
-the top, before any number; **this month's** figure, marked as committed or
-merely proposed, with a one-tap _Odložit_ that writes the ordinary outflow; and
-**the record of months**, ✓ or ✗ against what he actually agreed to.
+the top, before any number; **this month's** figure, with a one-tap _Odložit_
+that writes the ordinary outflow; and **the record of months**, ✓ or ✗ against
+the figure that month was aiming at.
+
+**The month's number writes itself.** `catchUpGoalTargets` puts it there on
+launch — remaining ÷ months left — so the record means something without a
+monthly ritual in front of it, and a bad month raises the next one by itself. It
+was confirmed by hand until 2026-08-28, and the case that mechanism protected
+turned out to be thin: not wanting a goal this month says itself by nothing
+going into it. `Upravit cíl měsíce` is what survived, because *that* was the
+real case — "this month I can do 2 000, not 4 500" is a decision, and the month
+is then marked against 2 000.
+
+**Which goal reaches the entry screen is chosen.** `mít na očích` pins one, and
+a pin beats the nearest-deadline guess absolutely — including for a goal that is
+finished or overdue, because that is exactly the goal somebody wants kept in
+front of them.
 
 The form is the refusal: the save button reads _"Napiš proč"_ until the why
 clears ten characters, _"Zadej termín"_ until the date is in the future. This is
@@ -686,6 +706,11 @@ above it.
 The system is called **graphite instrument**, and it replaced the "quiet blue
 paper" palette this document originally specified. Tokens live in
 `lib/styles/tokens.css` and are the only place colours are defined.
+
+**A sheet has no close button.** It is pulled down by its grip, dismissed by
+tapping the blurred app behind it, or by Esc. The `✕` in the top-right went on
+2026-08-28: it was the one corner a thumb cannot reach on a phone held in one
+hand, next to a grip that already said how the thing opens and shuts.
 
 **Dark first.** The app is used one-handed, in bed, with the lights off, so the
 graphite theme is the one it was designed for and the light theme is its daylight

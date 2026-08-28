@@ -289,25 +289,34 @@ export function paceText(status: GoalStatus): string {
 /**
  * The goal that gets the strip on the entry screen.
  *
- * Nearest deadline that is still open. A finished goal steps aside for the next
- * one rather than sitting there being congratulated at, and an overdue one only
- * wins when there is nothing live left — at which point it is the thing that
- * most needs looking at anyway.
+ * **A pin wins, always.** `isPinned` is a decision and this function does not
+ * get to second-guess it — not even when the goal is finished or overdue,
+ * because "keep this one in front of me" is exactly the sentence somebody says
+ * about a goal that is going badly. Un-pinning is one tap.
+ *
+ * With nothing pinned it falls back to the guess it has always made: nearest
+ * deadline still open. A finished goal steps aside for the next one rather than
+ * sitting there being congratulated at, and an overdue one only wins when there
+ * is nothing live left — at which point it is the thing that most needs looking
+ * at anyway.
  */
 export function pickPrimary(statuses: readonly GoalStatus[]): GoalStatus | null {
 	const live = statuses.filter((s) => !s.goal.isDeleted);
 	if (live.length === 0) return null;
 
 	const rank = (s: GoalStatus) => (s.isComplete ? 2 : s.isOverdue ? 1 : 0);
-	return (
-		[...live].sort((a, b) => {
-			const byRank = rank(a) - rank(b);
-			if (byRank !== 0) return byRank;
-			if (a.goal.targetDate !== b.goal.targetDate)
-				return a.goal.targetDate < b.goal.targetDate ? -1 : 1;
-			return a.goal.id < b.goal.id ? -1 : 1;
-		})[0] ?? null
-	);
+	const byDeadline = [...live].sort((a, b) => {
+		const byRank = rank(a) - rank(b);
+		if (byRank !== 0) return byRank;
+		if (a.goal.targetDate !== b.goal.targetDate)
+			return a.goal.targetDate < b.goal.targetDate ? -1 : 1;
+		return a.goal.id < b.goal.id ? -1 : 1;
+	});
+
+	// Two pinned is not a state the app can produce — `pinGoal` clears the rest —
+	// but a merge from another device can, briefly. The same tiebreak decides it
+	// rather than whichever row Dexie handed back first.
+	return byDeadline.find((s) => s.goal.isPinned) ?? byDeadline[0] ?? null;
 }
 
 /** Index the written targets by month, so a screen can look one up per row. */
