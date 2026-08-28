@@ -26,7 +26,7 @@
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
 	import type { Category, Holding, Schedule, SpendType } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
-	import { pair, unpair } from '$lib/sync/pair';
+	import { defaultBaseUrl, pair, unpair } from '$lib/sync/pair';
 	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
@@ -193,7 +193,7 @@
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `vydaje-zaloha-${today()}.json`;
+		link.download = `prosper-zaloha-${today()}.json`;
 		link.click();
 		URL.revokeObjectURL(url);
 	}
@@ -322,7 +322,7 @@
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `vydaje-${today()}.xlsx`;
+		link.download = `prosper-${today()}.xlsx`;
 		link.click();
 		URL.revokeObjectURL(url);
 		toast.show(`Vyexportováno ${counted(live.length, RECORDS)}`);
@@ -353,7 +353,11 @@
 	// keypad.
 	const sync = syncStatus();
 
-	let syncBaseUrl = $state('');
+	// Prefilled with the origin the app was served from, because in the
+	// deployment this repository describes that is the answer — client and API
+	// are one nginx and one domain. A wrong address is caught by the health
+	// probe in `pair()` rather than by a 404 nobody can read.
+	let syncBaseUrl = $state(defaultBaseUrl());
 	let syncCode = $state('');
 	let syncDeviceName = $state('');
 	let syncBusy = $state(false);
@@ -406,7 +410,7 @@
 </script>
 
 <svelte:head>
-	<title>Výdaje — nastavení</title>
+	<title>Prosper — nastavení</title>
 </svelte:head>
 
 <AppBar title="Nastavení" />
@@ -668,7 +672,7 @@
 				<input
 					class="field__input"
 					bind:value={syncBaseUrl}
-					placeholder="https://vydaje.example.com"
+					placeholder="https://prosper.example.com"
 					autocomplete="off"
 					inputmode="url"
 				/>
@@ -839,17 +843,6 @@
 		flex-direction: column;
 		gap: var(--space-3);
 		padding: 0 var(--space-3) var(--space-5);
-	}
-
-	.card {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-		padding: var(--space-4);
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--edge), var(--elev-1);
 	}
 
 	/* ── categories ──────────────────────────────────────────────────────── */
@@ -1181,11 +1174,13 @@
 		color: var(--ink);
 	}
 
+	/* The track is the pocket, the selection is raised: `--ground-2` up to
+	   `--raised`. One rule, and it steps the right way in both themes. */
 	.segments {
 		display: flex;
 		gap: 2px;
 		padding: 3px;
-		background: var(--surface-2);
+		background: var(--ground-2);
 		border: 1px solid var(--hairline);
 		border-radius: var(--radius-md);
 	}
@@ -1195,21 +1190,17 @@
 		min-height: var(--touch);
 		border-radius: var(--radius-sm);
 		font-size: var(--text-md);
-		font-weight: 500;
+		font-weight: 400;
 		color: var(--ink-3);
 		transition:
 			background var(--dur-base) var(--ease-out),
-			color var(--dur-base) var(--ease-out),
-			box-shadow var(--dur-base) var(--ease-out);
+			color var(--dur-base) var(--ease-out);
 	}
 
 	.segment--on {
-		background: var(--surface);
+		background: var(--raised);
 		color: var(--ink);
 		font-weight: 600;
-		box-shadow:
-			var(--edge),
-			0 1px 3px rgb(0 0 0 / 16%);
 	}
 
 	@media (hover: hover) {
@@ -1279,7 +1270,7 @@
 		margin-right: calc(var(--space-2) * -1);
 		border-radius: var(--radius-sm);
 		color: var(--signal);
-		font-weight: 500;
+		font-weight: 600;
 		text-decoration: underline;
 		text-underline-offset: 3px;
 		text-decoration-thickness: 1px;

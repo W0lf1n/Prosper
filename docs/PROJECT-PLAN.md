@@ -1,6 +1,6 @@
-# Výdaje — Project Plan
+# Prosper — Project Plan
 
-**Name:** Výdaje · repository `Prosper`
+**Name:** Prosper · repository `Prosper`
 **Owner:** Petr
 **Status:** P0, P1 and **P2 (sync)** shipped. Targeting, investments, recurring
 payments and P5 reporting shipped on top of P1. P3 designed, not built. The
@@ -166,7 +166,7 @@ Full reasoning, including every rejected alternative, is in `DECISIONS.md`.
 | Client storage | **Dexie 4.4.5**, schema **v6** behind a migration array                          |
 | Money          | `number` in minor units (haléře), branded `Minor`, all arithmetic in one module  |
 | Ids            | Client-generated **UUIDv7**, hand-rolled, no dependency                          |
-| Hosting        | Static output (`adapter-static`), same origin as the API from P2                 |
+| Hosting        | Static output (`adapter-static`), served by its own nginx container from the API's origin — `deploy/`, runbook in `DEPLOYMENT.md` |
 | UI language    | **Czech.** Code, identifiers, comments and docs stay English                     |
 | Currency       | CZK only; `currency` column present and unused on every account                  |
 | Phone          | Android primary; iOS kept working as a degraded case                             |
@@ -206,11 +206,21 @@ full analysis, including the eight distinct failure modes it exhibited, is in
 └─────────────────────────────────────────────────│────────────┘
                                                   │ HTTPS, JWT (P2)
                                                   ▼
-┌──────────────── CONTABO VPS (Docker) — apps/api ─────────────┐
-│  Caddy  →  ASP.NET Core 9 Minimal API  →  Postgres 16        │
-│                                        nightly pg_dump → NAS │
+┌──────────────── VPS (Docker) — deploy/ ──────────────────────┐
+│  nginx (host, TLS)  →  127.0.0.1:8080                        │
+│      │                                                        │
+│      ▼                                                        │
+│  web   nginx + static PWA, location /api/ ──┐                │
+│                                             ▼                 │
+│                     api  ASP.NET Core 9  →  db  Postgres 16  │
+│                                        nightly pg_dump → disk │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+**Client and API are one origin**, because the `web` container proxies `/api/`
+to the `api` container. That is what retires the CORS allowlist, what lets
+Settings prefill the pairing address, and why only one port is published — bound
+to `127.0.0.1`. The runbook is `DEPLOYMENT.md`.
 
 **Client is the source of truth for authoring. Server is durable storage and a
 cross-device merge point.** The app must be fully functional with the server
@@ -732,7 +742,7 @@ two devices in quick succession is a race the protocol cannot order.
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P0** Foundation             | ✅ TS strict, ESLint, Prettier, Vitest. `money.ts` written and tested first. Dexie schema behind a migration array. Design tokens                                     |
 | **P1** MVP, local only        | ✅ Six screens, the checks layer, category set seeded from the real workbook, service worker, installable, works fully in airplane mode. No backend, no sync, no auth |
-| **P2** Sync                   | Not started                                                                                                                                                           |
+| **P2** Sync                   | ✅ Protocol, engine, pairing and the deployment — `deploy/` and `DEPLOYMENT.md`. Never run against real Postgres; there is no Docker on the development machine       |
 | **P3** Reliability & guidance | Designed, not built                                                                                                                                                   |
 | **P4** Import                 | Not started                                                                                                                                                           |
 | **P5** Reporting              | Not started                                                                                                                                                           |

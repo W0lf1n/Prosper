@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#3a3a3e;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}a{color:#409cff}a:hover{color:#74b8ff}</style>
+</helmet>
+<div style="min-height:100vh;padding:40px 32px 56px;display:flex;flex-direction:column;align-items:center;gap:28px">
+  <div style="max-width:820px;width:100%;color:#d8d8dc">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8e8e94;margin-bottom:6px">Krok 1 · tokens.css</div>
+    <h1 style="margin:0 0 10px;font-size:22px;font-weight:600;letter-spacing:-0.02em;color:#f5f5f7">Graphite instrument, 2. vydání — vzorník obou témat</h1>
+    <div style="font-size:13px;line-height:1.55;color:#b5b5ba;max-width:72ch">
+      Stejná jména tokenů, nové hodnoty. Neutrální near-black povrchy z referenčního systému (#1d1d1f → #252527 → #2a2a2c) na čistě černém groundu; hairlines jako inkoust v nízké alfě; stíny staženy z karet a tlačítek (--elev-1 je no-op) — elevace je změna luminance, stín zůstává jen plovoucím vrstvám (sheet, toast). Chrome akcent (--signal) přechází na modrou odvozenou z Action Blue — světlé #0066cc, tmavé #409cff; máta zůstává výhradně barvou příjmu (--in) a spoření. Datové odstíny (flag, danger, split) sdílejí stejnou oklch světlost a chromu, aby žádná třída nekřičela. Rádiusy přemapovány na gramatiku 8 / 11 / 18 / pill. --font-ui jde na systémový stack (SF Pro na iOS, nula bajtů); peníze zůstávají IBM Plex Mono.
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;justify-content:center;align-items:flex-start">
+
+    <!-- ══ DARK — primary ══ -->
+    <div style="width:390px;border-radius:28px;padding:24px 22px 26px;background:linear-gradient(175deg,#000000 0%,#0c0c0e 100%);color:#f5f5f7;border:1px solid rgba(255,255,255,0.09);display:flex;flex-direction:column;gap:22px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,245,247,0.52)">Tmavé téma</span>
+        <span style="font-size:11px;font-weight:600;color:#409cff">primární</span>
+      </div>
+      <div style="text-align:center;padding:26px 0 22px;background:radial-gradient(78% 66% at 50% 0%,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.015) 40%,transparent 72%);border-radius:18px">
+        <div style="font-size:12px;color:rgba(245,245,247,0.52);margin-bottom:8px">Dnes · Jídlo</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:56px;font-weight:600;letter-spacing:-0.025em;line-height:1">−4 250<span style="font-size:26px;font-weight:400;color:rgba(245,245,247,0.52)"> Kč</span></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,245,247,0.52);margin-bottom:10px">Ground → Surface-3</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+          <div><div style="height:44px;border-radius:8px;background:#000000;border:1px solid rgba(255,255,255,0.09)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(245,245,247,0.52);margin-top:5px">000000</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#0c0c0e;border:1px solid rgba(255,255,255,0.09)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(245,245,247,0.52);margin-top:5px">0c0c0e</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#1d1d1f"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(245,245,247,0.52);margin-top:5px">1d1d1f</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#252527"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(245,245,247,0.52);margin-top:5px">252527</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#2a2a2c"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(245,245,247,0.52);margin-top:5px">2a2a2c</div></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,245,247,0.52);margin-bottom:8px">Ink</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:16px;color:#f5f5f7">Primární text — ink</div>
+          <div style="font-size:14px;color:rgba(245,245,247,0.66)">Sekundární popisek — ink-2 (66 %)</div>
+          <div style="font-size:13px;color:rgba(245,245,247,0.52)">Terciární, mikro-popisky — ink-3 (52 %)</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,245,247,0.52);margin-bottom:10px">Akce · pill jen pro primární</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button style="border:none;cursor:pointer;background:#409cff;color:#06213d;font-size:16px;font-weight:600;padding:12px 26px;border-radius:9999px;font-family:inherit">Uložit</button>
+          <button style="cursor:pointer;background:#252527;color:#f5f5f7;font-size:14px;font-weight:400;padding:10px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.09);font-family:inherit">Zpět</button>
+          <span style="font-size:14px;color:#409cff">Zobrazit vše</span>
+        </div>
+        <div style="font-size:11px;color:rgba(245,245,247,0.52);margin-top:8px">stisk: transform scale(0.95) · 90 ms · bez stínu</div>
+      </div>
+      <div style="background:#1d1d1f;border:1px solid rgba(255,255,255,0.09);border-radius:18px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,245,247,0.52)">Peníze · out je ink</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:15px">Albert</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;font-size:15px;color:#f5f5f7">−316,00</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:15px">Výplata</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;font-size:15px;color:#4ccfa1">+52 400,00</span></div>
+        <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.16) 12%,rgba(255,255,255,0.16) 88%,transparent)"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:#dfb567;background:rgba(223,181,103,0.12);padding:6px 12px;border-radius:8px">Spíš JÍDLO?</span>
+          <span style="font-size:13px;font-weight:600;color:#ef6f5e;background:rgba(239,111,94,0.12);padding:6px 12px;border-radius:8px">Smazat</span>
+        </div>
+      </div>
+      <div style="background:#1d1d1f;border:1px solid rgba(255,255,255,0.09);border-radius:18px;padding:16px;display:flex;align-items:center;gap:18px">
+        <div style="position:relative;width:76px;height:76px;flex:none;border-radius:50%;background:conic-gradient(#a294ec 0 10%,#4ccfa1 10% 20%,#d3a15e 20% 30%,#8b9299 30% 72%,#232326 72% 100%)"><div style="position:absolute;inset:13px;border-radius:50%;background:#1d1d1f"></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:12.5px">
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#a294ec"></span>Dávat</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#4ccfa1"></span>Spořit</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#d3a15e"></span>Dluh</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#8b9299"></span>Žít</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:12px">
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:8px;background:#252527;border:1px solid rgba(255,255,255,0.09)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(245,245,247,0.52);margin-top:5px">sm 8</div></div>
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:11px;background:#252527;border:1px solid rgba(255,255,255,0.09)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(245,245,247,0.52);margin-top:5px">base 11</div></div>
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:18px;background:#252527;border:1px solid rgba(255,255,255,0.09)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(245,245,247,0.52);margin-top:5px">lg 18</div></div>
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:9999px;background:#409cff"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(245,245,247,0.52);margin-top:5px">pill</div></div>
+      </div>
+    </div>
+
+    <!-- ══ LIGHT ══ -->
+    <div style="width:390px;border-radius:28px;padding:24px 22px 26px;background:linear-gradient(175deg,#f5f5f7 0%,#e8e8ec 100%);color:#1d1d1f;border:1px solid rgba(29,29,31,0.08);display:flex;flex-direction:column;gap:22px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,29,31,0.6)">Světlé téma</span>
+        <span style="font-size:11px;font-weight:600;color:rgba(29,29,31,0.6)">odvozené</span>
+      </div>
+      <div style="text-align:center;padding:26px 0 22px;background:radial-gradient(78% 66% at 50% 0%,rgba(255,255,255,0.55) 0%,rgba(255,255,255,0.2) 40%,transparent 72%);border-radius:18px">
+        <div style="font-size:12px;color:rgba(29,29,31,0.6);margin-bottom:8px">Dnes · Jídlo</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:56px;font-weight:600;letter-spacing:-0.025em;line-height:1">−4 250<span style="font-size:26px;font-weight:400;color:rgba(29,29,31,0.6)"> Kč</span></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,29,31,0.6);margin-bottom:10px">Ground → Surface-3</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+          <div><div style="height:44px;border-radius:8px;background:#f5f5f7;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(29,29,31,0.6);margin-top:5px">f5f5f7</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#e8e8ec;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(29,29,31,0.6);margin-top:5px">e8e8ec</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#ffffff;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(29,29,31,0.6);margin-top:5px">ffffff</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#fafafc;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(29,29,31,0.6);margin-top:5px">fafafc</div></div>
+          <div><div style="height:44px;border-radius:8px;background:#f2f2f5;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(29,29,31,0.6);margin-top:5px">f2f2f5</div></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,29,31,0.6);margin-bottom:8px">Ink</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:16px;color:#1d1d1f">Primární text — ink</div>
+          <div style="font-size:14px;color:rgba(29,29,31,0.72)">Sekundární popisek — ink-2 (72 %)</div>
+          <div style="font-size:13px;color:rgba(29,29,31,0.6)">Terciární, mikro-popisky — ink-3 (60 %)</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,29,31,0.6);margin-bottom:10px">Akce · pill jen pro primární</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button style="border:none;cursor:pointer;background:#0066cc;color:#ffffff;font-size:16px;font-weight:600;padding:12px 26px;border-radius:9999px;font-family:inherit">Uložit</button>
+          <button style="cursor:pointer;background:#fafafc;color:#1d1d1f;font-size:14px;font-weight:400;padding:10px 16px;border-radius:8px;border:1px solid rgba(29,29,31,0.08);font-family:inherit">Zpět</button>
+          <span style="font-size:14px;color:#0066cc">Zobrazit vše</span>
+        </div>
+        <div style="font-size:11px;color:rgba(29,29,31,0.6);margin-top:8px">stisk: transform scale(0.95) · 90 ms · bez stínu</div>
+      </div>
+      <div style="background:#ffffff;border:1px solid rgba(29,29,31,0.08);border-radius:18px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,29,31,0.6)">Peníze · out je ink</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:15px">Albert</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;font-size:15px;color:#1d1d1f">−316,00</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:15px">Výplata</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;font-size:15px;color:#007850">+52 400,00</span></div>
+        <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(29,29,31,0.15) 12%,rgba(29,29,31,0.15) 88%,transparent)"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:#8a6400;background:rgba(138,100,0,0.1);padding:6px 12px;border-radius:8px">Spíš JÍDLO?</span>
+          <span style="font-size:13px;font-weight:600;color:#c93f32;background:rgba(201,63,50,0.09);padding:6px 12px;border-radius:8px">Smazat</span>
+        </div>
+      </div>
+      <div style="background:#ffffff;border:1px solid rgba(29,29,31,0.08);border-radius:18px;padding:16px;display:flex;align-items:center;gap:18px">
+        <div style="position:relative;width:76px;height:76px;flex:none;border-radius:50%;background:conic-gradient(#6353c4 0 10%,#007850 10% 20%,#8f6508 20% 30%,#6e7478 30% 72%,#e2e2e7 72% 100%)"><div style="position:absolute;inset:13px;border-radius:50%;background:#ffffff"></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:12.5px">
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#6353c4"></span>Dávat</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#007850"></span>Spořit</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#8f6508"></span>Dluh</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#6e7478"></span>Žít</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:12px">
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:8px;background:#ffffff;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(29,29,31,0.6);margin-top:5px">sm 8</div></div>
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:11px;background:#ffffff;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(29,29,31,0.6);margin-top:5px">base 11</div></div>
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:18px;background:#ffffff;border:1px solid rgba(29,29,31,0.08)"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(29,29,31,0.6);margin-top:5px">lg 18</div></div>
+        <div style="text-align:center"><div style="width:56px;height:40px;border-radius:9999px;background:#0066cc"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(29,29,31,0.6);margin-top:5px">pill</div></div>
+      </div>
+    </div>
+  </div>
+  <div style="max-width:820px;width:100%;color:#b5b5ba;font-size:13px;line-height:1.55;border-top:1px solid rgba(255,255,255,0.12);padding-top:18px">
+    <span style="font-weight:600;color:#d8d8dc">Zvoleno:</span> chrome akcent v Action Blue
+    <span style="display:inline-block;vertical-align:middle;width:14px;height:14px;border-radius:50%;background:#0066cc;margin:0 2px 0 6px"></span>
+    <span style="display:inline-block;vertical-align:middle;width:14px;height:14px;border-radius:50%;background:#2997ff;margin:0 6px 0 2px"></span>
+    — tlačítka, výběr, fokus ring a odkazy jedou v modré (světlé #0066cc, tmavé změkčené na #409cff s tmavým inkoustem pro čitelnost). Máta zůstává jen datům: příjem a Spořit v doughnutu.
+    <br><br>
+    <span style="font-weight:600;color:#d8d8dc">Co tokens.css nezmůže samo:</span> font-weight 500 → 600 v komponentách (krok 2), komprese paddingů na obrazovkách (krok 2–3), a pill rádius se do primárních tlačítek dostane až úpravou .btn — tokeny na to připravují gramatiku 8 / 11 / 18 / pill. Instrument Sans lze po kroku 2 smazat z /fonts (−97 kB proti budgetu).
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

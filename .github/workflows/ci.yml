@@ -64,3 +64,60 @@ jobs:
 
       - run: dotnet test --no-build --verbosity normal
         working-directory: apps/api
+
+  # Neither image has ever been built on the development machine — there is no
+  # Docker on it. This job is the only thing standing between a typo in a
+  # Dockerfile and finding it on the VPS at the end of `DEPLOYMENT.md` step 3.
+  #
+  # It builds and throws away. Nothing is pushed anywhere: the deployment builds
+  # from source on the box, so there is no registry to push to.
+  deploy:
+    name: deploy images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Catches a bad interpolation or a service that names a volume nothing
+      # declares, without starting anything.
+      - name: Compose file is valid
+        working-directory: deploy
+        env:
+          POSTGRES_PASSWORD: ci
+          PAIRING_CODE: '000000'
+        run: docker compose config --quiet
+
+      # Context is the repository root: the client imports `@prosper/contracts`,
+      # a sibling workspace package, and pnpm needs the lockfile at the top.
+      - name: Build the web image
+        run: docker build -f apps/web/Dockerfile -t prosper-web:ci .
+
+      - name: Build the API image
+        run: docker build -t prosper-api:ci apps/api
+
+      # A built image that 404s its own entry point is a build that passed and a
+      # deployment that did not. The container is nginx and nothing else, so
+      # this needs no database and no API.
+      - name: The web image serves the app
+        run: |
+          docker run --rm -d -p 8080:80 --name prosper-web-ci prosper-web:ci
+          for _ in $(seq 1 30); do
+            curl -fsS http://localhost:8080/200.html >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+          status() { curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$1"; }
+
+          # The app shell, the manifest that carries the name, a prerendered
+          # route, and a deep link that only `200.html` can answer.
+          test "$(status /)" = 200
+          curl -fsS http://localhost:8080/manifest.webmanifest | grep -q '"short_name": "Prosper"'
+          test "$(status /cil)" = 200
+          test "$(status /neco/co/neexistuje)" = 200
+
+          # `/api/` must be proxied, not served. There is no API container here,
+          # so 502 is the right answer — and 200 would mean the location never
+          # matched and every sync request was quietly answered with the app
+          # shell, which is the failure that would take a day to find.
+          test "$(status /api/v1/health)" = 502
+
+          docker rm -f prosper-web-ci

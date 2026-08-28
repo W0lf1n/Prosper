@@ -17,10 +17,10 @@
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 333 pass, 18 files              |
+| `pnpm test`                | 341 pass, 19 files              |
 | `pnpm check`               | 0 errors, 0 warnings, 406 files |
 | `pnpm lint`                | passes                          |
-| `pnpm budget`              | 84.1 kB of 150 kB brotli        |
+| `pnpm budget`              | 84.2 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 32 pass                         |
 | Schema · backup format     | **v6** · **5**                  |
 
@@ -28,6 +28,10 @@ P0, P1, P2 (sync) and P5 (reporting) ship, along with targeting, investments,
 recurring payments, coverage and the streak, reconciliation, and draining
 OSTATNÍ. **Everything left in P3 is blocked on a question below.** P4 has not
 been started.
+
+The app was renamed **Výdaje → Prosper** on 2026-08-27 (`DECISIONS.md`, Q0 —
+Name). The IndexedDB database is still called `finance` and stays that way:
+renaming it opens a second, empty database rather than migrating the first.
 
 ---
 
@@ -69,7 +73,7 @@ Three targets in `PROJECT-PLAN.md` §3 have never been measured, and nothing in
 the repository can measure them. They need a phone and a stopwatch.
 
 1. **Entry speed.** Phone locked, in your pocket. Start a stopwatch, take it
-   out, open Výdaje from the home screen, record a real 249 Kč of groceries,
+   out, open Prosper from the home screen, record a real 249 Kč of groceries,
    stop on the confirmation. Three times; keep the worst. Target **5 seconds**.
    Every design decision in this app defers to that number and nobody has ever
    checked it.
@@ -89,20 +93,32 @@ than feared, which also closes a risk in §14.
 
 ### 4.1 Deployment — the rest of P2
 
-Sync works and was verified across two devices. What is left is running it for
-real, and none of it is application code:
+**Written on 2026-08-27, and not yet run.** `deploy/` holds the whole thing —
+compose for all three containers, the web image, both nginx configs, the backup
+script — and `docs/DEPLOYMENT.md` is the runbook. Three of the four items that
+were on this list are now files rather than intentions:
 
-- **A run against actual Postgres.** Everything was verified against SQLite,
-  which the server supports so it can run on a laptop. The EF model is
-  identical, but `docker compose up` has never been done — there is no Docker on
-  this machine.
-- **The nightly `pg_dump` to the NAS** (§14). A host concern. Until it exists
-  the JSON export in Settings is still the only backup that has been tested.
-- **Serving the client from the same origin as the API**, which retires the
-  dev-only CORS allowlist.
-- **Somewhere to serve it from over HTTPS**, which is also what makes a real
-  home-screen install possible — the service worker will not register over plain
-  HTTP.
+- ✅ **Serving the client from the same origin as the API.** `apps/web/Dockerfile`
+  is nginx plus the static build plus one `location /api/`. The API's port is no
+  longer published; `Cors:Origins` stays unset in production.
+- ✅ **Somewhere to serve it from over HTTPS.** Host nginx and `certbot --nginx`,
+  step 5 of the runbook. It is what makes a real home-screen install possible —
+  the service worker will not register over plain HTTP.
+- ✅ **The nightly `pg_dump`** (§14). `deploy/backup.sh` plus a cron line. Still
+  the _second_ copy: the JSON export in Settings is the only backup anybody has
+  restored from.
+
+What is genuinely left needs a box, not a keyboard:
+
+- **A run against actual Postgres, and against Docker at all.** Everything was
+  verified against SQLite, which the server supports so it can run on a laptop.
+  The EF model is identical either way — but nothing in `deploy/` has been
+  executed once, because there is no Docker on the development machine. Treat
+  the runbook as unproven until step 3 answers `{"ok":true}` on a real VPS.
+- **A restore.** Run `backup.sh`, then restore it into a throwaway database. A
+  dump nobody has restored is a hypothesis.
+- **The domain** (`DECISIONS.md`, Q0 — Domain). Nothing in the repository
+  hard-codes one; it is typed once into the host vhost.
 
 ### 4.2 P3 — the Training law
 

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#3a3a3e;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}a{color:#409cff}a:hover{color:#74b8ff}</style>
+</helmet>
+<div style="min-height:100vh;padding:40px 32px 56px;display:flex;flex-direction:column;align-items:center;gap:28px">
+  <div style="max-width:830px;width:100%;color:#d8d8dc">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8e8e94;margin-bottom:6px">Krok 3 · / — keypad home</div>
+    <h1 style="margin:0 0 10px;font-size:22px;font-weight:600;letter-spacing:-0.02em;color:#f5f5f7">Vstupní obrazovka — částka je hrdina</h1>
+    <div style="font-size:13px;line-height:1.55;color:#b5b5ba;max-width:74ch">
+      Struktura 1:1 podle +page.svelte (totals → due strip → částka s mincí → panel kontextu → check → pad). Změny: pad ztrácí elev-3 — sedí na zemi, nelevituje; Uložit je pill (jediný na obrazovce); mince ztrácí glow, nese ji wash + hairline; datum-slab a meta-well bez vnitřních stínů; váhy 500 → 400/600. Ušetřený stín jde částce: větší clamp, koralový pool za výdajem zůstává. Přesné diffy: patches/step-3.md.
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:28px;justify-content:center;align-items:flex-start">
+
+    <!-- ══ DARK ══ -->
+    <div style="width:390px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8e8e94">Tmavé · primární</div>
+      <div style="border-radius:32px;background:linear-gradient(175deg,#000000,#0c0c0e);border:1px solid rgba(255,255,255,0.09);color:#f5f5f7;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0">
+        <div style="margin:12px 12px 0;padding:12px 16px 16px;background:#1d1d1f;border:1px solid rgba(255,255,255,0.09);border-radius:18px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(245,245,247,0.52)">Srpen 2026</div>
+            <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;background:rgba(64,156,255,0.12);color:#409cff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5.6 12.4 4.4 4.4 8.4-9.6"></path></svg>12</span>
+            <div style="display:flex;gap:2px;margin:-8px -12px -8px 0;color:rgba(245,245,247,0.52)">
+              <span style="display:grid;place-items:center;width:40px;height:40px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span>
+              <span style="position:relative;display:grid;place-items:center;width:40px;height:40px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="15.6" width="16.4" height="4.6" rx="2.3"></rect><rect x="5.9" y="9.8" width="12.2" height="4.6" rx="2.3"></rect><rect x="8" y="4" width="8" height="4.6" rx="2.3"></rect></svg><span style="position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:#dfb567;box-shadow:0 0 0 2px #1d1d1f"></span></span>
+              <span style="display:grid;place-items:center;width:40px;height:40px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:8px">
+            <div style="display:flex;flex-direction:column">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-0.02em;color:#4ccfa1">+8 420</span>
+              <span style="font-size:11px;color:rgba(245,245,247,0.52)">zůstatek měsíce</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;width:136px;padding-bottom:2px">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:rgba(245,245,247,0.66)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#4ccfa1" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">52 400</span></span>
+                <span style="display:block;height:3px;border-radius:999px;background:#2a2a2c;overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:999px;background:#4ccfa1"></span></span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:rgba(245,245,247,0.66)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="rgba(245,245,247,0.52)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">43 980</span></span>
+                <span style="display:block;height:3px;border-radius:999px;background:#2a2a2c;overflow:hidden"><span style="display:block;height:100%;width:84%;border-radius:999px;background:rgba(245,245,247,0.52)"></span></span>
+              </div>
+            </div>
+          </div>
+          <div style="height:1px;margin:12px -16px 0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.16) 12%,rgba(255,255,255,0.16) 88%,transparent)"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding-top:12px;min-height:32px">
+            <span style="font-size:13px;font-weight:400;color:rgba(245,245,247,0.66);white-space:nowrap">Rezerva</span>
+            <span style="flex:1;height:3px;border-radius:999px;background:#2a2a2c;overflow:hidden"><span style="display:block;height:100%;width:64%;border-radius:999px;background:rgba(245,245,247,0.52)"></span></span>
+            <span style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.25">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:12px;font-weight:600">3 200<span style="font-weight:400;color:rgba(245,245,247,0.52)">/5 000</span></span>
+              <span style="font-size:11px;color:rgba(245,245,247,0.52)">chybí 1 800</span>
+            </span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin:8px 12px 0;padding:0 12px;min-height:44px;border:1px solid rgba(223,181,103,0.38);border-radius:14px;background:rgba(223,181,103,0.12)">
+          <span style="width:6px;height:6px;border-radius:50%;background:#dfb567"></span>
+          <span style="flex:1;font-size:13px">2 platby k potvrzení</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:rgba(245,245,247,0.66)">1 128</span>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="rgba(245,245,247,0.52)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg>
+        </div>
+        <div style="flex:1;display:grid;grid-auto-flow:column;place-content:center;align-items:baseline;gap:8px;padding:20px 16px;min-height:130px;background:radial-gradient(78% 46% at 50% 0%,rgba(239,111,94,0.08) 0%,rgba(239,111,94,0.025) 40%,transparent 72%) center / 150% 180% no-repeat">
+          <span style="align-self:center;display:grid;place-items:center;width:46px;height:46px;margin-right:4px;border:1px solid #ef6f5e;border-radius:50%;background:rgba(239,111,94,0.12);color:#ef6f5e"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:60px;font-weight:600;line-height:1;letter-spacing:-0.025em">247</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:rgba(245,245,247,0.52)">Kč</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:8px 12px 12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;min-width:0;display:flex;gap:8px;overflow:hidden;mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent)">
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid #409cff;border-radius:999px;background:#203041;color:#f5f5f7;font-size:12px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#8b9299"></span>JÍDLO</span>
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid rgba(255,255,255,0.09);border-radius:999px;background:#1d1d1f;color:rgba(245,245,247,0.66);font-size:12px">​<span style="width:6px;height:6px;border-radius:50%;background:#8b9299"></span>POTRAVINY</span>
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid rgba(255,255,255,0.09);border-radius:999px;background:#1d1d1f;color:rgba(245,245,247,0.66);font-size:12px"><span style="width:6px;height:6px;border-radius:50%;background:#8b9299"></span>DOPRAVA</span>
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid rgba(255,255,255,0.09);border-radius:999px;background:#1d1d1f;color:rgba(245,245,247,0.66);font-size:12px"><span style="width:6px;height:6px;border-radius:50%;background:#dfb567"></span>ZÁBAVA</span>
+            </div>
+            <span style="flex:none;display:grid;place-items:center;width:30px;height:26px;color:rgba(245,245,247,0.52)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.3"></circle><path d="m15.7 15.7 3.8 3.8"></path></svg></span>
+          </div>
+          <div style="display:flex;align-items:stretch;min-height:47px;border:1px solid rgba(255,255,255,0.09);border-radius:14px;background:#252527">
+            <span style="flex:none;display:grid;place-items:center;min-width:92px;margin:3px 0 3px 3px;padding:0 12px;border-radius:10px;background:#2a2a2c;color:rgba(245,245,247,0.66);font-size:14px;font-weight:600;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,0.05)">dnes</span>
+            <span style="flex:1;display:flex;align-items:center;padding:0 12px;font-size:16px;color:rgba(245,245,247,0.52)">komu / za co</span>
+          </div>
+          <div style="position:relative;display:flex;justify-content:space-between;gap:8px;margin:0 -8px;padding-top:8px">
+            <span style="position:absolute;top:0;left:8px;right:8px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.16) 12%,rgba(255,255,255,0.16) 88%,transparent);opacity:0.85"></span>
+            <span style="display:flex;align-items:center;gap:8px;min-height:37px;padding:0 8px;color:rgba(245,245,247,0.52);font-size:13px">mimořádný výdaj<span style="position:relative;display:inline-block;width:34px;height:20px;border-radius:999px;background:#2a2a2c"><span style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:rgba(245,245,247,0.52)"></span></span></span>
+            <span style="display:flex;align-items:center;gap:8px;min-height:37px;padding:0 8px;color:rgba(245,245,247,0.52);font-size:13px">dluží mi<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:stretch;margin:0 12px 8px;border:1px solid rgba(223,181,103,0.38);border-radius:14px;background:rgba(223,181,103,0.12)">
+          <span style="flex:1;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px"><span style="width:6px;height:6px;border-radius:50%;background:#dfb567"></span><span style="font-size:13px">Spíš JÍDLO?</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(245,245,247,0.52)">+1</span></span>
+          <span style="display:grid;place-items:center;min-height:44px;padding:0 16px;border-left:1px solid rgba(255,255,255,0.09);font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase">Přeřadit</span>
+        </div>
+        <div style="margin:0 12px 12px;padding:12px;background:#1d1d1f;border:1px solid rgba(255,255,255,0.09);border-radius:24px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">7</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">8</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">9</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">4</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">5</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">6</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">1</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">2</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">3</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;color:rgba(245,245,247,0.52);font-family:'IBM Plex Mono',monospace;font-size:22px">,</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#252527;font-family:'IBM Plex Mono',monospace;font-size:22px">0</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;color:rgba(245,245,247,0.52)"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.3 5.4h9.1a1.7 1.7 0 0 1 1.7 1.7v9.8a1.7 1.7 0 0 1-1.7 1.7H9.3L3.6 12Z"></path><path d="m12.1 9.7 4.6 4.6m0-4.6-4.6 4.6"></path></svg></span>
+          </div>
+          <div style="display:grid;place-items:center;min-height:54px;margin-top:12px;border-radius:9999px;background:#409cff;color:#06213d;font-size:18px;font-weight:600">Uložit</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ LIGHT ══ -->
+    <div style="width:390px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8e8e94">Světlé</div>
+      <div style="border-radius:32px;background:linear-gradient(175deg,#f5f5f7,#e8e8ec);border:1px solid rgba(29,29,31,0.08);color:#1d1d1f;display:flex;flex-direction:column;overflow:hidden">
+        <div style="margin:12px 12px 0;padding:12px 16px 16px;background:#ffffff;border:1px solid rgba(29,29,31,0.08);border-radius:18px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,29,31,0.6)">Srpen 2026</div>
+            <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;background:rgba(0,102,204,0.08);color:#0066cc;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5.6 12.4 4.4 4.4 8.4-9.6"></path></svg>12</span>
+            <div style="display:flex;gap:2px;margin:-8px -12px -8px 0;color:rgba(29,29,31,0.6)">
+              <span style="display:grid;place-items:center;width:40px;height:40px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span>
+              <span style="position:relative;display:grid;place-items:center;width:40px;height:40px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="15.6" width="16.4" height="4.6" rx="2.3"></rect><rect x="5.9" y="9.8" width="12.2" height="4.6" rx="2.3"></rect><rect x="8" y="4" width="8" height="4.6" rx="2.3"></rect></svg><span style="position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:#8a6400;box-shadow:0 0 0 2px #ffffff"></span></span>
+              <span style="display:grid;place-items:center;width:40px;height:40px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:8px">
+            <div style="display:flex;flex-direction:column">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-0.02em;color:#007850">+8 420</span>
+              <span style="font-size:11px;color:rgba(29,29,31,0.6)">zůstatek měsíce</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;width:136px;padding-bottom:2px">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:rgba(29,29,31,0.72)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#007850" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">52 400</span></span>
+                <span style="display:block;height:3px;border-radius:999px;background:#f2f2f5;overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:999px;background:#007850"></span></span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:rgba(29,29,31,0.72)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="rgba(29,29,31,0.6)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">43 980</span></span>
+                <span style="display:block;height:3px;border-radius:999px;background:#f2f2f5;overflow:hidden"><span style="display:block;height:100%;width:84%;border-radius:999px;background:rgba(29,29,31,0.6)"></span></span>
+              </div>
+            </div>
+          </div>
+          <div style="height:1px;margin:12px -16px 0;background:linear-gradient(90deg,transparent,rgba(29,29,31,0.15) 12%,rgba(29,29,31,0.15) 88%,transparent)"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding-top:12px;min-height:32px">
+            <span style="font-size:13px;font-weight:400;color:rgba(29,29,31,0.72);white-space:nowrap">Rezerva</span>
+            <span style="flex:1;height:3px;border-radius:999px;background:#f2f2f5;overflow:hidden"><span style="display:block;height:100%;width:64%;border-radius:999px;background:rgba(29,29,31,0.6)"></span></span>
+            <span style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.25">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:12px;font-weight:600">3 200<span style="font-weight:400;color:rgba(29,29,31,0.6)">/5 000</span></span>
+              <span style="font-size:11px;color:rgba(29,29,31,0.6)">chybí 1 800</span>
+            </span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin:8px 12px 0;padding:0 12px;min-height:44px;border:1px solid rgba(138,100,0,0.35);border-radius:14px;background:rgba(138,100,0,0.1)">
+          <span style="width:6px;height:6px;border-radius:50%;background:#8a6400"></span>
+          <span style="flex:1;font-size:13px">2 platby k potvrzení</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:rgba(29,29,31,0.72)">1 128</span>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="rgba(29,29,31,0.6)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg>
+        </div>
+        <div style="flex:1;display:grid;grid-auto-flow:column;place-content:center;align-items:baseline;gap:8px;padding:20px 16px;min-height:130px;background:radial-gradient(78% 46% at 50% 0%,rgba(201,63,50,0.06) 0%,rgba(201,63,50,0.02) 40%,transparent 72%) center / 150% 180% no-repeat">
+          <span style="align-self:center;display:grid;place-items:center;width:46px;height:46px;margin-right:4px;border:1px solid #c93f32;border-radius:50%;background:rgba(201,63,50,0.09);color:#c93f32"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:60px;font-weight:600;line-height:1;letter-spacing:-0.025em">247</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:rgba(29,29,31,0.6)">Kč</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:8px 12px 12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;min-width:0;display:flex;gap:8px;overflow:hidden;mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent)">
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid #0066cc;border-radius:999px;background:#e5f0fa;color:#1d1d1f;font-size:12px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#6e7478"></span>JÍDLO</span>
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid rgba(29,29,31,0.08);border-radius:999px;background:#ffffff;color:rgba(29,29,31,0.72);font-size:12px"><span style="width:6px;height:6px;border-radius:50%;background:#6e7478"></span>POTRAVINY</span>
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid rgba(29,29,31,0.08);border-radius:999px;background:#ffffff;color:rgba(29,29,31,0.72);font-size:12px"><span style="width:6px;height:6px;border-radius:50%;background:#6e7478"></span>DOPRAVA</span>
+              <span style="flex:none;display:flex;align-items:center;gap:8px;height:26px;padding:0 12px;border:1px solid rgba(29,29,31,0.08);border-radius:999px;background:#ffffff;color:rgba(29,29,31,0.72);font-size:12px"><span style="width:6px;height:6px;border-radius:50%;background:#8a6400"></span>ZÁBAVA</span>
+            </div>
+            <span style="flex:none;display:grid;place-items:center;width:30px;height:26px;color:rgba(29,29,31,0.6)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.3"></circle><path d="m15.7 15.7 3.8 3.8"></path></svg></span>
+          </div>
+          <div style="display:flex;align-items:stretch;min-height:47px;border:1px solid rgba(29,29,31,0.08);border-radius:14px;background:#fafafc">
+            <span style="flex:none;display:grid;place-items:center;min-width:92px;margin:3px 0 3px 3px;padding:0 12px;border-radius:10px;background:#ffffff;color:rgba(29,29,31,0.72);font-size:14px;font-weight:600;white-space:nowrap;border:1px solid rgba(29,29,31,0.06)">dnes</span>
+            <span style="flex:1;display:flex;align-items:center;padding:0 12px;font-size:16px;color:rgba(29,29,31,0.6)">komu / za co</span>
+          </div>
+          <div style="position:relative;display:flex;justify-content:space-between;gap:8px;margin:0 -8px;padding-top:8px">
+            <span style="position:absolute;top:0;left:8px;right:8px;height:1px;background:linear-gradient(90deg,transparent,rgba(29,29,31,0.15) 12%,rgba(29,29,31,0.15) 88%,transparent);opacity:0.85"></span>
+            <span style="display:flex;align-items:center;gap:8px;min-height:37px;padding:0 8px;color:rgba(29,29,31,0.6);font-size:13px">mimořádný výdaj<span style="position:relative;display:inline-block;width:34px;height:20px;border-radius:999px;background:#e8e8ec"><span style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:rgba(29,29,31,0.45)"></span></span></span>
+            <span style="display:flex;align-items:center;gap:8px;min-height:37px;padding:0 8px;color:rgba(29,29,31,0.6);font-size:13px">dluží mi<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:stretch;margin:0 12px 8px;border:1px solid rgba(138,100,0,0.35);border-radius:14px;background:rgba(138,100,0,0.1)">
+          <span style="flex:1;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px"><span style="width:6px;height:6px;border-radius:50%;background:#8a6400"></span><span style="font-size:13px">Spíš JÍDLO?</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(29,29,31,0.6)">+1</span></span>
+          <span style="display:grid;place-items:center;min-height:44px;padding:0 16px;border-left:1px solid rgba(29,29,31,0.08);font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase">Přeřadit</span>
+        </div>
+        <div style="margin:0 12px 12px;padding:12px;background:#ffffff;border:1px solid rgba(29,29,31,0.08);border-radius:24px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">7</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">8</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">9</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">4</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">5</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">6</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">1</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">2</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">3</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;color:rgba(29,29,31,0.6);font-family:'IBM Plex Mono',monospace;font-size:22px">,</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;background:#fafafc;border:1px solid rgba(29,29,31,0.08);font-family:'IBM Plex Mono',monospace;font-size:22px">0</span>
+            <span style="display:grid;place-items:center;height:48px;border-radius:11px;color:rgba(29,29,31,0.6)"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.3 5.4h9.1a1.7 1.7 0 0 1 1.7 1.7v9.8a1.7 1.7 0 0 1-1.7 1.7H9.3L3.6 12Z"></path><path d="m12.1 9.7 4.6 4.6m0-4.6-4.6 4.6"></path></svg></span>
+          </div>
+          <div style="display:grid;place-items:center;min-height:54px;margin-top:12px;border-radius:9999px;background:#0066cc;color:#ffffff;font-size:18px;font-weight:600">Uložit</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="max-width:830px;width:100%;color:#b5b5ba;font-size:13px;line-height:1.55;border-top:1px solid rgba(255,255,255,0.12);padding-top:18px">
+    <span style="font-weight:600;color:#d8d8dc">Co zůstalo záměrně:</span> koralová mince a pool za výdajem (jediné místo, kde má outflow barvu), mátový příjem v totals, amber due-strip i check, spend-type tečky na chipech. <span style="font-weight:600;color:#d8d8dc">Ke schválení:</span> pill Uložit vs. původní 14px rádius; pad bez stínu; datum-slab bez inset stínu. Diffy k aplikaci: patches/step-3.md.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

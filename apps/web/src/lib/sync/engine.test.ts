@@ -9,7 +9,7 @@
 
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PullResponse, PushResponse, SyncRow } from '@vydaje/contracts';
+import type { PullResponse, PushResponse, SyncRow } from '@prosper/contracts';
 
 import type { Minor } from '$lib/domain/money';
 import {

@@ -292,7 +292,7 @@
 </script>
 
 <svelte:head>
-	<title>Výdaje — měsíc</title>
+	<title>Prosper — měsíc</title>
 </svelte:head>
 
 <AppBar>
@@ -704,15 +704,10 @@
 		color: var(--ink);
 	}
 
+	/* The card itself is `app.css`. This screen packs more into one than the
+	   others do, so it takes a tighter gap and nothing else. */
 	.card {
-		display: flex;
-		flex-direction: column;
 		gap: var(--space-3);
-		padding: var(--space-4);
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--edge), var(--elev-1);
 	}
 
 	.card__head {
@@ -805,31 +800,9 @@
 	}
 
 	/* ── the shared meter ────────────────────────────────────────────────
-	   One bar, used by the goal and by every bucket, so a length means the
-	   same thing wherever it appears on the screen. */
-
-	.meter {
-		height: 4px;
-		border-radius: var(--radius-full);
-		background: var(--surface-3);
-		overflow: hidden;
-	}
-
-	.meter--thick {
-		height: 6px;
-	}
-
-	.meter__fill {
-		display: block;
-		height: 100%;
-		border-radius: var(--radius-full);
-		background: var(--ink-2);
-		/* Width, not `scaleX`: these are pill-shaped, and scaling one horizontally
-		   squashes the radius on its end into an ellipse. They animate once, when
-		   the figures load or change, so there is no layout cost worth the
-		   distortion. */
-		transition: width var(--dur-slow) var(--ease-out);
-	}
+	   Geometry, track and default fill live in `app.css`, because `/cil` draws
+	   the same bar and a length has to mean the same thing on both screens.
+	   What is local is what the colour *means* here: pace against the month. */
 
 	.meter__fill[data-pace='on'] {
 		background: var(--signal);
@@ -962,7 +935,7 @@
 
 	.finding__title {
 		font-size: var(--text-md);
-		font-weight: 500;
+		font-weight: 600;
 	}
 
 	.finding__detail {

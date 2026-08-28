@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;background:#3a3a3e;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}a{color:#409cff;text-decoration:none}a:hover{color:#74b8ff}</style>
+</helmet>
+<div style="min-height:100vh;padding:40px 32px 64px;display:flex;flex-direction:column;align-items:center;gap:40px">
+
+  <div style="max-width:880px;width:100%;color:#d8d8dc">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8e8e94;margin-bottom:6px">Krok 4 — zbývající obrazovky</div>
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;letter-spacing:-0.02em;color:#f5f5f7">Výpis · Měsíc · Cíl · Jmění · Nastavení</h1>
+    <div style="font-size:13px;line-height:1.6;color:#b5b5ba;max-width:78ch">
+      Markup, routing a logika beze změny — diff je jen ve <span style="font-family:'IBM Plex Mono',monospace">&lt;style&gt;</span> blocích, přesně jako v krocích 2 a 3. V náhledu není ani jeden literál barvy: každý rám nese sadu tokenů jako CSS proměnné a všechno pod ním čte <span style="font-family:'IBM Plex Mono',monospace">var(--token)</span>. Světlý rám je tentýž markup s jinou sadou.
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px">
+        <div><span style="color:#f5f5f7;font-weight:600">Zákon kroku 4 — kapsa.</span> Všechny <span style="font-family:'IBM Plex Mono',monospace">inset</span> stíny mizí. Co je v kartě zapuštěné (díra ve výpisu, „proč“ u cíle, dráha segmentů, políčka) je <span style="font-family:'IBM Plex Mono',monospace">--ground-2</span>; co je vyzdvižené je <span style="font-family:'IBM Plex Mono',monospace">--raised</span>. Jeden pravidlo, obě témata, žádný stín.</div>
+        <div><span style="color:#f5f5f7;font-weight:600">Váhy.</span> Posledních sedm výskytů 500 padá na 400 nebo 600. Nadpis karty je 11/600 uppercase, čtené číslo 600, kontext 400.</div>
+        <div><span style="color:#f5f5f7;font-weight:600">Press.</span> <span style="font-family:'IBM Plex Mono',monospace">scale(0.95)</span> na každém tlačítku. Výjimka je řádek na celou šířku — ten se mačká luminancí, protože 95 % z celé šířky ukáže podklad v rozích.</div>
+        <div><span style="color:#f5f5f7;font-weight:600">Pilulka</span> zůstává jen primární akci. Karty 18, políčka a segmenty 8, kapsle 11.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ 4a — /tape ══════════════════ -->
+  <section id="4a" style="max-width:880px;width:100%;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="flex:none;padding:2px 8px;border-radius:11px;background:rgba(64,156,255,0.14);color:#409cff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">4a</span>
+      <h2 style="margin:0;font-size:15px;font-weight:600;color:#f5f5f7">Výpis</h2>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8e8e94">/tape · 393 × 872</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <div data-screen-label="Výpis tmavé" style="--ground:#000000;--ground-2:#0c0c0e;--surface:#1d1d1f;--surface-2:#252527;--surface-3:#2a2a2c;--raised:#2a2a2c;--hairline:rgba(255,255,255,0.09);--hairline-2:rgba(255,255,255,0.16);--ink:#f5f5f7;--ink-2:rgba(245,245,247,0.66);--ink-3:rgba(245,245,247,0.52);--signal:#409cff;--signal-ink:#06213d;--signal-wash:rgba(64,156,255,0.12);--in:#4ccfa1;--in-wash:rgba(76,207,161,0.12);--flag:#dfb567;--flag-wash:rgba(223,181,103,0.12);--danger:#ef6f5e;--danger-wash:rgba(239,111,94,0.12);--split-give:#a294ec;--split-save:#4ccfa1;--split-debt:#d3a15e;--split-live:#8b9299;--split-left:#232326;flex:none;width:393px;height:872px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.025em">Výpis</div>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;flex-direction:column;padding:12px 16px 16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Běžný účet</div>
+            <div style="margin-top:8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:34px;font-weight:600;letter-spacing:-0.025em;line-height:1.1">14 145,00 <span style="font-size:22px;color:var(--ink-2)">Kč</span></div>
+            <div style="text-align:right;font-size:11px;color:var(--ink-3)">aktuální zůstatek</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)">
+              <span style="font-size:13px;font-weight:600;color:var(--signal)">Srovnat s bankou</span>
+              <span style="font-size:12px;color:var(--ink-3)">před 12 dny</span>
+            </div>
+          </div>
+
+          <div style="flex:none;overflow:hidden;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--hairline)">
+              <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Srpen 2026</span>
+              <span style="display:flex;gap:16px">
+                <span style="display:flex;align-items:center;gap:4px;color:var(--ink-2)"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">81 701,00</span></span>
+                <span style="display:flex;align-items:center;gap:4px;color:var(--in)"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">59 400,00</span></span>
+              </span>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Dnes</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">−349,00 Kč</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">POTRAVINY</span><span style="font-size:12px;color:var(--ink-3)">Drogerie</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−349,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">14 145,00</span></span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Včera</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">+2 400,00 Kč</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">MZDA</span><span style="font-size:12px;color:var(--ink-3)">Bonus</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600;color:var(--in)">+2 615,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">14 494,00</span></span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">JÍDLO</span><span style="font-size:12px;color:var(--ink-3)">Oběd</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−215,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">11 879,00</span></span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Út 25. srpna</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">−3 915,00 Kč</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">POTRAVINY</span><span style="font-size:12px;color:var(--ink-3)">Lidl · <span style="color:var(--flag)">Zůza dluží 1 250,00</span></span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−915,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">12 794,00</span></span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px;color:var(--flag)">bez kategorie</span><span style="font-size:12px;color:var(--ink-3)">Rezerva</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−3 000,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">15 624,00</span></span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div style="background:var(--ground-2)">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3);opacity:0.72">Ne 23. srpna</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 16px">
+                <span style="font-size:14px;color:var(--ink-3)">žádný záznam</span>
+                <span style="font-size:11px;color:var(--ink-3);opacity:0.78;text-align:right">označit jako den bez výdaje</span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div style="background:var(--ground-2)">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3);opacity:0.72">So 22. srpna</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 16px">
+                <span style="flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;background:var(--in-wash);color:var(--in)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.6 12.4 4.4 4.4 8.4-9.6"></path></svg></span>
+                <span style="flex:1;font-size:14px;color:var(--ink-2)">bez výdaje</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--signal)"><span style="display:grid;place-items:center;width:40px;height:26px;border-radius:9999px;background:var(--signal-wash)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:600;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Nastavení</span></div></div>
+      </div>
+      <sc-if value="{{ showLight }}" hint-placeholder-val="{{ true }}"><div data-screen-label="Výpis světlé" style="--ground:#f5f5f7;--ground-2:#e8e8ec;--surface:#ffffff;--surface-2:#fafafc;--surface-3:#f2f2f5;--raised:#ffffff;--hairline:rgba(29,29,31,0.08);--hairline-2:rgba(29,29,31,0.15);--ink:#1d1d1f;--ink-2:rgba(29,29,31,0.72);--ink-3:rgba(29,29,31,0.6);--signal:#0066cc;--signal-ink:#ffffff;--signal-wash:rgba(0,102,204,0.08);--in:#007850;--in-wash:rgba(0,120,80,0.08);--flag:#8a6400;--flag-wash:rgba(138,100,0,0.1);--danger:#c93f32;--danger-wash:rgba(201,63,50,0.09);--split-give:#6353c4;--split-save:#007850;--split-debt:#8f6508;--split-live:#6e7478;--split-left:#e2e2e7;flex:none;width:393px;height:872px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.025em">Výpis</div>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;flex-direction:column;padding:12px 16px 16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Běžný účet</div>
+            <div style="margin-top:8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:34px;font-weight:600;letter-spacing:-0.025em;line-height:1.1">14 145,00 <span style="font-size:22px;color:var(--ink-2)">Kč</span></div>
+            <div style="text-align:right;font-size:11px;color:var(--ink-3)">aktuální zůstatek</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)">
+              <span style="font-size:13px;font-weight:600;color:var(--signal)">Srovnat s bankou</span>
+              <span style="font-size:12px;color:var(--ink-3)">před 12 dny</span>
+            </div>
+          </div>
+
+          <div style="flex:none;overflow:hidden;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--hairline)">
+              <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Srpen 2026</span>
+              <span style="display:flex;gap:16px">
+                <span style="display:flex;align-items:center;gap:4px;color:var(--ink-2)"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">81 701,00</span></span>
+                <span style="display:flex;align-items:center;gap:4px;color:var(--in)"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">59 400,00</span></span>
+              </span>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Dnes</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">−349,00 Kč</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">POTRAVINY</span><span style="font-size:12px;color:var(--ink-3)">Drogerie</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−349,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">14 145,00</span></span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Včera</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">+2 400,00 Kč</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">MZDA</span><span style="font-size:12px;color:var(--ink-3)">Bonus</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600;color:var(--in)">+2 615,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">14 494,00</span></span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">JÍDLO</span><span style="font-size:12px;color:var(--ink-3)">Oběd</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−215,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">11 879,00</span></span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Út 25. srpna</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)">−3 915,00 Kč</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px">POTRAVINY</span><span style="font-size:12px;color:var(--ink-3)">Lidl · <span style="color:var(--flag)">Zůza dluží 1 250,00</span></span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−915,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">12 794,00</span></span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 16px">
+                <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:14px;color:var(--flag)">bez kategorie</span><span style="font-size:12px;color:var(--ink-3)">Rezerva</span></span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="font-size:16px;font-weight:600">−3 000,00 Kč</span><span style="font-size:13px;color:var(--ink-3)">15 624,00</span></span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div style="background:var(--ground-2)">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3);opacity:0.72">Ne 23. srpna</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 16px">
+                <span style="font-size:14px;color:var(--ink-3)">žádný záznam</span>
+                <span style="font-size:11px;color:var(--ink-3);opacity:0.78;text-align:right">označit jako den bez výdaje</span>
+              </div>
+              <div style="height:1px;margin:0 16px;background:var(--hairline)"></div>
+            </div>
+
+            <div style="background:var(--ground-2)">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px 4px">
+                <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3);opacity:0.72">So 22. srpna</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 16px">
+                <span style="flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;background:var(--in-wash);color:var(--in)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.6 12.4 4.4 4.4 8.4-9.6"></path></svg></span>
+                <span style="flex:1;font-size:14px;color:var(--ink-2)">bez výdaje</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--signal)"><span style="display:grid;place-items:center;width:40px;height:26px;border-radius:9999px;background:var(--signal-wash)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:600;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Nastavení</span></div></div>
+      </div></sc-if>
+    </div>
+    <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}"><div style="font-size:12px;line-height:1.55;color:#9c9ca2;max-width:78ch"><span style="color:#d8d8dc;font-weight:600">Díra je kapsa, ne stín.</span> <span style="font-family:'IBM Plex Mono',monospace">inset 0 1px 3px rgb(0 0 0 / 12%)</span> u <span style="font-family:'IBM Plex Mono',monospace">.day--gap</span> padá; den bez záznamu jde na <span style="font-family:'IBM Plex Mono',monospace">--ground-2</span> — tmavší než karta v tmavém i ve světlém tématu, takže „zapuštěno“ znamená totéž v obou. Zůstatek dostal celý display řez (34/600/−0.025em) a je zarovnaný napravo, kde ho hledá palec. Odtok je bez odstínu, jediné mint číslo na obrazovce je příjem.</div></sc-if>
+  </section>
+
+  <!-- ══════════════════ 4b — /mesic ══════════════════ -->
+  <section id="4b" style="max-width:880px;width:100%;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="flex:none;padding:2px 8px;border-radius:11px;background:rgba(64,156,255,0.14);color:#409cff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">4b</span>
+      <h2 style="margin:0;font-size:15px;font-weight:600;color:#f5f5f7">Měsíc</h2>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8e8e94">/mesic · 393 × 1424</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <div data-screen-label="Měsíc tmavé" style="--ground:#000000;--ground-2:#0c0c0e;--surface:#1d1d1f;--surface-2:#252527;--surface-3:#2a2a2c;--raised:#2a2a2c;--hairline:rgba(255,255,255,0.09);--hairline-2:rgba(255,255,255,0.16);--ink:#f5f5f7;--ink-2:rgba(245,245,247,0.66);--ink-3:rgba(245,245,247,0.52);--signal:#409cff;--signal-ink:#06213d;--signal-wash:rgba(64,156,255,0.12);--in:#4ccfa1;--in-wash:rgba(76,207,161,0.12);--flag:#dfb567;--flag-wash:rgba(223,181,103,0.12);--danger:#ef6f5e;--danger-wash:rgba(239,111,94,0.12);--split-give:#a294ec;--split-save:#4ccfa1;--split-debt:#d3a15e;--split-live:#8b9299;--split-left:#232326;flex:none;width:393px;height:1424px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:56px;padding:8px 8px">
+          <span style="display:grid;place-items:center;width:44px;height:44px;border-radius:9999px;color:var(--ink-2)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"></path></svg></span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:-0.02em">srpen 2026</span>
+          <span style="display:grid;place-items:center;width:44px;height:44px;border-radius:9999px;color:var(--ink-2);opacity:0.22"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></span>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:12px 16px 14px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="min-width:0">
+              <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Srpen 2026</div>
+              <div style="margin-top:4px;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-0.02em;line-height:1.15">−22 301,00 <span style="font-size:18px;color:var(--ink-2)">Kč</span></div>
+              <div style="font-size:11px;color:var(--ink-3)">zůstatek měsíce</div>
+            </div>
+            <div style="flex:none;display:flex;flex-direction:column;gap:4px;padding-bottom:4px">
+              <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:var(--in)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">59 400,00</span></span>
+              <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:var(--ink-2)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">81 701,00</span></span>
+            </div>
+          </div>
+
+          <div style="flex:none;padding:0 8px;font-size:12px;line-height:1.5;color:var(--ink-2);text-wrap:pretty">Z toho jednorázově <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)">41 890,00 Kč</span>. Běžný chod měsíce vyšel na <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)">39 811,00 Kč</span>.</div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:8px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Cíl · Rezerva na půl roku</span>
+              <span style="display:grid;place-items:center;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></span>
+            </div>
+            <div style="font-size:14px;font-style:italic;line-height:1.5;color:var(--ink-2);text-wrap:pretty">Abych nemusel sahat po kreditce, když se něco pokazí.</div>
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:4px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600">5 000,00 Kč</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">z 5 000,00 Kč</span>
+            </div>
+            <div style="height:6px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:9999px;background:var(--in)"></span></div>
+            <div style="font-size:12px;color:var(--in)">Tenhle měsíc máš splněný.</div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Zápisy</span>
+            <div style="display:flex;align-items:center;gap:16px">
+              <span style="flex:none;position:relative;display:grid;place-items:center;width:104px;height:104px">
+                <svg viewBox="0 0 104 104" width="104" height="104" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="52" cy="52" r="45" fill="none" stroke="var(--split-left)" stroke-width="14"></circle><circle cx="52" cy="52" r="45" fill="none" stroke="var(--signal)" stroke-width="14" stroke-dasharray="248.8 282.7" stroke-linecap="butt"></circle></svg>
+                <span style="position:relative;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;letter-spacing:-0.02em;white-space:nowrap">88&nbsp;%</span>
+              </span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                <div style="font-size:16px;color:var(--ink-2)"><span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:var(--ink)">23</span> z 26 dnů</div>
+                <div style="font-size:13px;font-weight:600;color:var(--signal)">5 dní v řadě.</div>
+                <div style="font-size:12px;line-height:1.5;color:var(--ink-3);text-wrap:pretty">3 dny bez zápisu. Ve výpisu se dají doplnit — nebo označit jako den bez výdaje.</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Kontrola</span>
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <span style="flex:none;width:6px;height:6px;margin-top:7px;border-radius:9999px;background:var(--flag)"></span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:600">Utraceno víc, než přišlo</div>
+                <div style="font-size:12px;line-height:1.5;color:var(--ink-2);text-wrap:pretty">Podívej se na jednorázové výdaje — pokud tam žádné nejsou, je to trend.</div>
+                <div style="display:inline-block;margin-top:8px;font-size:12px;font-weight:600;color:var(--signal)">Vysypat kategorii</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Rozdělení příjmu</span>
+            <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+              <span style="flex:none;position:relative;display:grid;place-items:center;width:148px;height:148px">
+                <svg viewBox="0 0 148 148" width="148" height="148" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-left)" stroke-width="18"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-give)" stroke-width="18" stroke-dasharray="16.3 408.4"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-save)" stroke-width="18" stroke-dasharray="49 408.4" stroke-dashoffset="-16.3"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-debt)" stroke-width="18" stroke-dasharray="32.7 408.4" stroke-dashoffset="-65.3"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-live)" stroke-width="18" stroke-dasharray="277.7 408.4" stroke-dashoffset="-98"></circle></svg>
+                <span style="position:relative;display:flex;flex-direction:column;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-0.025em;line-height:1">8 %</span><span style="font-size:11px;color:var(--ink-3)">zbylo</span></span>
+              </span>
+              <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-give)"></span><span style="flex:1;min-width:0;font-size:14px">Dávání <span style="display:block;font-size:11px;color:var(--ink-3)">bez očekávání návratu</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">4 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--flag)">−6</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-save)"></span><span style="flex:1;min-width:0;font-size:14px">Spoření <span style="display:block;font-size:11px;color:var(--ink-3)">stranou, na později</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">12 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--in)">+2</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-debt)"></span><span style="flex:1;min-width:0;font-size:14px">Dluh a rezerva <span style="display:block;font-size:11px;color:var(--ink-3)">splátky, nebo rezerva</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">8 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--flag)">−2</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-live)"></span><span style="flex:1;min-width:0;font-size:14px">Život <span style="display:block;font-size:11px;color:var(--ink-3)">nutné i chtěné dohromady</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">68 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-3)">−2</span></div>
+              </div>
+            </div>
+            <div style="font-size:13px;color:var(--in)">Zbylo 8 % — měsíc drží.</div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Kam to šlo</span>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-size:16px">BYDLENÍ</span><span style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">72 %</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600">−58 890,00 Kč</span></span></div>
+              <div style="height:4px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:9999px;background:var(--ink-2)"></span></div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">3×</span><span style="font-size:12px;color:var(--ink-3)">z toho 1× 41 890,00 Kč</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-size:16px">POTRAVINY</span><span style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">8 %</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600">−6 461,00 Kč</span></span></div>
+              <div style="height:4px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:11%;border-radius:9999px;background:var(--ink-2)"></span></div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">8×</span><span style="font-size:12px;color:var(--flag)">↑ 34 % oproti obvyklým 4 820,00 Kč</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-size:16px">SPOŘENÍ</span><span style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">6 %</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600">−5 000,00 Kč</span></span></div>
+              <div style="height:4px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:8%;border-radius:9999px;background:var(--in)"></span></div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--signal)"><span style="display:grid;place-items:center;width:40px;height:26px;border-radius:9999px;background:var(--signal-wash)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:600;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Nastavení</span></div></div>
+      </div>
+      <sc-if value="{{ showLight }}" hint-placeholder-val="{{ true }}"><div data-screen-label="Měsíc světlé" style="--ground:#f5f5f7;--ground-2:#e8e8ec;--surface:#ffffff;--surface-2:#fafafc;--surface-3:#f2f2f5;--raised:#ffffff;--hairline:rgba(29,29,31,0.08);--hairline-2:rgba(29,29,31,0.15);--ink:#1d1d1f;--ink-2:rgba(29,29,31,0.72);--ink-3:rgba(29,29,31,0.6);--signal:#0066cc;--signal-ink:#ffffff;--signal-wash:rgba(0,102,204,0.08);--in:#007850;--in-wash:rgba(0,120,80,0.08);--flag:#8a6400;--flag-wash:rgba(138,100,0,0.1);--danger:#c93f32;--danger-wash:rgba(201,63,50,0.09);--split-give:#6353c4;--split-save:#007850;--split-debt:#8f6508;--split-live:#6e7478;--split-left:#e2e2e7;flex:none;width:393px;height:1424px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:56px;padding:8px 8px">
+          <span style="display:grid;place-items:center;width:44px;height:44px;border-radius:9999px;color:var(--ink-2)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"></path></svg></span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:-0.02em">srpen 2026</span>
+          <span style="display:grid;place-items:center;width:44px;height:44px;border-radius:9999px;color:var(--ink-2);opacity:0.22"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></span>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:12px 16px 14px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="min-width:0">
+              <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Srpen 2026</div>
+              <div style="margin-top:4px;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-0.02em;line-height:1.15">−22 301,00 <span style="font-size:18px;color:var(--ink-2)">Kč</span></div>
+              <div style="font-size:11px;color:var(--ink-3)">zůstatek měsíce</div>
+            </div>
+            <div style="flex:none;display:flex;flex-direction:column;gap:4px;padding-bottom:4px">
+              <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:var(--in)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">59 400,00</span></span>
+              <span style="display:flex;align-items:center;justify-content:flex-end;gap:4px;color:var(--ink-2)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"></path></svg><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px">81 701,00</span></span>
+            </div>
+          </div>
+
+          <div style="flex:none;padding:0 8px;font-size:12px;line-height:1.5;color:var(--ink-2);text-wrap:pretty">Z toho jednorázově <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)">41 890,00 Kč</span>. Běžný chod měsíce vyšel na <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)">39 811,00 Kč</span>.</div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:8px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Cíl · Rezerva na půl roku</span>
+              <span style="display:grid;place-items:center;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></span>
+            </div>
+            <div style="font-size:14px;font-style:italic;line-height:1.5;color:var(--ink-2);text-wrap:pretty">Abych nemusel sahat po kreditce, když se něco pokazí.</div>
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:4px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600">5 000,00 Kč</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">z 5 000,00 Kč</span>
+            </div>
+            <div style="height:6px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:9999px;background:var(--in)"></span></div>
+            <div style="font-size:12px;color:var(--in)">Tenhle měsíc máš splněný.</div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Zápisy</span>
+            <div style="display:flex;align-items:center;gap:16px">
+              <span style="flex:none;position:relative;display:grid;place-items:center;width:104px;height:104px">
+                <svg viewBox="0 0 104 104" width="104" height="104" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="52" cy="52" r="45" fill="none" stroke="var(--split-left)" stroke-width="14"></circle><circle cx="52" cy="52" r="45" fill="none" stroke="var(--signal)" stroke-width="14" stroke-dasharray="248.8 282.7" stroke-linecap="butt"></circle></svg>
+                <span style="position:relative;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;letter-spacing:-0.02em;white-space:nowrap">88&nbsp;%</span>
+              </span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                <div style="font-size:16px;color:var(--ink-2)"><span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:var(--ink)">23</span> z 26 dnů</div>
+                <div style="font-size:13px;font-weight:600;color:var(--signal)">5 dní v řadě.</div>
+                <div style="font-size:12px;line-height:1.5;color:var(--ink-3);text-wrap:pretty">3 dny bez zápisu. Ve výpisu se dají doplnit — nebo označit jako den bez výdaje.</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Kontrola</span>
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <span style="flex:none;width:6px;height:6px;margin-top:7px;border-radius:9999px;background:var(--flag)"></span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:600">Utraceno víc, než přišlo</div>
+                <div style="font-size:12px;line-height:1.5;color:var(--ink-2);text-wrap:pretty">Podívej se na jednorázové výdaje — pokud tam žádné nejsou, je to trend.</div>
+                <div style="display:inline-block;margin-top:8px;font-size:12px;font-weight:600;color:var(--signal)">Vysypat kategorii</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Rozdělení příjmu</span>
+            <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+              <span style="flex:none;position:relative;display:grid;place-items:center;width:148px;height:148px">
+                <svg viewBox="0 0 148 148" width="148" height="148" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-left)" stroke-width="18"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-give)" stroke-width="18" stroke-dasharray="16.3 408.4"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-save)" stroke-width="18" stroke-dasharray="49 408.4" stroke-dashoffset="-16.3"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-debt)" stroke-width="18" stroke-dasharray="32.7 408.4" stroke-dashoffset="-65.3"></circle><circle cx="74" cy="74" r="65" fill="none" stroke="var(--split-live)" stroke-width="18" stroke-dasharray="277.7 408.4" stroke-dashoffset="-98"></circle></svg>
+                <span style="position:relative;display:flex;flex-direction:column;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-0.025em;line-height:1">8 %</span><span style="font-size:11px;color:var(--ink-3)">zbylo</span></span>
+              </span>
+              <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-give)"></span><span style="flex:1;min-width:0;font-size:14px">Dávání <span style="display:block;font-size:11px;color:var(--ink-3)">bez očekávání návratu</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">4 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--flag)">−6</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-save)"></span><span style="flex:1;min-width:0;font-size:14px">Spoření <span style="display:block;font-size:11px;color:var(--ink-3)">stranou, na později</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">12 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--in)">+2</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-debt)"></span><span style="flex:1;min-width:0;font-size:14px">Dluh a rezerva <span style="display:block;font-size:11px;color:var(--ink-3)">splátky, nebo rezerva</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">8 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--flag)">−2</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:8px;height:8px;border-radius:2px;background:var(--split-live)"></span><span style="flex:1;min-width:0;font-size:14px">Život <span style="display:block;font-size:11px;color:var(--ink-3)">nutné i chtěné dohromady</span></span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">68 %</span><span style="width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-3)">−2</span></div>
+              </div>
+            </div>
+            <div style="font-size:13px;color:var(--in)">Zbylo 8 % — měsíc drží.</div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Kam to šlo</span>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-size:16px">BYDLENÍ</span><span style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">72 %</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600">−58 890,00 Kč</span></span></div>
+              <div style="height:4px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:9999px;background:var(--ink-2)"></span></div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">3×</span><span style="font-size:12px;color:var(--ink-3)">z toho 1× 41 890,00 Kč</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-size:16px">POTRAVINY</span><span style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">8 %</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600">−6 461,00 Kč</span></span></div>
+              <div style="height:4px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:11%;border-radius:9999px;background:var(--ink-2)"></span></div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">8×</span><span style="font-size:12px;color:var(--flag)">↑ 34 % oproti obvyklým 4 820,00 Kč</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-size:16px">SPOŘENÍ</span><span style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">6 %</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600">−5 000,00 Kč</span></span></div>
+              <div style="height:4px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:8%;border-radius:9999px;background:var(--in)"></span></div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--signal)"><span style="display:grid;place-items:center;width:40px;height:26px;border-radius:9999px;background:var(--signal-wash)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:600;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Nastavení</span></div></div>
+      </div></sc-if>
+    </div>
+    <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}"><div style="font-size:12px;line-height:1.55;color:#9c9ca2;max-width:78ch"><span style="color:#d8d8dc;font-weight:600">Kruhy a pruhy sedí na jedné dráze.</span> Dráha měřidla i prstenec jdou na <span style="font-family:'IBM Plex Mono',monospace">--ground-2</span> / <span style="font-family:'IBM Plex Mono',monospace">--split-left</span> — kapsa, ne stín; výplň nese roli. Čtyři barvy rozdělení drží stejnou světlost i chromu, takže žádná třída nepřekřičí ostatní, a <span style="font-family:'IBM Plex Mono',monospace">.finding__title</span> je poslední 500 na téhle obrazovce — jde na 600. „Dluží mi“ karta v náhledu není: je to stejná gramatika řádků a sekundárního tlačítka, bez vlastního rozhodnutí.</div></sc-if>
+  </section>
+
+  <!-- ══════════════════ 4c — /cil ══════════════════ -->
+  <section id="4c" style="max-width:880px;width:100%;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="flex:none;padding:2px 8px;border-radius:11px;background:rgba(64,156,255,0.14);color:#409cff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">4c</span>
+      <h2 style="margin:0;font-size:15px;font-weight:600;color:#f5f5f7">Cíl</h2>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8e8e94">/cil · 393 × 864</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <div data-screen-label="Cíl tmavé" style="--ground:#000000;--ground-2:#0c0c0e;--surface:#1d1d1f;--surface-2:#252527;--surface-3:#2a2a2c;--raised:#2a2a2c;--hairline:rgba(255,255,255,0.09);--hairline-2:rgba(255,255,255,0.16);--ink:#f5f5f7;--ink-2:rgba(245,245,247,0.66);--ink-3:rgba(245,245,247,0.52);--signal:#409cff;--signal-ink:#06213d;--signal-wash:rgba(64,156,255,0.12);--in:#4ccfa1;--in-wash:rgba(76,207,161,0.12);--flag:#dfb567;--flag-wash:rgba(223,181,103,0.12);--danger:#ef6f5e;--danger-wash:rgba(239,111,94,0.12);--split-give:#a294ec;--split-save:#4ccfa1;--split-debt:#d3a15e;--split-live:#8b9299;--split-left:#232326;flex:none;width:393px;height:864px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.025em">Cíl</div>
+          <span style="display:grid;place-items:center;width:44px;height:44px;margin-right:-8px;color:var(--signal)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <span style="font-size:22px;font-weight:600;letter-spacing:-0.02em">Rezerva na půl roku</span>
+              <span style="flex:none;padding:3px 10px;border-radius:11px;background:var(--signal-wash);color:var(--signal);font-size:11px;font-weight:600">na očích</span>
+            </div>
+            <div style="padding:16px;border-radius:14px;background:var(--ground-2);font-size:16px;font-style:italic;line-height:1.5;text-wrap:pretty">Abych nemusel sahat po kreditce, když se něco pokazí.</div>
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;letter-spacing:-0.02em">10 000,00 Kč</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">z 180 000,00 Kč</span>
+            </div>
+            <div style="height:6px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:6%;border-radius:9999px;background:var(--signal)"></span></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">6 %</span><span style="font-size:12px;color:var(--ink-3)">do st 30. června 2027 · 11 měsíců</span></div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Srpen 2026</span>
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+              <span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;letter-spacing:-0.02em">5 000,00 Kč</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">z 5 000,00 Kč</span>
+            </div>
+            <div style="height:6px;border-radius:9999px;background:var(--ground-2);overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:9999px;background:var(--in)"></span></div>
+            <div style="font-size:12px;color:var(--in)">Tenhle měsíc máš splněný.</div>
+            <div style="display:flex;gap:8px">
+              <span style="flex:1;display:grid;place-items:center;height:44px;padding:0 16px;border:1px solid var(--signal);border-radius:9999px;background:var(--signal);color:var(--signal-ink);font-size:16px;font-weight:600">Odložit</span>
+              <span style="flex:1;display:grid;place-items:center;height:44px;padding:0 16px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px;color:var(--ink)">Upravit cíl měsíce</span>
+            </div>
+            <div style="font-size:12px;color:var(--ink-3)">Zbývá 5 dní měsíce.</div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Měsíce</span>
+            <div style="display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;gap:12px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="flex:1;font-size:14px;color:var(--ink-2)">srpen 2026</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">5 000,00</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">/ 5 000,00</span><span style="flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;background:var(--in-wash);color:var(--in)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.6 12.4 4.4 4.4 8.4-9.6"></path></svg></span></div>
+              <div style="display:flex;align-items:center;gap:12px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="flex:1;font-size:14px;color:var(--ink-2)">červenec 2026</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">5 000,00</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">/ 5 000,00</span><span style="flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;background:var(--in-wash);color:var(--in)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5.6 12.4 4.4 4.4 8.4-9.6"></path></svg></span></div>
+              <div style="display:flex;align-items:center;gap:12px;min-height:44px"><span style="flex:1;font-size:14px;color:var(--ink-2)">červen 2026</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600">2 000,00</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-3)">/ 5 000,00</span><span style="flex:none;width:20px;height:20px"></span></div>
+            </div>
+            <div style="font-size:12px;line-height:1.5;color:var(--ink-3);text-wrap:pretty">Počítá se, co v daném měsíci přišlo do SPOŘENÍ. Žádné druhé účetnictví — proto se tomu dá věřit.</div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--signal)"><span style="display:grid;place-items:center;width:40px;height:26px;border-radius:9999px;background:var(--signal-wash)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:600;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Nastavení</span></div></div>
+      </div>
+    </div>
+    <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}"><div style="font-size:12px;line-height:1.55;color:#9c9ca2;max-width:78ch"><span style="color:#d8d8dc;font-weight:600">„Proč“ je zapuštěné bez stínu.</span> <span style="font-family:'IBM Plex Mono',monospace">.why</span> ztrácí <span style="font-family:'IBM Plex Mono',monospace">inset 0 1px 3px</span> a bere <span style="font-family:'IBM Plex Mono',monospace">--ground-2</span>: to jediné, co si napsal sám, sedí v kartě jako v rámu. Odložit je jediná pilulka na obrazovce, Upravit cíl měsíce je 14px sekundár — dvě stejně velká tlačítka vedle sebe se rozliší tvarem, ne barvou navíc.</div></sc-if>
+  </section>
+
+  <!-- ══════════════════ 4d — /jmeni ══════════════════ -->
+  <section id="4d" style="max-width:880px;width:100%;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="flex:none;padding:2px 8px;border-radius:11px;background:rgba(64,156,255,0.14);color:#409cff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">4d</span>
+      <h2 style="margin:0;font-size:15px;font-weight:600;color:#f5f5f7">Jmění</h2>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8e8e94">/jmeni · 393 × 632</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <div data-screen-label="Jmění tmavé" style="--ground:#000000;--ground-2:#0c0c0e;--surface:#1d1d1f;--surface-2:#252527;--surface-3:#2a2a2c;--raised:#2a2a2c;--hairline:rgba(255,255,255,0.09);--hairline-2:rgba(255,255,255,0.16);--ink:#f5f5f7;--ink-2:rgba(245,245,247,0.66);--ink-3:rgba(245,245,247,0.52);--signal:#409cff;--signal-ink:#06213d;--signal-wash:rgba(64,156,255,0.12);--in:#4ccfa1;--in-wash:rgba(76,207,161,0.12);--flag:#dfb567;--flag-wash:rgba(223,181,103,0.12);--danger:#ef6f5e;--danger-wash:rgba(239,111,94,0.12);--split-give:#a294ec;--split-save:#4ccfa1;--split-debt:#d3a15e;--split-live:#8b9299;--split-left:#232326;flex:none;width:393px;height:632px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.025em">Jmění</div>
+          <span style="display:grid;place-items:center;width:44px;height:44px;margin-right:-8px;color:var(--signal)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;flex-direction:column;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="text-align:center;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:34px;font-weight:600;letter-spacing:-0.025em;line-height:1.1">720 645,00 <span style="font-size:22px;color:var(--ink-2)">Kč</span></div>
+            <div style="text-align:center;margin-top:2px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Celkem</div>
+            <div style="height:1px;margin:14px 0 4px;background:var(--hairline)"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px"><span style="font-size:16px;color:var(--ink-2)">Na účtu</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px">14 145,00 Kč</span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px"><span style="font-size:16px;color:var(--ink-2)">V investicích</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px">706 500,00 Kč</span></div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:2px;padding:12px 16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;gap:10px"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--split-give)"></span><span style="flex:1;min-width:0;font-size:18px;font-weight:600;letter-spacing:-0.02em">Penzijko</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600">248 000,00 Kč</span></div>
+            <div style="padding-left:18px;font-size:12px;color:var(--ink-3)">k 30. 6.</div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:2px;padding:12px 16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;gap:10px"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--split-save)"></span><span style="flex:1;min-width:0;font-size:18px;font-weight:600;letter-spacing:-0.02em">Spořicí účet</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600">142 000,00 Kč</span></div>
+            <div style="padding-left:18px;font-size:12px;color:var(--ink-3)">k 25. 8.</div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <div style="display:flex;align-items:center;gap:10px"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--split-give)"></span><span style="flex:1;min-width:0;font-size:18px;font-weight:600;letter-spacing:-0.02em">ETF</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:18px;font-weight:600">316 500,00 Kč</span></div>
+            <div style="display:flex;align-items:center;gap:8px;min-height:44px;margin:0 -4px;padding:0 12px;border:1px solid var(--flag);border-radius:14px;background:var(--flag-wash)">
+              <span style="flex:none;width:6px;height:6px;border-radius:9999px;background:var(--flag)"></span>
+              <span style="flex:1;font-size:13px">Ocenění je z 20. 2. — přepiš ho</span>
+              <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase">Ocenit</span>
+            </div>
+          </div>
+
+          <div style="flex:none;padding:4px 8px;font-size:12px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">Hodnoty jsou to, co jsi opsal z výpisu — nic se nikam nenačítá. Růst se nepočítá jako příjem a do rozdělení měsíce nevstupuje.</div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Nastavení</span></div></div>
+      </div>
+    </div>
+    <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}"><div style="font-size:12px;line-height:1.55;color:#9c9ca2;max-width:78ch"><span style="color:#d8d8dc;font-weight:600">Karta na položku, ne řádek v seznamu.</span> Držba nese jedinou barevnou tečku (třída rozdělení) a jinak nic — jmění je součet, ne dashboard. Staré ocenění je jediná ambrová věc na obrazovce a je to akce v místě, kde vznikla: nový pruh <span style="font-family:'IBM Plex Mono',monospace">--flag-wash</span> uvnitř karty držby, stejná gramatika jako due strip na <span style="font-family:'IBM Plex Mono',monospace">/</span>.</div></sc-if>
+  </section>
+
+  <!-- ══════════════════ 4e — /settings ══════════════════ -->
+  <section id="4e" style="max-width:880px;width:100%;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="flex:none;padding:2px 8px;border-radius:11px;background:rgba(64,156,255,0.14);color:#409cff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">4e</span>
+      <h2 style="margin:0;font-size:15px;font-weight:600;color:#f5f5f7">Nastavení</h2>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8e8e94">/settings · 393 × 1264</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <div data-screen-label="Nastavení tmavé" style="--ground:#000000;--ground-2:#0c0c0e;--surface:#1d1d1f;--surface-2:#252527;--surface-3:#2a2a2c;--raised:#2a2a2c;--hairline:rgba(255,255,255,0.09);--hairline-2:rgba(255,255,255,0.16);--ink:#f5f5f7;--ink-2:rgba(245,245,247,0.66);--ink-3:rgba(245,245,247,0.52);--signal:#409cff;--signal-ink:#06213d;--signal-wash:rgba(64,156,255,0.12);--in:#4ccfa1;--in-wash:rgba(76,207,161,0.12);--flag:#dfb567;--flag-wash:rgba(223,181,103,0.12);--danger:#ef6f5e;--danger-wash:rgba(239,111,94,0.12);--split-give:#a294ec;--split-save:#4ccfa1;--split-debt:#d3a15e;--split-live:#8b9299;--split-left:#232326;flex:none;width:393px;height:1264px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.025em">Nastavení</div>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Účet</span>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--ink-2)">Název</span><span style="display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-size:16px">Běžný účet</span></div>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--ink-2)">Počáteční zůstatek</span><span style="display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px">36 446,00</span></div>
+              <div style="flex:none;width:132px;display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--ink-2)">Ke dni</span><span style="display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--ink-2)">1. 1. 2026</span></div>
+            </div>
+            <span style="display:grid;place-items:center;height:44px;border:1px solid var(--signal);border-radius:9999px;background:var(--signal);color:var(--signal-ink);font-size:16px;font-weight:600">Uložit účet</span>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">Zůstatek se počítá z počátečního stavu a všech záznamů. Zadej ho přesně tak, jak ho ukazovala banka k uvedenému dni — jinak nebude sedět nikdy.</span>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Kategorie</span>
+            <div style="display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--split-live)"></span><span style="flex:1;min-width:0;font-size:16px">POTRAVINY</span><span style="flex:none;font-size:13px;color:var(--ink-3)">nutné</span><span style="flex:none;display:grid;place-items:center;width:44px;height:44px;margin-right:-10px;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10M17 7 7 17"></path></svg></span></div>
+              <div style="display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--flag)"></span><span style="flex:1;min-width:0;font-size:16px">LIFESTYLE</span><span style="flex:none;font-size:13px;color:var(--ink-3)">chtěné</span><span style="flex:none;display:grid;place-items:center;width:44px;height:44px;margin-right:-10px;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10M17 7 7 17"></path></svg></span></div>
+              <div style="display:flex;align-items:center;gap:10px;min-height:44px;opacity:0.5"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--split-save)"></span><span style="flex:1;min-width:0;font-size:16px;text-decoration:line-through">DOVOLENÁ</span><span style="flex:none;font-size:13px;color:var(--ink-3)">spoření</span><span style="flex:none;display:grid;place-items:center;width:44px;height:44px;margin-right:-10px;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="flex:1;display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-size:16px;color:var(--ink-3)">Nová kategorie</span>
+              <span style="flex:none;display:grid;place-items:center;height:44px;padding:0 16px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Přidat</span>
+            </div>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3)">Kategorie se archivují, nemažou — staré záznamy musí zůstat čitelné.</span>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Vzhled</span>
+            <div style="display:flex;gap:2px;padding:3px;border:1px solid var(--hairline);border-radius:14px;background:var(--ground-2)">
+              <span style="flex:1;display:grid;place-items:center;height:44px;border-radius:8px;font-size:14px;color:var(--ink-3)">systém</span>
+              <span style="flex:1;display:grid;place-items:center;height:44px;border-radius:8px;font-size:14px;color:var(--ink-3)">světlý</span>
+              <span style="flex:1;display:grid;place-items:center;height:44px;border-radius:8px;background:var(--raised);color:var(--ink);font-size:14px;font-weight:600">tmavý</span>
+            </div>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">Tmavý je výchozí. Tahle appka se používá jednou rukou, v posteli, se zhasnutým světlem.</span>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Data</span>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">Dokud není synchronizace, žije celý sešit jen v tomhle prohlížeči. Vyexportuj si zálohu, než na ni budeš spoléhat.</span>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <span style="flex:1 1 auto;display:grid;place-items:center;height:44px;padding:0 14px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Export zálohy</span>
+              <span style="flex:1 1 auto;display:grid;place-items:center;height:44px;padding:0 14px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Načíst zálohu</span>
+              <span style="flex:1 1 auto;display:grid;place-items:center;height:44px;padding:0 14px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Export do Excelu</span>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="font-size:14px;color:var(--ink-2)">Záznamů</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px">412</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px"><span style="font-size:14px;color:var(--ink-2)">Trvalé úložiště</span><span style="font-size:14px;color:var(--in)">zapnuté</span></div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--signal)"><span style="display:grid;place-items:center;width:40px;height:26px;border-radius:9999px;background:var(--signal-wash)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:600;line-height:1">Nastavení</span></div></div>
+      </div>
+      <sc-if value="{{ showLight }}" hint-placeholder-val="{{ true }}"><div data-screen-label="Nastavení světlé" style="--ground:#f5f5f7;--ground-2:#e8e8ec;--surface:#ffffff;--surface-2:#fafafc;--surface-3:#f2f2f5;--raised:#ffffff;--hairline:rgba(29,29,31,0.08);--hairline-2:rgba(29,29,31,0.15);--ink:#1d1d1f;--ink-2:rgba(29,29,31,0.72);--ink-3:rgba(29,29,31,0.6);--signal:#0066cc;--signal-ink:#ffffff;--signal-wash:rgba(0,102,204,0.08);--in:#007850;--in-wash:rgba(0,120,80,0.08);--flag:#8a6400;--flag-wash:rgba(138,100,0,0.1);--danger:#c93f32;--danger-wash:rgba(201,63,50,0.09);--split-give:#6353c4;--split-save:#007850;--split-debt:#8f6508;--split-live:#6e7478;--split-left:#e2e2e7;flex:none;width:393px;height:1264px;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--hairline-2);border-radius:20px;background:linear-gradient(175deg,var(--ground),var(--ground-2));color:var(--ink)">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.025em">Nastavení</div>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 12px 12px;overflow:hidden">
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Účet</span>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--ink-2)">Název</span><span style="display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-size:16px">Běžný účet</span></div>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--ink-2)">Počáteční zůstatek</span><span style="display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px">36 446,00</span></div>
+              <div style="flex:none;width:132px;display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:var(--ink-2)">Ke dni</span><span style="display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--ink-2)">1. 1. 2026</span></div>
+            </div>
+            <span style="display:grid;place-items:center;height:44px;border:1px solid var(--signal);border-radius:9999px;background:var(--signal);color:var(--signal-ink);font-size:16px;font-weight:600">Uložit účet</span>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">Zůstatek se počítá z počátečního stavu a všech záznamů. Zadej ho přesně tak, jak ho ukazovala banka k uvedenému dni — jinak nebude sedět nikdy.</span>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Kategorie</span>
+            <div style="display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--split-live)"></span><span style="flex:1;min-width:0;font-size:16px">POTRAVINY</span><span style="flex:none;font-size:13px;color:var(--ink-3)">nutné</span><span style="flex:none;display:grid;place-items:center;width:44px;height:44px;margin-right:-10px;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10M17 7 7 17"></path></svg></span></div>
+              <div style="display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--flag)"></span><span style="flex:1;min-width:0;font-size:16px">LIFESTYLE</span><span style="flex:none;font-size:13px;color:var(--ink-3)">chtěné</span><span style="flex:none;display:grid;place-items:center;width:44px;height:44px;margin-right:-10px;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10M17 7 7 17"></path></svg></span></div>
+              <div style="display:flex;align-items:center;gap:10px;min-height:44px;opacity:0.5"><span style="flex:none;width:8px;height:8px;border-radius:9999px;background:var(--split-save)"></span><span style="flex:1;min-width:0;font-size:16px;text-decoration:line-through">DOVOLENÁ</span><span style="flex:none;font-size:13px;color:var(--ink-3)">spoření</span><span style="flex:none;display:grid;place-items:center;width:44px;height:44px;margin-right:-10px;color:var(--ink-3)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="flex:1;display:flex;align-items:center;height:44px;padding:0 12px;border:1px solid var(--hairline);border-radius:8px;background:var(--ground-2);font-size:16px;color:var(--ink-3)">Nová kategorie</span>
+              <span style="flex:none;display:grid;place-items:center;height:44px;padding:0 16px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Přidat</span>
+            </div>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3)">Kategorie se archivují, nemažou — staré záznamy musí zůstat čitelné.</span>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Vzhled</span>
+            <div style="display:flex;gap:2px;padding:3px;border:1px solid var(--hairline);border-radius:14px;background:var(--ground-2)">
+              <span style="flex:1;display:grid;place-items:center;height:44px;border-radius:8px;font-size:14px;color:var(--ink-3)">systém</span>
+              <span style="flex:1;display:grid;place-items:center;height:44px;border-radius:8px;font-size:14px;color:var(--ink-3)">světlý</span>
+              <span style="flex:1;display:grid;place-items:center;height:44px;border-radius:8px;background:var(--raised);color:var(--ink);font-size:14px;font-weight:600">tmavý</span>
+            </div>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">Tmavý je výchozí. Tahle appka se používá jednou rukou, v posteli, se zhasnutým světlem.</span>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--hairline);border-radius:18px">
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">Data</span>
+            <span style="font-size:12px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">Dokud není synchronizace, žije celý sešit jen v tomhle prohlížeči. Vyexportuj si zálohu, než na ni budeš spoléhat.</span>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <span style="flex:1 1 auto;display:grid;place-items:center;height:44px;padding:0 14px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Export zálohy</span>
+              <span style="flex:1 1 auto;display:grid;place-items:center;height:44px;padding:0 14px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Načíst zálohu</span>
+              <span style="flex:1 1 auto;display:grid;place-items:center;height:44px;padding:0 14px;border:1px solid var(--hairline);border-radius:14px;background:var(--surface-2);font-size:14px">Export do Excelu</span>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;border-bottom:1px solid var(--hairline)"><span style="font-size:14px;color:var(--ink-2)">Záznamů</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px">412</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px"><span style="font-size:14px;color:var(--ink-2)">Trvalé úložiště</span><span style="font-size:14px;color:var(--in)">zapnuté</span></div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--hairline)"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Výpis</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Měsíc</span></div><div style="display:grid;place-items:center;min-height:58px"><span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--signal);color:var(--signal-ink)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--ink-3)"><span style="display:grid;place-items:center;width:40px;height:26px"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.6"></circle><circle cx="12" cy="12" r="3.4"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg></span><span style="font-size:11px;font-weight:400;line-height:1">Cíl</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;color:var(--signal)"><span style="display:grid;place-items:center;width:40px;height:26px;border-radius:9999px;background:var(--signal-wash)"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></span><span style="font-size:11px;font-weight:600;line-height:1">Nastavení</span></div></div>
+      </div></sc-if>
+    </div>
+    <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}"><div style="font-size:12px;line-height:1.55;color:#9c9ca2;max-width:78ch"><span style="color:#d8d8dc;font-weight:600">Segment už nesvítí.</span> <span style="font-family:'IBM Plex Mono',monospace">0 1px 3px rgb(0 0 0 / 16%)</span> pod vybraným segmentem padá: dráha je kapsa (<span style="font-family:'IBM Plex Mono',monospace">--ground-2</span>), vybraný je <span style="font-family:'IBM Plex Mono',monospace">--raised</span>. V tmavém to je <span style="font-family:'IBM Plex Mono',monospace">#0c0c0e → #2a2a2c</span>, ve světlém <span style="font-family:'IBM Plex Mono',monospace">#e8e8ec → #ffffff</span> — jedno pravidlo, luminance oběma směry. Váha vybraného 600, ostatní 400; 500 padlo i tady a v <span style="font-family:'IBM Plex Mono',monospace">.link</span>. Karty Pravidelné platby, Jmění a Synchronizace v náhledu nejsou — je to stejná gramatika řádku, políčka a sekundárního tlačítka.</div></sc-if>
+  </section>
+
+  <div style="max-width:880px;width:100%;color:#b5b5ba;font-size:13px;line-height:1.6;border-top:1px solid rgba(255,255,255,0.12);padding-top:18px">
+    Přesný diff po souborech a pravidlech: <span style="font-family:'IBM Plex Mono',monospace">patches/step-4.md</span>. Beze změny zůstávají <span style="font-family:'IBM Plex Mono',monospace">Doughnut</span>, <span style="font-family:'IBM Plex Mono',monospace">Money</span>, <span style="font-family:'IBM Plex Mono',monospace">MonthTotals</span> a <span style="font-family:'IBM Plex Mono',monospace">DueStrip</span> — každý stín v nich je už token a 500 tam není. Sheety dostávají jen srovnání váhy popisků; stín pod plovoucí vrstvou zůstává, protože ta skutečně plove.
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1720,&quot;height&quot;:1400},&quot;showLight&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Náhled&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Náhled&quot;}}">class Component extends DCLogic {
+  renderVals() {
+    return {
+      showLight: this.props.showLight ?? true,
+      showNotes: this.props.showNotes ?? true
+    };
+  }
+}</script>
+</body>
+</html>

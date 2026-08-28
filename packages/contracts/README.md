@@ -1,4 +1,4 @@
-# @vydaje/contracts
+# @prosper/contracts
 
 The sync protocol, as TypeScript types. `docs/PROJECT-PLAN.md` §10 and nothing
 else.

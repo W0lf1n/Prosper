@@ -169,7 +169,7 @@
 </script>
 
 <svelte:head>
-	<title>Výdaje — výpis</title>
+	<title>Prosper — výpis</title>
 </svelte:head>
 
 <AppBar title="Výpis" />
@@ -182,7 +182,7 @@
   verify a figure they are currently looking at is how a monthly habit becomes a
   yearly one.
 -->
-<section class="balance">
+<section class="balance slab">
 	<h2 class="balance__name u-label">{$account?.name ?? '—'}</h2>
 	<Money value={balance} colour={false} size="2xl" bold />
 	<span class="balance__caption">aktuální zůstatek</span>
@@ -212,7 +212,7 @@
 
 <main class="tape">
 	{#each months as month (month.key)}
-		<section class="month">
+		<section class="month slab">
 			<header class="month__head">
 				<h2 class="u-label">{formatMonthHeading(month.firstDate)}</h2>
 				<div class="month__totals">
@@ -342,16 +342,24 @@
 
 <style>
 	/* The one number this screen exists to answer. It gets a slab of its own. */
+	/* The slab recipe is `.slab` in `app.css`. What is local is the layout and
+	   the alignment. */
 	.balance {
 		flex: none;
 		display: flex;
 		flex-direction: column;
 		margin: 0 var(--space-3) var(--space-3);
 		padding: var(--space-3) var(--space-4) var(--space-4);
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--edge), var(--elev-1);
+		/* The balance is the one number this screen exists to answer, so it sits
+		   under the thumb, on the right. */
+		text-align: right;
+	}
+
+	/* 2xl (28) → 3xl (34). The `Money` prop stays `size="2xl"`; the slab it sits
+	   in is what promotes it, so no markup moves. */
+	.balance :global(.money) {
+		font-size: var(--text-3xl);
+		letter-spacing: var(--track-display);
 	}
 
 	/* A full-width row rather than a corner button: it carries two pieces of
@@ -381,6 +389,8 @@
 	}
 
 	.balance__name {
+		/* The account name is a left-hand label; only the figure goes right. */
+		text-align: left;
 		margin-bottom: var(--space-2);
 		white-space: nowrap;
 		overflow: hidden;
@@ -430,10 +440,7 @@
 		 * clipped. The tape had nothing left to scroll.
 		 */
 		flex: none;
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--edge), var(--elev-1);
+		/* The slab recipe is `.slab` in `app.css`; this clips to its radius. */
 		overflow: hidden;
 	}
 
@@ -492,9 +499,12 @@
 	 * is drawn as a hole: the surface is pressed in rather than raised, and the
 	 * light that lands on every other row does not land here.
 	 */
+	/**
+	 * A hole is a pocket, not a shadow. `--ground-2` is darker than the card in
+	 * both themes, so "pressed in" reads the same way with the lights on and off.
+	 */
 	.day--gap {
-		background: var(--surface-2);
-		box-shadow: inset 0 1px 3px rgb(0 0 0 / 12%);
+		background: var(--ground-2);
 	}
 
 	.day--gap .day__date {
@@ -585,13 +595,14 @@
 		transition: background var(--dur-fast) var(--ease-out);
 	}
 
+	/* The press has to go *up* out of the pocket now, not further down. */
 	.blank:active {
-		background: var(--surface-3);
+		background: var(--surface-2);
 	}
 
 	@media (hover: hover) {
 		.blank:hover {
-			background: var(--surface-3);
+			background: var(--surface-2);
 		}
 	}
 

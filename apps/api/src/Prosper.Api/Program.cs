@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Prosper.Api.Data;
 using Prosper.Api.Sync;
@@ -34,6 +36,36 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<DeviceAuth>();
 
+// The pairing code is short because it is typed on a phone with one thumb, and
+// it is the only thing between the internet and the whole ledger. Six digits is
+// a million guesses, which is minutes at line rate — `CodeMatches` being
+// constant-time defends against timing, not against volume.
+//
+// Five attempts a minute per address turns that million into months, which is
+// long enough that the code's shortness stops being the weak part. Pairing
+// happens once in a device's life, so the limit is invisible to the person
+// actually doing it.
+const string PairPolicy = "pair";
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy(PairPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+        // Behind the container's nginx and the host's, so the peer address is a
+        // proxy. `X-Forwarded-For`'s first hop is what both of them set.
+        http.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
+            ?? http.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            // No queue: a pairing attempt that has to wait is a wrong guess.
+            QueueLimit = 0
+        }));
+});
+
 // The client is served from the same origin in production (§4), so there is no
 // CORS policy by default and deliberately no wildcard one: a sync endpoint any
 // page can call is a sync endpoint any page can drain. An explicit allowlist
@@ -53,6 +85,8 @@ if (allowedOrigins.Length > 0)
 var app = builder.Build();
 
 if (allowedOrigins.Length > 0) app.UseCors();
+
+app.UseRateLimiter();
 
 if (app.Configuration.GetValue("Database:MigrateOnStart", true))
 {
@@ -84,7 +118,7 @@ app.MapPost("/api/v1/pair", async (
     }
 
     return Results.Ok(await auth.PairAsync(request.DeviceName ?? "Zařízení", ct));
-});
+}).RequireRateLimiting(PairPolicy);
 
 app.MapPost("/api/v1/sync/push", async (
     PushRequest request,

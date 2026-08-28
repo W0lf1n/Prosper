@@ -3,7 +3,7 @@
 ASP.NET Core 9 Minimal API + EF Core + Postgres 16. It implements
 `docs/PROJECT-PLAN.md` §10 and nothing else.
 
-**The app does not need it.** Výdaje is offline-first: the ledger lives in
+**The app does not need it.** Prosper is offline-first: the ledger lives in
 IndexedDB on the device, and every screen works with this server permanently
 down. What it adds is a second copy and a merge point between two devices.
 
@@ -84,16 +84,41 @@ endpoint any page can drain.
 
 ### In production
 
+This server is not deployed on its own. It is one of three containers in
+`deploy/docker-compose.yml`, behind the same nginx that serves the client —
+which is what makes them one origin and retires the CORS allowlist entirely.
+
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Set `POSTGRES_PASSWORD` and `PAIRING_CODE` in a `.env` beside the compose file.
-Neither has a default: a default password is one nobody changes, and an unset
-pairing code makes the server refuse to pair rather than accept anything.
+from `deploy/`, with `POSTGRES_PASSWORD` and `PAIRING_CODE` in a `.env` beside
+it. Neither has a default: a default password is one nobody changes, and an
+unset pairing code makes the server refuse to pair rather than accept anything.
 
-Put it behind whatever already terminates TLS. The compose file binds to
-`127.0.0.1` on purpose.
+**The whole runbook — the VPS, the domain, the certificate, the backups — is
+[`docs/DEPLOYMENT.md`](../../docs/DEPLOYMENT.md).**
+
+### The database creates itself
+
+There are **no EF migrations here.** On startup the API calls
+`EnsureCreatedAsync()` — gated behind `Database:MigrateOnStart`, default true —
+which creates `changes`, `devices` and `sync_state` if the database has no
+tables, and does nothing otherwise. There is no `dotnet ef database update` step
+in this project, on a server or on a laptop.
+
+The consequence worth knowing: `EnsureCreated` never *alters* a schema. It has
+not mattered, because the server stores rows as JSON and reasons about four
+fields, so a client schema change is not a server concern. If the server model
+ever changes, that is the moment to add migrations and switch to
+`MigrateAsync()` — not before.
+
+Table names are lowercase; **column names are PascalCase**, because EF takes
+them from the property names. Postgres folds unquoted identifiers, so
+`select entity from changes` fails and `select "Entity" from changes` works.
+
+[`docs/DEPLOYMENT.md` § The sync database](../../docs/DEPLOYMENT.md#the-sync-database)
+has the schema, the inspection commands and the reset.
 
 ---
 
@@ -133,7 +158,10 @@ edit.
 
 ## Backups
 
-`docs/PROJECT-PLAN.md` §14 calls for a nightly `pg_dump` to the NAS. That is a
-host concern and is not in this repository — but the risk it covers is real, and
-until it exists the JSON export in the app's Settings is still the only backup
-that has been tested.
+`docs/PROJECT-PLAN.md` §14 calls for a nightly `pg_dump`. It is `deploy/backup.sh`
+— dump, gzip, keep thirty days, refuse to call a file under a kilobyte a backup —
+and `docs/DEPLOYMENT.md` has the cron line.
+
+It is still the **second** copy. The first is IndexedDB on the phone, and the
+JSON export in the app's Settings is the only backup anybody has restored from.
+A dump nobody has restored is a hypothesis.

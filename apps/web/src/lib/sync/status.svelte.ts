@@ -11,10 +11,11 @@
  * auto-subscribes in the first place.
  */
 
-import { refreshSyncEnabled } from '$lib/db/repo';
+import { refreshSyncEnabled, setOutboxListener } from '$lib/db/repo';
 import { nowIso } from '$lib/domain/datetime';
 import { db } from '$lib/db/schema';
 import {
+	SyncError,
 	backoffMs,
 	readCursor,
 	readSettings,
@@ -59,12 +60,15 @@ async function refreshPending(): Promise<void> {
 
 /** Read what is stored and take up position. Safe to call more than once. */
 export async function initSync(): Promise<void> {
+	setOutboxListener(syncAfterWrite);
 	settings = await readSettings();
 	await refreshSyncEnabled();
 	status.cursor = await readCursor();
 	await refreshPending();
 	status.state = settings ? 'idle' : 'off';
-	if (settings) schedule(0);
+	// Coming to the foreground is a trigger (§10.7), and app start is the first
+	// one of those, so this is debounced rather than left to the idle floor.
+	if (settings) schedule(0, AFTER_WRITE_DEBOUNCE_MS);
 }
 
 export async function configure(next: SyncSettings | null): Promise<void> {
@@ -75,7 +79,7 @@ export async function configure(next: SyncSettings | null): Promise<void> {
 	status.failures = 0;
 	status.lastError = null;
 	await refreshPending();
-	if (next) schedule(0);
+	if (next) schedule(0, AFTER_WRITE_DEBOUNCE_MS);
 	else if (timer) clearTimeout(timer);
 }
 
@@ -100,12 +104,22 @@ export async function syncNow(): Promise<void> {
 		status.state = 'idle';
 	} catch (error) {
 		status.failures += 1;
-		status.lastError = error instanceof Error ? error.message : 'Neznámá chyba';
+		// A 401/403 is the one failure a person can act on, and the outbox is
+		// deliberately kept intact through it (`pushOnce`). Say what to do.
+		status.lastError =
+			error instanceof SyncError && error.unauthorized
+				? 'Server tohle zařízení nezná. Spáruj ho znovu.'
+				: error instanceof Error
+					? error.message
+					: 'Neznámá chyba';
 		status.state = 'error';
 	} finally {
 		running = false;
 		await refreshPending();
-		schedule(backoffMs(status.failures));
+		// Failed: the backoff ladder, as written, with no floor over it.
+		// Succeeded: nothing is waiting, so the next cycle is the idle safety
+		// net rather than a ten-second poll.
+		schedule(backoffMs(status.failures), status.failures > 0 ? 0 : IDLE_POLL_MS);
 	}
 }
 
@@ -118,10 +132,45 @@ export async function syncNow(): Promise<void> {
  */
 const AFTER_WRITE_DEBOUNCE_MS = 10_000;
 
-function schedule(delay: number): void {
+/**
+ * The floor under an *idle* cycle, which is a different number entirely.
+ *
+ * These two were one constant, and the debounce won: every successful cycle
+ * scheduled the next one ten seconds later, so a paired device with the app
+ * open ran a full push-pull-adopt cycle every ten seconds forever — some
+ * 8 600 requests a day from a phone whose ledger changes a handful of times.
+ * Nothing asked for that; it was the debounce leaking into the resting state.
+ *
+ * §10.7's triggers are the events, and they still fire immediately. This is
+ * only the safety net under them, for the changes another device pushed while
+ * this one sat open and untouched.
+ */
+const IDLE_POLL_MS = 15 * 60_000;
+
+/**
+ * Wake up in `delay` ms, never sooner than `floor`.
+ *
+ * The floor is passed rather than assumed, because the three callers want
+ * three different ones: a trigger is debounced, a failed cycle honours the
+ * backoff ladder (§10.5) exactly, and an idle re-arm waits a quarter of an hour.
+ */
+function schedule(delay: number, floor: number): void {
 	if (!settings) return;
 	if (timer) clearTimeout(timer);
-	timer = setTimeout(() => void syncNow(), Math.max(delay, AFTER_WRITE_DEBOUNCE_MS));
+	timer = setTimeout(() => void syncNow(), Math.max(delay, floor));
+}
+
+/**
+ * The trigger §10.7 names and the app never actually had: a write happened.
+ *
+ * Debounced, because a five-second entry is several writes and the ledger is
+ * not in a hurry. This is what lets the idle floor be a quarter of an hour
+ * without anything waiting a quarter of an hour — the moment something is
+ * genuinely queued, the cycle is ten seconds away.
+ */
+export function syncAfterWrite(): void {
+	if (!settings || running) return;
+	schedule(0, AFTER_WRITE_DEBOUNCE_MS);
 }
 
 /** Wire the browser events. Returns the teardown. */

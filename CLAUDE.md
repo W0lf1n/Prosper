@@ -2,13 +2,13 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-08-27 · schema v6 · 333 web tests · 32 API tests
+**Last revised:** 2026-08-27 · schema v6 · 341 web tests · 32 API tests
 
 ---
 
 ## What this is
 
-**Výdaje** — an offline-first personal finance PWA in Czech, built so that
+**Prosper** — an offline-first personal finance PWA in Czech, built so that
 recording a transaction takes under five seconds, one hand, no network. One
 user, one device, no backend.
 
@@ -85,6 +85,8 @@ apps/web/src/
 ├─ lib/db/         Dexie schema + migrations, and repo.ts — the only writer.
 ├─ lib/ui/         Hand-rolled components. No component library.
 ├─ lib/styles/     tokens.css (the only place colours exist), app.css, fonts.
+│                  app.css also owns the shared primitives: slab, card, meter,
+│                  btn, field. One definition each, no per-route copies.
 ├─ routes/         / · /tape · /mesic · /cil · /jmeni · /settings
 └─ service-worker.ts
 ```
@@ -92,6 +94,11 @@ apps/web/src/
 `apps/api/` is the sync server (ASP.NET Core 9 + EF Core + Postgres 16) and
 `packages/contracts/` is the protocol both sides share. Each has its own README.
 `apps/web/src/lib/sync/` is the client half.
+
+`deploy/` is the VPS: `docker-compose.yml` for all three containers, both nginx
+configs, and `backup.sh`. The web image is `apps/web/Dockerfile` and builds from
+the **repository root**, because the client imports a sibling workspace package.
+The runbook is `docs/DEPLOYMENT.md`.
 
 ### The domain layer
 
@@ -136,8 +143,15 @@ Violations are bugs regardless of test status. The long version is
    there, with tests, before it belongs on a screen.
 7. **No check may block a save.** Checks advise, offer a one-tap fix, and get out
    of the way. The one exception in the whole app is the goal form.
-8. **No component library.** Hand-rolled against the token set.
-9. **Colours only from `tokens.css`.** No literal hex in a component.
+8. **No component library.** Hand-rolled against the token set. `.slab`,
+   `.card`, `.meter` and the `.btn` / `.field` families live once, in
+   `app.css`. A screen that needs a variant declares only the difference — a
+   scoped rule outranks the global one, so it never restates the recipe.
+9. **Colours only from `tokens.css`**, and the weight ladder is **400 / 600 /
+   700 — 500 does not exist in this app.** Two greps must return nothing: a
+   literal hex outside `tokens.css`, and `font-weight: 500`. The one colour
+   written twice anywhere is the ground, in `app.html`'s `theme-color` and in
+   the manifest, neither of which can take a custom property.
 10. **No `localStorage` for domain data.** IndexedDB only. `localStorage` holds
     the theme preference and nothing else.
 11. **Czech dates and money through `Intl`**, never hand-rolled. Czech plurals
@@ -148,6 +162,14 @@ Violations are bugs regardless of test status. The long version is
     to an existing one — a released version is already on the phone.
 14. **Update `docs/DECISIONS.md`** whenever a question gets answered or an
     assumption turns out wrong.
+15. **Elevation is luminance; recession is a pocket.** A card is raised because
+    it is lighter than the ground, not because it throws a shadow — real shadow
+    survives only under `Sheet` and `Toaster`, which genuinely float over
+    content. Inside a card, recessed is `--ground-2` and raised is `--raised`;
+    there are no `inset` shadows in the app. Buttons press with `scale(0.95)`,
+    full-bleed rows press by background luminance, and `--radius-full` on a
+    button means "this is the action" and is reserved for it. The long version
+    is `docs/DECISIONS.md` under the second edition.
 
 ---
 
@@ -198,6 +220,7 @@ exactly that reason. `ssr = false`, `prerender = true` in `routes/+layout.ts`.
 | `docs/TRIMMING-AND-TRAINING.md` | Laws 3 and 4 — design for what is not built yet                |
 | `docs/INVESTMENTS.md`           | `/jmeni` — what shipped, and items 5–8 which did not           |
 | `docs/RECURRING.md`             | Declared recurring payments — shipped                          |
+| `docs/DEPLOYMENT.md`            | The VPS runbook — Docker, nginx, the certificate, the backups  |
 
 `Výdaje 2026.xlsx` — eight months, 547 rows — is the source for the category set
 and every rule in `checks.ts`. The analysis is in `DECISIONS.md` under "The
@@ -221,3 +244,9 @@ answer.
 
 **The UI is Czech. Code, identifiers, comments, commit messages and docs are
 English.** No exceptions in either direction.
+
+**The app is called Prosper.** It was `Výdaje` until 2026-08-27. The Czech word
+_výdaje_ still appears throughout the UI and stays there — it means "expenses"
+and it is the common noun, not the title. `Výdaje 2026.xlsx` is a real file and
+keeps its name. When renaming anything, that is the distinction: the product
+name changed, the vocabulary did not.

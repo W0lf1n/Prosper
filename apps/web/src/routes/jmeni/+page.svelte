@@ -143,7 +143,7 @@
 </script>
 
 <svelte:head>
-	<title>Výdaje — jmění</title>
+	<title>Prosper — jmění</title>
 </svelte:head>
 
 <AppBar title="Jmění">

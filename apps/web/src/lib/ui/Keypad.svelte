@@ -95,14 +95,22 @@
 		}
 	}
 
+	/* Gutters close further; the keys themselves stay at 44. */
+	@media (max-height: 480px) {
+		.keypad {
+			gap: 2px;
+		}
+	}
+
 	/**
 	 * A key is a physical object: a slab raised out of the pad by one step of
-	 * luminance, lit along its top edge, with a contact shadow underneath.
+	 * luminance. It is lighter than the pad, and that is the whole elevation —
+	 * no contact shadow underneath it.
 	 *
-	 * Pressing it moves it. The face travels a pixel, the top highlight goes
-	 * out, the shadow collapses to nothing and the surface darkens — the four
-	 * things that happen when you push a real key into its housing. Ninety
-	 * milliseconds, because a key that takes longer than that feels broken.
+	 * Pressing it does two things and no more: the surface darkens one step and
+	 * the key scales to 0.95, which is the press contract every button in the
+	 * app shares. Ninety milliseconds, because a key that takes longer than that
+	 * feels broken.
 	 */
 	.key {
 		display: grid;
@@ -122,12 +130,9 @@
 		background: var(--surface-2);
 		color: var(--ink);
 		user-select: none;
-		box-shadow:
-			var(--edge),
-			0 1px 2px rgb(0 0 0 / 12%);
+		box-shadow: var(--edge);
 		transition:
 			background var(--dur-press) var(--ease-out),
-			box-shadow var(--dur-press) var(--ease-out),
 			transform var(--dur-press) var(--ease-out);
 	}
 
@@ -139,17 +144,13 @@
 		font-weight: 400;
 		line-height: 1;
 		letter-spacing: 0;
-		transition: transform var(--dur-press) var(--ease-out);
 	}
 
+	/* One press, one property. The key scales; the glyph inside it no longer
+	   scales separately, which was two presses fighting over 90 ms. */
 	.key:active {
 		background: var(--surface-3);
-		box-shadow: inset 0 1px 3px rgb(0 0 0 / 22%);
-		transform: translateY(1px);
-	}
-
-	.key:active .key__face {
-		transform: scale(0.94);
+		transform: scale(0.95);
 	}
 
 	/* Auxiliary keys keep the target and the geometry, and give up the material:
@@ -162,7 +163,6 @@
 
 	.key--aux:active {
 		background: var(--surface-2);
-		box-shadow: inset 0 1px 3px rgb(0 0 0 / 18%);
 	}
 
 	@media (hover: hover) {

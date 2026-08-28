@@ -72,11 +72,25 @@ public sealed class DeviceAuth(AppDbContext db)
         var token = authorization["Bearer ".Length..].Trim();
         if (token.Length == 0) return null;
 
-        var device = await db.Devices.FirstOrDefaultAsync(d => d.TokenHash == Hash(token), ct);
+        var hash = Hash(token);
+        var device = await db.Devices.FirstOrDefaultAsync(d => d.TokenHash == hash, ct);
         if (device is null) return null;
 
-        device.LastSeenAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
+        // `LastSeenAt` is diagnostics, and diagnostics do not get a write per
+        // request. Stamping it on every call turned every read-only pull into
+        // an UPDATE — a WAL record, and eventually autovacuum work, to record a
+        // timestamp to the second that nobody reads to the hour. A quarter of an
+        // hour is as precise as the answer ever needs to be.
+        var now = DateTimeOffset.UtcNow;
+        if (device.LastSeenAt is null || now - device.LastSeenAt.Value > LastSeenPrecision)
+        {
+            device.LastSeenAt = now;
+            await db.SaveChangesAsync(ct);
+        }
+
         return device;
     }
+
+    /// <summary>How stale <see cref="Device.LastSeenAt"/> is allowed to get.</summary>
+    private static readonly TimeSpan LastSeenPrecision = TimeSpan.FromMinutes(15);
 }

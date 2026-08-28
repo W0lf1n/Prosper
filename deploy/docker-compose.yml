@@ -1,0 +1,61 @@
+# The whole deployment: the app, the sync server, and Postgres.
+#
+# Run it from this directory, with a `.env` beside it (see `.env.example`):
+#
+#     docker compose up -d --build
+#
+# **One port reaches the world, and it is bound to loopback.** The host's nginx
+# terminates TLS for the domain and proxies to it; nothing here listens on a
+# public interface, so a misconfigured firewall cannot expose Postgres or an
+# unauthenticated sync endpoint by accident.
+#
+# The full runbook, including the certificate and the backups, is
+# `docs/DEPLOYMENT.md`.
+name: prosper
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: prosper
+      POSTGRES_USER: prosper
+      # No default, on purpose: a default password is one nobody changes.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U prosper']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../apps/api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Postgres: Host=db;Port=5432;Database=prosper;Username=prosper;Password=${POSTGRES_PASSWORD}
+      # The code a device types once, when pairing. No default — an unset code
+      # makes the server refuse to pair rather than accept anything.
+      Pairing__Code: ${PAIRING_CODE:?set PAIRING_CODE in .env}
+    # Deliberately not published. The only way in is through `web`, which is
+    # what makes the client and the API one origin and retires CORS.
+    expose:
+      - '8080'
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '127.0.0.1:${PROSPER_PORT:-8080}:80'
+
+volumes:
+  pgdata:

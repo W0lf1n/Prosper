@@ -175,6 +175,14 @@
 		transition: background var(--dur-fast) var(--ease-out);
 	}
 
+	/* Part of the `/` height ladder: the strip gives up half its bottom margin
+	   on a short screen, the same step the checks strip below it takes. */
+	@media (max-height: 700px) {
+		.due-strip {
+			margin-bottom: var(--space-1);
+		}
+	}
+
 	.due-strip:active {
 		background: color-mix(in srgb, var(--flag) 18%, var(--surface));
 	}

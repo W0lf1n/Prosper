@@ -12,8 +12,8 @@
  * stale copy of a row it is about to overwrite anyway, and spend a round trip
  * doing it.
  *
- * Conflicts never reach here. `mergeDecision` in `@vydaje/contracts` is the
- * rule, it is the same function on both sides, and `applyRemote` uses it for
+ * Conflicts never reach here. `mergeDecision` in `@prosper/contracts` is the
+ * rule, it is the same function on both sides, and `applyRemotePage` uses it for
  * every incoming row.
  */
 
@@ -25,7 +25,7 @@ import {
 	type PushResponse,
 	type SyncRow,
 	type SyncedEntity
-} from '@vydaje/contracts';
+} from '@prosper/contracts';
 
 import { db } from '$lib/db/schema';
 import { adoptRemoteLedger, getDeviceId, getMeta, setMeta } from '$lib/db/repo';
@@ -54,9 +54,29 @@ export async function readSettings(): Promise<SyncSettings | null> {
 	return baseUrl && token ? { baseUrl, token } : null;
 }
 
+/**
+ * Store the pairing, and reset the cursor with it.
+ *
+ * The cursor is a sequence number in **one server's** numbering and means
+ * nothing anywhere else. Carrying it across a re-pair is how a phone asks
+ * `?since=4211` of a database whose highest sequence is 0, receives nothing,
+ * and shows an empty ledger while both sides report success — which is exactly
+ * what the restore in `DEPLOYMENT.md` does to every device.
+ *
+ * So it is cleared whenever the pairing changes identity: unpairing, and
+ * pairing against an address or token that is not the one already stored.
+ */
 export async function writeSettings(settings: SyncSettings | null): Promise<void> {
+	const current = await readSettings();
+	const sameServer =
+		settings !== null &&
+		current !== null &&
+		current.baseUrl === settings.baseUrl &&
+		current.token === settings.token;
+
 	await setMeta(META_BASE_URL, settings?.baseUrl ?? null);
 	await setMeta(META_TOKEN, settings?.token ?? null);
+	if (!sameServer) await setMeta(META_CURSOR, 0);
 }
 
 export async function readCursor(): Promise<number> {
@@ -100,13 +120,42 @@ class SyncError extends Error {
 	constructor(
 		message: string,
 		readonly status: number,
-		/** 4xx is the client's fault and will not fix itself by waiting. */
+		/**
+		 * The row will never be accepted, so retrying it is pointless and
+		 * dropping it is safe. **Malformed only** — see `REJECTING` below.
+		 */
 		readonly permanent: boolean
 	) {
 		super(message);
 		this.name = 'SyncError';
 	}
+
+	/** The queue is fine; this device's credentials are not. */
+	get unauthorized(): boolean {
+		return this.status === 401 || this.status === 403;
+	}
 }
+
+/**
+ * The statuses that mean "this row is wrong", as opposed to "you are not
+ * allowed" or "the server is unwell".
+ *
+ * The distinction is the difference between dropping a mutation and keeping
+ * it. A 401 after a token is revoked, or after the server database is restored
+ * from `backup.sh`, says nothing at all about the rows in the outbox — they are
+ * the only copy of work the user has done, and draining the queue over an
+ * authentication problem loses it silently.
+ */
+const REJECTING = new Set([400, 409, 413, 422]);
+
+/**
+ * A cycle is never in a hurry, but it must not hang.
+ *
+ * A `fetch` to a host that accepts the connection and then drops the packets
+ * never settles on its own, and a pinned promise here means `running` stays
+ * true and no further cycle is ever scheduled.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 async function request<T>(
 	settings: SyncSettings,
@@ -116,6 +165,7 @@ async function request<T>(
 	let response: Response;
 	try {
 		response = await fetch(`${settings.baseUrl.replace(/\/+$/, '')}${path}`, {
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 			...init,
 			headers: {
 				'content-type': 'application/json',
@@ -133,7 +183,7 @@ async function request<T>(
 		throw new SyncError(
 			body || response.statusText,
 			response.status,
-			response.status >= 400 && response.status < 500
+			REJECTING.has(response.status)
 		);
 	}
 
@@ -195,7 +245,16 @@ export async function pushOnce(settings: SyncSettings): Promise<PushOutcome> {
 		} catch (error) {
 			// The batch stays queued. Attempts are counted so a row the server
 			// will never accept cannot block the ones behind it forever.
+			//
+			// **An authentication failure never counts.** A revoked token or a
+			// restored server database says nothing about these rows, and the
+			// outbox is the only copy of the work in it: counting 401s toward
+			// MAX_ATTEMPTS empties the queue about a minute after a token stops
+			// working, and the user is never told what they lost. It is surfaced
+			// as an error and left alone until somebody re-pairs.
 			const message = error instanceof Error ? error.message : 'Neznámá chyba';
+			if (error instanceof SyncError && error.unauthorized) throw error;
+
 			const permanent = error instanceof SyncError && error.permanent;
 			await database.transaction('rw', database.outbox, async () => {
 				for (const entry of batch) {
@@ -251,41 +310,96 @@ export interface PullOutcome {
 }
 
 /**
- * Write one incoming row into its table, under the merge rule.
+ * Write one page of incoming rows into their tables, under the merge rule.
  *
  * The rows that arrive here were authored on another device, so they do **not**
  * go through `repo.ts` — that would re-stamp `updatedAt` with this device's
  * clock and enqueue them straight back out, which is a sync loop with extra
  * steps. This is the one place outside `repo.ts` that writes, and it writes
  * only what the server sent.
+ *
+ * A **page** rather than a row, because a page is what IndexedDB is good at.
+ * Row at a time meant two implicit transactions per row, each with its own
+ * commit — five hundred rows was a thousand transactions on the main thread,
+ * and a first pull after pairing is several thousand rows. Now it is one
+ * `bulkGet`, the merge decided in memory, and one `bulkPut` per table, inside a
+ * single transaction: the same decision for every row, one commit for the page.
  */
-async function applyRemote(row: SyncRow): Promise<boolean> {
+async function applyRemotePage(rows: SyncRow[]): Promise<number> {
+	if (rows.length === 0) return 0;
+
 	const database = db();
-	const table = database.table(TABLES[row.entity]);
-	if (!table) return false;
 
-	if (isDayMark(row.entity)) {
-		const payload = row.payload as { date?: string; updatedAt?: string } | null;
-		if (!payload?.date) return false;
-		const existing = await table.get(payload.date);
-		if (existing && String(existing.updatedAt) >= String(payload.updatedAt ?? '')) return false;
-		await table.put(payload);
-		return true;
+	// Grouped by table, because `bulkGet`/`bulkPut` are per table and the merge
+	// needs the existing row that shares the incoming one's key.
+	const byTable = new Map<string, SyncRow[]>();
+	for (const row of rows) {
+		const name = TABLES[row.entity];
+		if (!name) continue;
+		const group = byTable.get(name);
+		if (group) group.push(row);
+		else byTable.set(name, [row]);
 	}
+	if (byTable.size === 0) return 0;
 
-	const existing = (await table.get(row.id)) as
-		{ updatedAt: string; deviceId: string; isDeleted: boolean } | undefined;
+	let applied = 0;
 
-	if (mergeDecision(row, existing ?? null) === 'superseded') return false;
+	await database.transaction('rw', [...byTable.keys()], async () => {
+		for (const [name, group] of byTable) {
+			const table = database.table(name);
 
-	// A delete is never undone by a merge (§6.1). The winner decides every other
-	// field; `isDeleted` is the one field where either side saying "gone" wins.
-	const payload = row.payload as Record<string, unknown>;
-	await table.put({
-		...payload,
-		isDeleted: row.isDeleted || (existing?.isDeleted ?? false)
+			// `dayMark` is keyed by its date and carries no `id`; every other
+			// entity is keyed by the row id the client generated.
+			const keyOf = (row: SyncRow): string | null =>
+				isDayMark(row.entity) ? ((row.payload as { date?: string } | null)?.date ?? null) : row.id;
+
+			const keyed = group.filter((row) => keyOf(row) !== null);
+			if (keyed.length === 0) continue;
+
+			const existing = await table.bulkGet(keyed.map((row) => keyOf(row)!));
+
+			// The last write for a key wins within the page too, so a key that
+			// appears twice is merged against the winner rather than both copies
+			// racing into the same `bulkPut`.
+			const winners = new Map<string, unknown>();
+			const merged = new Map<string, { updatedAt: string; deviceId: string; isDeleted: boolean }>();
+
+			for (let i = 0; i < keyed.length; i += 1) {
+				const row = keyed[i]!;
+				const key = keyOf(row)!;
+				const before = (merged.get(key) ?? existing[i]) as
+					{ updatedAt: string; deviceId: string; isDeleted: boolean } | undefined;
+
+				if (isDayMark(row.entity)) {
+					const payload = row.payload as { date?: string; updatedAt?: string };
+					if (before && String(before.updatedAt) >= String(payload.updatedAt ?? '')) continue;
+					winners.set(key, payload);
+					merged.set(key, {
+						updatedAt: String(payload.updatedAt ?? ''),
+						deviceId: '',
+						isDeleted: false
+					});
+					applied += 1;
+					continue;
+				}
+
+				if (mergeDecision(row, before ?? null) === 'superseded') continue;
+
+				// A delete is never undone by a merge (§6.1). The winner decides
+				// every other field; `isDeleted` is the one field where either side
+				// saying "gone" wins.
+				const isDeleted = row.isDeleted || (before?.isDeleted ?? false);
+				const payload = row.payload as Record<string, unknown>;
+				winners.set(key, { ...payload, isDeleted });
+				merged.set(key, { updatedAt: row.updatedAt, deviceId: row.deviceId, isDeleted });
+				applied += 1;
+			}
+
+			if (winners.size > 0) await table.bulkPut([...winners.values()]);
+		}
 	});
-	return true;
+
+	return applied;
 }
 
 export async function pullOnce(settings: SyncSettings): Promise<PullOutcome> {
@@ -297,10 +411,8 @@ export async function pullOnce(settings: SyncSettings): Promise<PullOutcome> {
 			`/api/v1/sync/pull?since=${outcome.cursor}&limit=${PULL_PAGE_SIZE}`
 		);
 
-		for (const row of response.changes) {
-			outcome.received += 1;
-			if (await applyRemote(row)) outcome.applied += 1;
-		}
+		outcome.received += response.changes.length;
+		outcome.applied += await applyRemotePage(response.changes);
 
 		outcome.cursor = response.cursor;
 		// The cursor is persisted per page, not per cycle: a connection that dies

@@ -380,7 +380,7 @@
 <svelte:window onkeydown={onKeydown} />
 
 <svelte:head>
-	<title>Výdaje</title>
+	<title>Prosper</title>
 </svelte:head>
 
 <main class="entry">
@@ -925,9 +925,7 @@
 		border-radius: var(--radius-full);
 		background: var(--danger-wash);
 		color: var(--danger);
-		box-shadow:
-			var(--edge-strong),
-			0 2px 12px var(--danger-edge);
+		box-shadow: var(--edge-strong);
 		transition:
 			background var(--dur-base) var(--ease-out),
 			border-color var(--dur-base) var(--ease-out),
@@ -961,9 +959,7 @@
 		background: var(--in-wash);
 		border-color: var(--signal);
 		color: var(--in);
-		box-shadow:
-			var(--edge-strong),
-			0 2px 12px var(--signal-edge);
+		box-shadow: var(--edge-strong);
 	}
 
 	/* Hover deepens the wash it already has. Neither state falls back to grey:
@@ -1047,7 +1043,6 @@
 		border: 1px solid var(--hairline);
 		border-radius: var(--radius-md);
 		background: var(--surface-2);
-		box-shadow: inset 0 1px 2px rgb(0 0 0 / 16%);
 		transition:
 			border-color var(--dur-fast) var(--ease-out),
 			box-shadow var(--dur-fast) var(--ease-out);
@@ -1057,9 +1052,7 @@
 	   two halves stay one object even while you are typing into one of them. */
 	.meta:focus-within {
 		border-color: var(--signal);
-		box-shadow:
-			inset 0 1px 2px rgb(0 0 0 / 16%),
-			0 0 0 3px var(--signal-wash);
+		box-shadow: 0 0 0 3px var(--signal-wash);
 	}
 
 	.meta__date {
@@ -1074,9 +1067,9 @@
 		background: var(--raised);
 		color: var(--ink-2);
 		font-size: var(--text-md);
-		font-weight: 500;
+		font-weight: 600;
 		white-space: nowrap;
-		box-shadow: var(--edge), var(--elev-1);
+		box-shadow: var(--edge);
 		transition:
 			background var(--dur-fast) var(--ease-out),
 			color var(--dur-fast) var(--ease-out),
@@ -1203,7 +1196,7 @@
 		border-radius: var(--radius-sm);
 		color: var(--ink-3);
 		font-size: var(--text-sm);
-		font-weight: 500;
+		font-weight: 400;
 		text-align: left;
 		transition:
 			background var(--dur-fast) var(--ease-out),
@@ -1246,8 +1239,10 @@
 		width: 34px;
 		height: 20px;
 		border-radius: var(--radius-full);
+		/* The pocket law is for a well *inside a card*. This panel has no card
+		   under it — it sits on the page ground — so the track is raised out of
+		   the ground rather than sunk into it, or it disappears on true black. */
 		background: var(--surface-3);
-		box-shadow: inset 0 1px 2px rgb(0 0 0 / 26%);
 		transition: background var(--dur-base) var(--ease-out);
 	}
 
@@ -1266,7 +1261,6 @@
 
 	.prop--on .prop__track {
 		background: var(--signal);
-		box-shadow: inset 0 1px 2px rgb(0 0 0 / 18%);
 	}
 
 	.prop--on .prop__knob {
@@ -1304,8 +1298,8 @@
 	}
 
 	/* ── the pad ─────────────────────────────────────────────────────────
-	   Keypad and primary action are one object, floating clear of the edges
-	   with the deepest shadow in the app under it. It is the thing you touch. */
+	   Keypad and primary action are one object, standing clear of the edges and
+	   raised by luminance alone. It is the thing you touch. */
 
 	.pad {
 		/* Never shrinks and never scrolls. It is the floor of the screen: the
@@ -1316,35 +1310,28 @@
 		background: var(--surface);
 		border: 1px solid var(--hairline);
 		border-radius: var(--radius-xl);
-		box-shadow: var(--edge), var(--elev-3);
+		box-shadow: var(--edge);
 	}
 
 	.save {
 		width: 100%;
 		min-height: var(--touch-lg);
 		margin-top: var(--space-3);
-		border-radius: var(--radius-md);
+		/* The pill is reserved for the primary action, and this is it. */
+		border-radius: var(--radius-full);
 		background: var(--signal);
 		color: var(--signal-ink);
 		font-size: var(--text-lg);
 		font-weight: 600;
 		letter-spacing: 0.005em;
-		box-shadow:
-			inset 0 1px 0 rgb(255 255 255 / 24%),
-			0 1px 2px rgb(0 0 0 / 16%),
-			0 8px 22px var(--signal-edge);
 		transition:
 			background var(--dur-base) var(--ease-out),
 			color var(--dur-base) var(--ease-out),
-			box-shadow var(--dur-press) var(--ease-out),
 			transform var(--dur-press) var(--ease-out);
 	}
 
 	.save:active {
-		transform: scale(0.985) translateY(1px);
-		box-shadow:
-			inset 0 1px 3px rgb(0 0 0 / 22%),
-			0 1px 2px rgb(0 0 0 / 10%);
+		transform: scale(0.95);
 	}
 
 	/* Refusing is a state, not an absence: it keeps the shape and drops the
@@ -1352,7 +1339,6 @@
 	.save:disabled {
 		background: var(--surface-2);
 		color: var(--ink-3);
-		box-shadow: none;
 		cursor: default;
 		transform: none;
 	}
@@ -1367,7 +1353,7 @@
 		border: 1px solid var(--hairline);
 		border-radius: var(--radius-md);
 		background: var(--surface);
-		box-shadow: var(--edge), var(--elev-1);
+		box-shadow: var(--edge);
 		transition:
 			background var(--dur-base) var(--ease-out),
 			border-color var(--dur-base) var(--ease-out);
@@ -1492,7 +1478,7 @@
 
 	.checks__row-title {
 		font-size: var(--text-md);
-		font-weight: 500;
+		font-weight: 600;
 	}
 
 	.checks__detail {
@@ -1581,6 +1567,7 @@
 		   their rhythm here; they only tighten a step further down. */
 		.context {
 			padding-top: var(--space-1);
+			padding-bottom: var(--space-2);
 		}
 
 		.display {
@@ -1644,7 +1631,8 @@
 		 * shrinking.
 		 */
 		.context {
-			padding-block: 2px var(--space-2);
+			gap: var(--space-2);
+			padding-block: 2px var(--space-1);
 		}
 
 		/* Last of the air: the slab closes around the keys and the button comes
@@ -1655,7 +1643,11 @@
 
 		.save {
 			min-height: var(--touch);
-			margin-top: var(--space-2);
+			margin-top: var(--space-1);
+		}
+
+		.checks {
+			margin-bottom: var(--space-1);
 		}
 	}
 
@@ -1676,6 +1668,34 @@
 	@media (max-height: 480px) {
 		.totals-slot {
 			order: 1;
+		}
+
+		/* The due strip is ledger business, same as the totals — it joins them
+		   below the fold. One swipe away, same reading order in the DOM. */
+		.flow > :global(.due-strip) {
+			order: 1;
+		}
+
+		.display {
+			padding-block: 0;
+		}
+
+		/* Rare props drawn at --control, hit at 44 via the ::after every other
+		   small control in the app already uses. */
+		.extras {
+			padding-top: var(--space-1);
+		}
+
+		.prop {
+			min-height: var(--control);
+		}
+
+		.prop::after {
+			inset: -10px 0;
+		}
+
+		.pad {
+			padding: var(--space-1);
 		}
 	}
 

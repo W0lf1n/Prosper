@@ -69,12 +69,32 @@ Two things worth knowing:
   internally. That is a language primitive, not a decimal library, and it never
   escapes the function.
 
-### Q0 — Name · answered 2026-08-23
+### Q0 — Name · answered 2026-08-23, **renamed 2026-08-27**
 
-**Výdaje.** Carries the spreadsheet's own name, so the habit transfers with it.
-Set in `static/manifest.webmanifest`, `src/app.html`, the page titles and the
-service-worker cache key. The repository is `Prosper`, which is the book's word
-rather than the spreadsheet's — see Q18.
+**Prosper.** It was `Výdaje` for the first four days, on the reasoning that
+carrying the spreadsheet's own name carried the habit with it. That reasoning
+held while the app only recorded expenses. It stopped holding once goals,
+investments, the 10/10/10/70 split and the record of months shipped: a ledger
+named after outflow describes a quarter of what is on screen, and three of the
+four laws are not about spending at all.
+
+`Prosper` is the book's word, it was already the repository name, and it removes
+the split identity between the two.
+
+Set in `static/manifest.webmanifest`, `src/app.html`, the six page titles, the
+service-worker cache key, the export filenames and the `@prosper/contracts`
+package. **Two things were deliberately not renamed:**
+
+- **The IndexedDB database is still `finance`.** Renaming it does not migrate
+  anything — it opens a second, empty database and leaves the ledger stranded in
+  the first, which is the one failure this project cannot recover from. The name
+  is internal and nobody ever sees it.
+- **`Výdaje 2026.xlsx`** is a real file on Petr's disk and the source for every
+  check. It keeps its name.
+
+The Czech word _výdaje_ stays everywhere it means "expenses" rather than the
+app — the toggle on the entry screen, the empty state on `/mesic`, the workbook
+column header. It is the common noun, not the title.
 
 ### Q7 — Excel history import · answered 2026-08-23
 
@@ -168,10 +188,19 @@ One seeded account, `Běžný účet`, renameable in Settings. `Account` and the
 transfer model exist for more; nothing has needed them. Revisit before P2 —
 transfers only become a core flow when there is a second account.
 
-### Q0 — Domain · still unpicked
+### Q0 — Domain · still unpicked, and now it blocks something
 
-The name is settled (**Výdaje**). The domain is not, and blocks nothing until
-P2 needs a JWT audience. `vydaje.petrbohac.eu` fits.
+The name is settled (**Prosper**). The domain is not — and as of 2026-08-27 it
+is no longer free to leave open. `DEPLOYMENT.md` needs one for three things at
+once: the TLS certificate, the origin the PWA installs from, and the sync
+address a device types when pairing. All three are the same host, because the
+client is served from the API's own origin.
+
+`prosper.petrbohac.eu` fits and `prosper.example.com` is what the runbook uses
+as its placeholder. Nothing in the repository hard-codes a domain: it is typed
+once, into the host's nginx vhost, by the one `sed` in `DEPLOYMENT.md` step 4.
+The containers never learn it — the client asks the browser what origin it was
+served from.
 
 ---
 
@@ -607,7 +636,7 @@ groceries and saving a settings change no longer look the same.
 
 ---
 
-## Design pass · graphite instrument — replaces the blue
+## Design pass · graphite instrument — replaces the blue · _superseded in part, see the second edition below_
 
 The quiet blue was replaced wholesale. The reference is no longer a homepage; it
 is a **machined instrument**: a graphite ground, surfaces raised by _luminance_
@@ -769,3 +798,233 @@ you spent nothing in, it is a month that does not exist. This is the same
 distinction the tape already makes between a gap day and an explicit `DayMark`,
 one level up. A genuine zero month _inside_ the ledger still counts — spending
 nothing on JÍDLO in June is a fact.
+
+---
+
+## Deployment · 2026-08-27
+
+### Q44 — nginx, not Caddy · applied 2026-08-27
+
+**`PROJECT-PLAN.md` §5 drew Caddy in front of the API.** It is now nginx, twice:
+once inside the `web` container and once on the host.
+
+Caddy's argument was automatic TLS in one line. That argument is worth less than
+it looks on a box that already runs nginx for other things — which this one
+does — because the cost of Caddy is then a second web server, a second config
+language and a second place a redirect can be written. certbot's nginx plugin
+edits a vhost in place and installs its own renewal timer; it is three commands
+once and nothing afterwards.
+
+Nothing about the app depends on the choice. The host's reverse proxy is four
+lines of `proxy_pass` and knows nothing about Prosper.
+
+### Q45 — The client is served by its own container, from the API's origin · applied 2026-08-27
+
+**§4 said "same origin as the API from P2" and nothing implemented it.** The
+client was a `build/` directory somebody was going to put somewhere.
+
+**Applied:** `apps/web/Dockerfile` — a pnpm build, then nginx with the static
+output and one `location /api/` proxying to the API container. The API's port is
+no longer published at all; the only way to reach it is through that location.
+
+**What it buys is not tidiness, it is three specific things:**
+
+1. **CORS is retired.** `Cors:Origins` stays unset in production. It exists so
+   the Vite dev server on another port can be developed against, and a sync
+   endpoint any page can call is a sync endpoint any page can drain.
+2. **The pairing address is prefilled.** Settings offers `location.origin`,
+   which is correct every time in this deployment, and the alternative was
+   typing a domain on a phone keyboard.
+3. **One published port**, bound to `127.0.0.1`. Postgres and the API are not
+   on a public interface, so a firewall rule that is missing cannot expose them.
+
+**Alternative rejected:** serving the static build from the host's nginx
+directly and proxying only `/api/`. Fewer containers, and it puts a build
+artefact on the host that has to be copied there and kept in step by hand. The
+whole point of the image is that `docker compose up -d --build` is the only
+thing anybody has to remember.
+
+### The nginx trap that cost this its first 502 · recorded before it happened
+
+**nginx resolves a literal hostname in `proxy_pass` once, when it loads its
+config, and holds that address until it is reloaded.** `proxy_pass
+http://api:8080` therefore works perfectly until the API container is rebuilt
+with a new IP — after which every sync cycle 502s, `docker compose ps` says all
+three containers are healthy, and the API's own logs are silent because nothing
+is reaching it.
+
+`app.conf` goes through a variable and Docker's embedded resolver
+(`127.0.0.11`), which forces a lookup per request. `$request_uri` is then
+mandatory: a `proxy_pass` with a variable in it passes no URI of its own.
+
+This is recorded because the symptom points everywhere except at the cause.
+
+### Brotli twins are built and not served · accepted 2026-08-27
+
+`precompress: true` emits `.br` and `.gz` beside every asset. Stock nginx has no
+brotli module, so the container serves the `.gz` with `gzip_static` and the
+`.br` files sit in the image unused.
+
+The budget is measured in brotli and the entry route is 84.2 kB of it. Gzip
+costs perhaps a fifth more on the wire, once, on a cold load of an app that then
+runs from a service worker cache. Maintaining a custom nginx build to recover
+that would be a dependency (rule 12) with a compile step attached, for bytes
+nobody waits on twice.
+
+### `add_header` does not merge down · recorded 2026-08-27
+
+A `location` block that declares any `add_header` of its own **replaces** every
+one inherited from the server block rather than adding to it. The two locations
+that set a long `Cache-Control` would have silently dropped the three security
+headers — and a missing security header looks exactly like a present one.
+
+`deploy/nginx/headers.conf` is included in every block that sets a header of its
+own. It is the fix that stays fixed when somebody adds a fourth location.
+
+### The sync database has no migrations, and creates itself · recorded 2026-08-27
+
+Asked directly — "what is needed to create the sync database on the server" —
+the answer turned out to be "nothing", and that was not written down anywhere.
+
+`Program.cs` calls `EnsureCreatedAsync()` on startup behind
+`Database:MigrateOnStart` (default true). There is no `Migrations/` folder in
+the repository and no `dotnet ef database update` step in any runbook, on a
+server or a laptop. Postgres creates the role and the database from the compose
+environment on the first start of an empty `pgdata` volume; the API then finds
+no tables and creates `changes`, `devices` and `sync_state`.
+
+**The latent trap: `EnsureCreated` creates a schema and never alters one.** A
+new column on the server model would leave an existing database silently on the
+old schema, failing on the first query that names it — with no migration error,
+because nothing attempted a migration.
+
+It is still the right call today, and the reason is the same one that makes the
+server simple: it stores the client's row as JSON and reasons about four fields,
+so a **client** schema change is not a server concern at all. The server model
+has not moved since it was written. If it ever does, that is the moment to add
+EF migrations and switch to `MigrateAsync()` — a migration history for a schema
+that has never changed is ceremony.
+
+Written up in `docs/DEPLOYMENT.md` § The sync database, with the schema, the
+inspection commands, the reset and the restore.
+
+### Table names are lowercase, column names are not · recorded 2026-08-27
+
+`AppDbContext` sets table names explicitly with `ToTable("changes")`, so those
+are lowercase. It does not set column names, so EF takes them from the property
+names and they are PascalCase: `"Entity"`, `"EntityId"`, `"UpdatedAt"`,
+`"DeviceId"`, `"IsDeleted"`, `"Payload"`, `"Seq"`.
+
+Postgres folds an unquoted identifier to lowercase, so the obvious query fails:
+
+```sql
+select entity, count(*) from changes group by entity;   -- column "entity" does not exist
+```
+
+The error names a column that is visibly right there in `\d changes`, which is
+what makes it cost more time than it should. Quote them.
+
+This is recorded rather than fixed. Renaming the columns to snake_case would be
+a schema change, and a schema change is exactly what this deployment has no
+migration path for — so the cost of tidiness here is the one operation the
+database cannot currently do.
+
+## Design pass · graphite instrument, second edition · 2026-08-27
+
+Same instrument, calmer machining. Delivered as a handoff bundle
+(`docs/design_handoff_prosper_visual_refresh/`) of a wholesale `tokens.css`
+replacement plus four patch files. Flow, routing, component structure, state and
+logic were not touched: every change is a token value or a rule inside an
+existing `<style>` block.
+
+**Every token name is frozen; only values moved.** That is what made the pass
+safe to apply at all — roughly 11 000 lines of CSS reference these names, so a
+rename would have been a rewrite. `--elev-1` was retired to a valid no-op
+(`0 0 0 0 rgb(0 0 0 / 0%)`) rather than deleted, so the existing
+`var(--edge), var(--elev-1)` comma lists kept parsing while the rules that used
+them were simplified one at a time.
+
+### The four laws of the refresh
+
+**1. Elevation is luminance, not shadow.** A card is raised because it is
+lighter than the ground. Real shadow survives only where a layer genuinely
+floats over content: `Sheet` (`--elev-sheet`), `Toaster` (`--elev-3`), and the
+≥35rem centred sheet. The keypad shell, the tab bar, every card and every key
+gave theirs up.
+
+**2. Recession is a pocket.** No `inset` shadows anywhere in the app. Inside a
+card, recessed is `--ground-2` and raised is `--raised`, and it steps the right
+way in both themes — dark `#0c0c0e → #2a2a2c`, light `#e8e8ec → #ffffff`.
+
+The pocket is explicitly a law about the inside of a card. `.prop__track` on `/`
+was left at `--surface-3` for exactly that reason: the context panel has no card
+under it, it sits on the page ground, and on a true-black ground a `--ground-2`
+toggle track is invisible. A well needs something above it to be sunk into.
+
+**3. One press, one number.** `transform: scale(0.95)` over `--dur-press`, and
+nothing else moves. The keypad key used to run four properties at once — face
+translate, highlight, shadow collapse, surface darken — which was two presses
+fighting over 90 ms. The exception is a full-bleed list row (`.row`, `.blank`),
+which presses by background luminance: scaling a 100 %-wide row by 5 % shows the
+ground through its own corners.
+
+**4. Pill is reserved for the primary action.** `--radius-full` on a button now
+means "this is the action" and nothing else is allowed to be one. Two buttons of
+equal size are told apart by shape rather than by a second colour — which is why
+`Odložit` is a pill on `/cil` and `Upravit cíl měsíce` beside it stays
+`--radius-md`.
+
+### Signal and inflow became two roles
+
+The graphite pass had one mint doing duty as both the chrome accent and money
+coming in. They are now separate hues: `--signal` is blue and is chrome only
+(links, primary buttons, focus ring, current selection, the record disc),
+`--in` stays mint and is money. Outflow keeps its ruling from the first pass —
+it has no hue, it is the ink — and the ambient pool behind the entry amount
+remains the one deliberate suspension of that rule.
+
+### Instrument Sans was removed, and the budget paid for the pass
+
+The label stack is now `system-ui, -apple-system, BlinkMacSystemFont, …`, which
+resolves to real SF Pro on Apple hardware and costs zero bytes. Nothing
+referenced Instrument Sans afterwards, so both `@font-face` blocks and both
+woff2 files went with it. IBM Plex Mono is now the only face the app ships, and
+it ships for one reason: money.
+
+The service worker needed no edit — it precaches from `$service-worker`'s
+generated `files` list, so deleting from `static/` removes them from the cache
+manifest on its own.
+
+Entry route after the pass: **84.2 kB brotli against the 150 kB budget.**
+
+### `.card` and `.meter` became single definitions · 2026-08-27
+
+Not part of the handoff, done alongside it. `.card` was three byte-identical
+copies in `/mesic`, `/cil` and `/settings` differing only by `gap`, and `.meter`
+was two copies in `/mesic` and `/cil` that had **already drifted** — 6 px versus
+8 px for `--thick`, and different default fills — while both files carried a
+comment calling it "the shared meter".
+
+Both now live once in `app.css`. `.slab` and `.card` share one surface rule,
+since a card is a slab as a padded column. No markup changed: the routes already
+spell the classes this way, and a Svelte scoped rule
+(`.card.svelte-xxx`, specificity 0-2-0) still beats the global one, so a screen
+that wants a tighter gap or a signal fill declares only that difference.
+
+This is the reason it was worth doing during a visual pass rather than after
+one: the drift above is what happens when "the shared meter" lives in two files,
+and the refresh would have had to change the track colour in both.
+
+### Two literals that are not colours
+
+The `grep` that must return nothing — a hex outside `tokens.css` — has one
+honest false positive and it was rewritten rather than exempted.
+`CategoryPicker`'s fade uses a `mask-image` whose stops are read for their alpha
+channel only; `#000` there means "fully opaque", not black. It is now the
+`black` keyword with a comment saying so.
+
+`app.html`'s two `theme-color` meta tags and the manifest's `background_color`
+genuinely cannot take a custom property, so they carry the ground as a literal
+and were retuned by hand to `#F5F5F7` / `#000000`. They are the only place in
+the app where a colour is written twice, and they are the first thing to check
+if the PWA's status bar ever stops matching the page.

@@ -82,9 +82,9 @@
 		padding-bottom: env(safe-area-inset-bottom, 0px);
 		background: var(--surface);
 		border-top: 1px solid var(--hairline);
-		box-shadow:
-			var(--edge),
-			0 -6px 24px rgb(0 0 0 / 10%);
+		/* The bar is furniture, not a floating layer: surface luminance and one
+		   hairline are the whole separation. */
+		box-shadow: var(--edge);
 	}
 
 	.tab {
@@ -123,7 +123,7 @@
 	.tab__label {
 		max-width: 100%;
 		font-size: var(--text-2xs);
-		font-weight: 500;
+		font-weight: 400;
 		letter-spacing: 0.005em;
 		line-height: 1;
 		white-space: nowrap;
@@ -143,8 +143,9 @@
 		font-weight: 600;
 	}
 
+	/* The press contract: scale(0.95), everywhere, one number. */
 	.tab:active .tab__glyph {
-		transform: scale(0.9);
+		transform: scale(0.95);
 	}
 
 	@media (hover: hover) {
@@ -176,29 +177,18 @@
 		border-radius: var(--radius-full);
 		background: var(--signal);
 		color: var(--signal-ink);
-		box-shadow:
-			inset 0 1px 0 rgb(255 255 255 / 28%),
-			0 2px 6px rgb(0 0 0 / 18%),
-			0 8px 20px var(--signal-edge);
-		transition:
-			transform var(--dur-press) var(--ease-out),
-			box-shadow var(--dur-base) var(--ease-out);
+		/* Flat. It is already the only filled shape in the bar and the only
+		   pill-round thing on the screen; a glow on top of that says it twice. */
+		transition: transform var(--dur-press) var(--ease-out);
 	}
 
 	.record:active .record__disc {
-		transform: scale(0.93);
-		box-shadow:
-			inset 0 1px 0 rgb(255 255 255 / 18%),
-			0 1px 3px rgb(0 0 0 / 20%);
+		transform: scale(0.95);
 	}
 
 	@media (hover: hover) {
 		.record:hover .record__disc {
-			transform: translateY(-1px);
-			box-shadow:
-				inset 0 1px 0 rgb(255 255 255 / 32%),
-				0 4px 10px rgb(0 0 0 / 20%),
-				0 12px 28px var(--signal-edge);
+			filter: brightness(1.06);
 		}
 	}
 </style>

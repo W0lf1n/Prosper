@@ -46,7 +46,7 @@
 	const outflowWidth = $derived(Math.round((Math.abs(outflow) / span) * 100));
 </script>
 
-<section class="totals">
+<section class="totals slab">
 	<header class="totals__head">
 		<h2 class="totals__month u-label">{formatMonthHeading(`${month}-01`)}</h2>
 
@@ -111,15 +111,12 @@
 </section>
 
 <style>
+	/* The slab recipe is `.slab` in `app.css`; only the placement is local. */
 	.totals {
 		flex: none;
 		margin: var(--space-3) var(--space-3) 0;
 		margin-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
 		padding: var(--space-3) var(--space-4) var(--space-4);
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--edge), var(--elev-1);
 	}
 
 	.totals__head {
@@ -333,6 +330,10 @@
 
 		.totals__caption {
 			display: none;
+		}
+
+		.totals__rule {
+			margin-top: var(--space-1);
 		}
 	}
 </style>

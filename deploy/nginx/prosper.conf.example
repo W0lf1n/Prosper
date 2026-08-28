@@ -1,0 +1,55 @@
+# The **host's** nginx — the one on the VPS, not the one in the container.
+#
+# Its whole job is: own the domain, terminate TLS, and hand everything to the
+# port compose published on loopback. It knows nothing about the app.
+#
+#     sudo cp prosper.conf.example /etc/nginx/sites-available/prosper.conf
+#     sudo sed -i 's/prosper.example.com/YOUR.DOMAIN/g' /etc/nginx/sites-available/prosper.conf
+#     sudo ln -s /etc/nginx/sites-available/prosper.conf /etc/nginx/sites-enabled/
+#     sudo nginx -t && sudo systemctl reload nginx
+#
+# **This file is HTTP only, and that is the first half of the job.** Run
+#
+#     sudo certbot --nginx -d prosper.example.com
+#
+# next: certbot edits this file in place — adds `listen 443 ssl`, the
+# certificate paths and a permanent redirect from `:80` — and installs the
+# renewal timer. What certbot will not write for you is everything below the
+# `location /`, which is why this file exists at all.
+#
+# Until that certificate is in place the app runs, but **it does not install**:
+# a service worker will not register over plain HTTP, so there is no home-screen
+# icon and no offline. HTTPS is not optional here, it is the feature.
+
+server {
+	listen 80;
+	listen [::]:80;
+	server_name prosper.example.com;
+
+	# One person's ledger. Nothing here is a static asset worth a CDN, and
+	# nothing is large enough for the host to think about.
+	location / {
+		proxy_pass http://127.0.0.1:8080;
+
+		proxy_http_version 1.1;
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+		# The container's nginx passes this straight through to the API, and it
+		# is the only way anything behind here can tell that the request arrived
+		# over TLS. Without it a redirect would be built as `http://`.
+		proxy_set_header X-Forwarded-Proto $scheme;
+
+		# Matches the container. A phone reconnecting after a week offline sends
+		# its whole outbox, and the 1 MB default is a number chosen for forms.
+		client_max_body_size 16m;
+		proxy_read_timeout 120s;
+	}
+
+	# Its own files, so `grep` on this domain does not mean reading every other
+	# site on the box. Logrotate picks these up with everything else in the
+	# directory — no extra configuration.
+	access_log /var/log/nginx/prosper.access.log;
+	error_log /var/log/nginx/prosper.error.log;
+}

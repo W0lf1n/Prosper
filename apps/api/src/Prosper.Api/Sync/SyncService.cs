@@ -9,7 +9,7 @@ namespace Prosper.Api.Sync;
 ///
 /// The rule is last-write-wins on <c>updatedAt</c>, ties broken on
 /// <c>deviceId</c> by ordinal string compare — the same function the client
-/// runs in <c>@vydaje/contracts</c>. It is written twice because the two sides
+/// runs in <c>@prosper/contracts</c>. It is written twice because the two sides
 /// are two languages; it is tested twice for the same reason.
 ///
 /// <c>updatedAt</c> is a client clock and that is accepted, not overlooked: one
@@ -76,24 +76,73 @@ public sealed class SyncService(AppDbContext db)
         // it numbers commit together or not at all.
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var state = await db.SyncState.FirstOrDefaultAsync(ct);
+        // The cursor row, **locked for the rest of the transaction**.
+        //
+        // Reading it without the lock is what made the "this serialises pushes"
+        // claim untrue: under READ COMMITTED two devices both read LastSeq = 100,
+        // both number their rows from 101, and the second one dies on the unique
+        // index over Seq — a 500 for a case the sync server exists to handle.
+        // `FOR UPDATE` makes the second push wait for the first to commit and
+        // then read the number it actually left behind.
+        //
+        // SQLite takes no such lock and needs none: it admits one writer at a
+        // time for the whole database, which is the same guarantee by a blunter
+        // route. The row is read plainly there.
+        var state = db.Database.IsNpgsql()
+            ? await db.SyncState
+                .FromSqlRaw("SELECT * FROM sync_state WHERE \"Id\" = 1 FOR UPDATE")
+                .FirstOrDefaultAsync(ct)
+            : await db.SyncState.FirstOrDefaultAsync(ct);
+
         if (state is null)
         {
             state = new SyncState { Id = 1, LastSeq = 0 };
             db.SyncState.Add(state);
+            // There is nothing to lock until the row exists. Saving it now takes
+            // the row lock for the rest of this transaction, so the very first
+            // two pushes race no differently from every one after them.
+            await db.SaveChangesAsync(ct);
         }
 
-        foreach (var row in changes)
+        // Validated once, up front, and the verdicts kept by position. The size
+        // check materialises the payload's raw text, so asking twice per row —
+        // once to filter and once in the loop — would allocate the whole batch
+        // twice over.
+        var problems = new SyncRejection?[changes.Count];
+        for (var i = 0; i < changes.Count; i++) problems[i] = Validate(changes[i]);
+
+        // Every row the batch might update, in one query rather than one query
+        // per row. A 200-row batch was 200 sequential round trips, all of them
+        // inside this transaction and holding the cursor lock while they ran.
+        // The unique index on (Entity, EntityId) serves this directly.
+        var valid = changes.Where((_, i) => problems[i] is null).ToList();
+        var entities = valid.Select(r => r.Entity).Distinct().ToList();
+        var ids = valid.Select(r => r.Id).Distinct().ToList();
+
+        var existingRows = new Dictionary<(string Entity, string EntityId), ChangeRow>();
+        if (valid.Count > 0)
         {
-            var problem = Validate(row);
-            if (problem is not null)
+            // Over-fetches slightly — the cross product of entities and ids
+            // rather than the exact pairs — but both lists are small, the index
+            // covers the lookup, and the alternative is a query per row.
+            var found = await db.Changes
+                .Where(c => entities.Contains(c.Entity) && ids.Contains(c.EntityId))
+                .ToListAsync(ct);
+
+            foreach (var c in found) existingRows[(c.Entity, c.EntityId)] = c;
+        }
+
+        for (var i = 0; i < changes.Count; i++)
+        {
+            var row = changes[i];
+
+            if (problems[i] is { } problem)
             {
                 rejected.Add(problem);
                 continue;
             }
 
-            var existing = await db.Changes
-                .FirstOrDefaultAsync(c => c.Entity == row.Entity && c.EntityId == row.Id, ct);
+            existingRows.TryGetValue((row.Entity, row.Id), out var existing);
 
             if (!IncomingWins(row, existing))
             {
@@ -105,7 +154,7 @@ public sealed class SyncService(AppDbContext db)
 
             if (existing is null)
             {
-                db.Changes.Add(new ChangeRow
+                var inserted = new ChangeRow
                 {
                     Seq = state.LastSeq,
                     Entity = row.Entity,
@@ -116,7 +165,12 @@ public sealed class SyncService(AppDbContext db)
                     // there is nothing to preserve, so the incoming flag stands.
                     IsDeleted = row.IsDeleted,
                     Payload = row.Payload.GetRawText()
-                });
+                };
+                db.Changes.Add(inserted);
+                // A row edited twice offline is two entries in one batch. The
+                // second must find the first, or both are inserted and the
+                // unique index over (Entity, EntityId) refuses the pair.
+                existingRows[(row.Entity, row.Id)] = inserted;
             }
             else
             {
@@ -158,17 +212,30 @@ public sealed class SyncService(AppDbContext db)
         var hasMore = rows.Count > take;
         if (hasMore) rows.RemoveAt(rows.Count - 1);
 
-        var changes = rows
-            .Select(c => new SyncRow(
-                c.Entity,
-                c.EntityId,
-                c.UpdatedAt,
-                c.DeviceId,
-                c.IsDeleted,
-                JsonDocument.Parse(c.Payload).RootElement.Clone()))
-            .ToList();
+        var changes = rows.Select(ToSyncRow).ToList();
 
         var cursor = rows.Count > 0 ? rows[^1].Seq : since;
         return new PullResponse(changes, cursor, hasMore);
+    }
+
+    /// <summary>
+    /// The stored row, as the wire type.
+    ///
+    /// The <c>using</c> is the whole point. <see cref="JsonDocument"/> rents its
+    /// backing array from a shared pool and returns it on dispose; five hundred
+    /// undisposed documents a page, every page, is a pool that never gets its
+    /// buffers back and allocates fresh ones instead. <c>Clone()</c> copies the
+    /// element out first, so the returned value outlives the document.
+    /// </summary>
+    private static SyncRow ToSyncRow(ChangeRow c)
+    {
+        using var payload = JsonDocument.Parse(c.Payload);
+        return new SyncRow(
+            c.Entity,
+            c.EntityId,
+            c.UpdatedAt,
+            c.DeviceId,
+            c.IsDeleted,
+            payload.RootElement.Clone());
     }
 }

@@ -1,0 +1,20 @@
+# The API image builds from `apps/api`. `bin/` and `obj/` from a local
+# `dotnet build` are the whole problem: they are host artifacts, `dotnet
+# publish` inside the image will not overwrite all of them, and a stale
+# `obj/project.assets.json` makes the restore inside the container resolve
+# against paths that only exist on the machine that built it.
+**/bin
+**/obj
+
+# SQLite lives here when the server is run on a laptop. It is a laptop's
+# database and it must never be baked into a production image.
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets are the host's, not the image's. The compose file that runs this
+# lives in `deploy/` and is not in this context at all.
+.env
+.env.*
+
+README.md

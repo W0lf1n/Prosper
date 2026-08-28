@@ -10,7 +10,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@vydaje/contracts':
+      '@prosper/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       dexie:

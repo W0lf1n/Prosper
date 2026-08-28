@@ -83,7 +83,7 @@
 		flex: 0 1 auto;
 		min-width: 0;
 		font-size: var(--text-sm);
-		font-weight: 500;
+		font-weight: 400;
 		color: var(--ink-2);
 		white-space: nowrap;
 		overflow: hidden;

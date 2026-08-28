@@ -36,6 +36,7 @@ const META_DEVICE_ID = 'deviceId';
 const META_ACTIVE_ACCOUNT = 'activeAccountId';
 const META_LAST_SEEN = 'lastSeenDate';
 const META_SYNC_BASE_URL = 'syncBaseUrl';
+const META_ADOPTED = 'ledgerAdopted';
 
 /**
  * Whether mutations are queued for the server.
@@ -90,6 +91,20 @@ export async function setActiveAccountId(id: string): Promise<void> {
 
 // ── outbox seam ─────────────────────────────────────────────────────────────
 
+/**
+ * Told when something lands in the outbox, so the sync layer can schedule a
+ * cycle — the "after a write, debounced" trigger of §10.7.
+ *
+ * A callback rather than an import, because `repo.ts` importing the sync status
+ * module would close the loop `repo → status → engine → repo`. The sync layer
+ * knows about the database; the database does not know about sync.
+ */
+let outboxListener: (() => void) | null = null;
+
+export function setOutboxListener(listener: (() => void) | null): void {
+	outboxListener = listener;
+}
+
 async function enqueue(entity: SyncedEntity, entityId: string, payload: unknown): Promise<void> {
 	if (syncEnabled === null) await refreshSyncEnabled();
 	if (!syncEnabled) return;
@@ -101,6 +116,7 @@ async function enqueue(entity: SyncedEntity, entityId: string, payload: unknown)
 		attempts: 0,
 		lastError: null
 	});
+	outboxListener?.();
 }
 
 async function stamp(): Promise<{ updatedAt: string; deviceId: string }> {
@@ -980,16 +996,49 @@ export async function seedOutbox(): Promise<number> {
 export async function adoptRemoteLedger(): Promise<string | null> {
 	const database = db();
 
+	/**
+	 * Asked once, then never again.
+	 *
+	 * This runs after **every** pull, and two live accounts is a perfectly
+	 * ordinary steady state — a bank account and cash. Without this flag the
+	 * scans below became the resting cost of being paired: the whole `txns`
+	 * table and the whole `categories` table materialised as objects, on the
+	 * main thread, on every cycle, to re-answer a question settled at pairing.
+	 *
+	 * The flag is set the first time the question gets a real answer — adopted
+	 * or decided against — which is the moment it stops being able to change.
+	 */
+	if (await getMeta<boolean>(META_ADOPTED)) return null;
+
 	const accounts = (await database.accounts.toArray()).filter((a) => !a.isDeleted);
+	// Still the only device there is. The question is not yet answerable, so
+	// the flag stays unset and the next pull asks again — this is two reads.
 	if (accounts.length < 2) return null;
 
 	const deviceId = await getDeviceId();
-	const txns = (await database.txns.toArray()).filter((t) => !t.isDeleted);
-	const used = new Set(txns.map((t) => t.accountId));
+
+	// Which accounts have been written into, asked per account through the
+	// `accountId` index and stopped at the first live row. A soft-deleted
+	// transaction is not evidence of use — same test as before — but this
+	// streams to the first match instead of materialising the whole ledger.
+	const used = new Set<string>();
+	for (const account of accounts) {
+		const first = await database.txns
+			.where('accountId')
+			.equals(account.id)
+			.filter((t) => !t.isDeleted)
+			.first();
+		if (first) used.add(account.id);
+	}
 
 	// Mine, and never written into. Anything else is somebody's real ledger.
 	const redundant = accounts.filter((a) => a.deviceId === deviceId && !used.has(a.id));
-	if (redundant.length === 0 || redundant.length === accounts.length) return null;
+	if (redundant.length === 0 || redundant.length === accounts.length) {
+		// A real second account, or nothing of this device's left to give up.
+		// Either way the answer will not change again.
+		await setMeta(META_ADOPTED, true);
+		return null;
+	}
 
 	// UUIDv7 is time-sortable, so the smallest id is the account that existed
 	// first — the one the other device has been writing into all along.
@@ -1007,15 +1056,23 @@ export async function adoptRemoteLedger(): Promise<string | null> {
 	// The starter categories duplicated too. Drop this device's unused copies of
 	// any bucket name that also arrived from elsewhere; keep anything genuinely
 	// new, and keep anything a transaction already points at.
+	//
+	// This does read the ledger, and it is the one place that has to: "which
+	// buckets has anything ever been filed under" is a question about every
+	// row. It is affordable because it is now reached at most once in a
+	// device's life — the flag at the top of this function is what makes it so.
 	const categories = (await database.categories.toArray()).filter((c) => !c.isDeleted);
-	const referenced = new Set(
-		txns.map((t) => t.categoryId).filter((id): id is string => id !== null)
-	);
+	const referenced = new Set<string>();
+	await database.txns.each((t) => {
+		if (!t.isDeleted && t.categoryId !== null) referenced.add(t.categoryId);
+	});
 
 	const byName = new Map<string, Category[]>();
 	for (const category of categories) {
 		const key = normalize(category.name);
-		byName.set(key, [...(byName.get(key) ?? []), category]);
+		const group = byName.get(key);
+		if (group) group.push(category);
+		else byName.set(key, [category]);
 	}
 
 	for (const group of byName.values()) {
@@ -1033,6 +1090,8 @@ export async function adoptRemoteLedger(): Promise<string | null> {
 	}
 
 	await setActiveAccountId(keep.id);
+	// Adopted. There is nothing left to decide, so no later pull re-asks.
+	await setMeta(META_ADOPTED, true);
 	return keep.id;
 }
 
@@ -1126,7 +1185,15 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 
 	const database = db();
 
-	// Ten tables: past five, Dexie wants the array form rather than varargs.
+	// Resolved **before** the transaction: `enqueue` reads `meta` on its first
+	// call, and `meta` is not one of the tables below. Asking now means the
+	// answer is cached by the time a row is written inside.
+	await refreshSyncEnabled();
+
+	// Ten tables, plus the outbox — a restore is a mutation like any other
+	// (rule 4) and everything it writes has to be able to leave the device.
+	// Same transaction, so the rows and the queue entries for them commit
+	// together or not at all.
 	await database.transaction(
 		'rw',
 		[
@@ -1139,55 +1206,68 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 			database.holdings,
 			database.valuations,
 			database.schedules,
-			database.reconciliations
+			database.reconciliations,
+			database.outbox
 		],
 		async () => {
 			await mergeRows(
+				'account',
 				backup.accounts ?? [],
 				(id) => database.accounts.get(id),
 				(row) => database.accounts.put(row)
 			);
 			await mergeRows(
+				'category',
 				backup.categories ?? [],
 				(id) => database.categories.get(id),
 				(row) => database.categories.put(row)
 			);
 			await mergeRows(
+				'txn',
 				backup.txns ?? [],
 				(id) => database.txns.get(id),
 				(row) => database.txns.put(row)
 			);
 			await mergeRows(
+				'goal',
 				backup.goals ?? [],
 				(id) => database.goals.get(id),
 				(row) => database.goals.put(row)
 			);
 			await mergeRows(
+				'monthTarget',
 				backup.monthTargets ?? [],
 				(id) => database.monthTargets.get(id),
 				(row) => database.monthTargets.put(row)
 			);
 			await mergeRows(
+				'holding',
 				backup.holdings ?? [],
 				(id) => database.holdings.get(id),
 				(row) => database.holdings.put(row)
 			);
 			await mergeRows(
+				'valuation',
 				backup.valuations ?? [],
 				(id) => database.valuations.get(id),
 				(row) => database.valuations.put(row)
 			);
 			await mergeRows(
+				'schedule',
 				backup.schedules ?? [],
 				(id) => database.schedules.get(id),
 				(row) => database.schedules.put(row)
 			);
 			await mergeRows(
+				'reconciliation',
 				backup.reconciliations ?? [],
 				(id) => database.reconciliations.get(id),
 				(row) => database.reconciliations.put(row)
 			);
-			for (const mark of backup.dayMarks ?? []) await database.dayMarks.put(mark);
+			for (const mark of backup.dayMarks ?? []) {
+				await database.dayMarks.put(mark);
+				await enqueue('dayMark', mark.date, mark);
+			}
 		}
 	);
 
@@ -1205,8 +1285,17 @@ interface Versioned {
 	isDeleted: boolean;
 }
 
-/** Last-write-wins on updatedAt, tiebreak on deviceId — the §5.3 rule. */
+/**
+ * Last-write-wins on updatedAt, tiebreak on deviceId — the §5.3 rule.
+ *
+ * Every row this actually writes is enqueued. A restore is the one path where
+ * skipping the outbox seam costs the most: the screens fill up, the ledger
+ * looks right, and none of it ever reaches the server or the second device —
+ * which then keeps pushing the pre-restore rows back. `entity` is here for no
+ * other reason.
+ */
 async function mergeRows<T extends Versioned>(
+	entity: SyncedEntity,
 	rows: T[],
 	read: (id: string) => Promise<T | undefined>,
 	write: (row: T) => Promise<unknown>
@@ -1215,12 +1304,17 @@ async function mergeRows<T extends Versioned>(
 		const existing = await read(incoming.id);
 		if (!existing) {
 			await write(incoming);
+			await enqueue(entity, incoming.id, incoming);
 			continue;
 		}
 		const wins =
 			incoming.updatedAt > existing.updatedAt ||
 			(incoming.updatedAt === existing.updatedAt && incoming.deviceId > existing.deviceId);
 		// A delete is never undone by a merge (§4).
-		if (wins) await write({ ...incoming, isDeleted: incoming.isDeleted || existing.isDeleted });
+		if (!wins) continue;
+
+		const merged = { ...incoming, isDeleted: incoming.isDeleted || existing.isDeleted };
+		await write(merged);
+		await enqueue(entity, merged.id, merged);
 	}
 }

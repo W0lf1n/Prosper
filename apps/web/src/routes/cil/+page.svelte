@@ -287,7 +287,7 @@
 </script>
 
 <svelte:head>
-	<title>Výdaje — cíl</title>
+	<title>Prosper — cíl</title>
 </svelte:head>
 
 <AppBar title="Cíl">
@@ -675,17 +675,6 @@
 		padding: 0 var(--space-3) var(--space-5);
 	}
 
-	.card {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-		padding: var(--space-4);
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--edge), var(--elev-1);
-	}
-
 	.card--flag {
 		border-color: color-mix(in srgb, var(--flag) 40%, var(--hairline));
 	}
@@ -754,8 +743,9 @@
 		margin: 0;
 		padding: var(--space-4);
 		border-radius: var(--radius-md);
-		background: var(--surface-2);
-		box-shadow: inset 0 1px 3px rgb(0 0 0 / 10%);
+		/* The why is the one thing on this screen he wrote himself: set into the
+		   card, not floating on it. Recession by luminance, no inset. */
+		background: var(--ground-2);
 		font-size: var(--text-base);
 		font-style: italic;
 		line-height: var(--leading-base);
@@ -777,29 +767,16 @@
 		color: var(--ink-3);
 	}
 
-	/* ── the shared meter ────────────────────────────────────────────────── */
-
-	.meter {
-		height: 4px;
-		border-radius: var(--radius-full);
-		background: var(--surface-3);
-		overflow: hidden;
-	}
+	/* ── the shared meter ────────────────────────────────────────────────
+	   Geometry and track live in `app.css`. This screen is the goal, so its
+	   bar is thicker and its resting fill is the signal rather than ink. */
 
 	.meter--thick {
 		height: 8px;
 	}
 
 	.meter__fill {
-		display: block;
-		height: 100%;
-		border-radius: var(--radius-full);
 		background: var(--signal);
-		/* Width, not `scaleX`: these are pill-shaped, and scaling one horizontally
-		   squashes the radius on its end into an ellipse. They animate once, when
-		   the figures load or change, so there is no layout cost worth the
-		   distortion. */
-		transition: width var(--dur-slow) var(--ease-out);
 	}
 
 	.meter__fill[data-tone='done'] {

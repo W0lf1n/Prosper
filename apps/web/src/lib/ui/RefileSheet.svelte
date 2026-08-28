@@ -221,7 +221,7 @@
 		border-radius: var(--radius-full);
 		background: var(--raised);
 		font-size: var(--text-sm);
-		font-weight: 500;
+		font-weight: 400;
 		color: var(--ink-2);
 	}
 

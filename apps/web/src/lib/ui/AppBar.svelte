@@ -47,10 +47,14 @@
 		padding-top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
 	}
 
+	/**
+	 * The screen title takes the display treatment — this is the only place on a
+	 * phone screen where a heading has room to be one.
+	 */
 	.appbar__title {
-		font-size: var(--text-xl);
-		font-weight: 600;
-		letter-spacing: var(--track-tight);
+		font-size: var(--text-2xl);
+		font-weight: 700;
+		letter-spacing: var(--track-display);
 		color: var(--ink);
 		text-wrap: balance;
 	}
@@ -77,8 +81,11 @@
 			padding-top: calc(var(--space-1) + env(safe-area-inset-top, 0px));
 		}
 
+		/* 28 px in a 48 px bar is a title wearing the bar. */
 		.appbar__title {
-			font-size: var(--text-lg);
+			font-size: var(--text-xl);
+			font-weight: 600;
+			letter-spacing: var(--track-tight);
 		}
 	}
 </style>

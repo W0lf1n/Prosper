@@ -66,10 +66,12 @@ load-bearing, and exactly one signal colour.
 | Elevation inverts between themes. Use `--raised`, never a hard-coded `--surface-N`                                      |
 | Dark is the theme this was designed for. Light is its daylight counterpart, not the default                             |
 
-Both palettes are declared twice — once under `prefers-color-scheme`, once under
-`[data-theme]` — so the Settings toggle wins in both directions. An explicit
-choice also moves `color-scheme`, or the browser keeps painting native controls
-from the system preference.
+Dark is **selected** twice — once under `prefers-color-scheme`, once under
+`[data-theme]` — so the Settings toggle wins in both directions. The values are
+declared once: a `--dark-*` bank on `:root`, which both blocks do nothing but
+point the roles at. Change a dark colour in the bank and nowhere else. An
+explicit choice also moves `color-scheme`, or the browser keeps painting native
+controls from the system preference.
 
 ### Global classes worth knowing
 
@@ -77,7 +79,7 @@ from the system preference.
 | ---------------------- | --------------------------------------------------------------------- |
 | `.money`               | Mono, `tabular-nums`, right-aligned. **All money, always**            |
 | `.money--out` / `--in` | The direction's colour                                                |
-| `.slab`                | A raised surface: hairline, lit top edge, shadow, `--radius-lg`       |
+| `.slab`                | A raised surface: hairline, lit top edge, `--radius-lg`. No shadow    |
 | `.u-label`             | The micro-label. The only place uppercase is allowed                  |
 | `.perforation`         | The score line separating two parts of one slab                       |
 | `.field`, `.btn`       | Form and button primitives, with `--primary` / `--quiet` / `--danger` |
@@ -120,19 +122,20 @@ open once a month.
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Fifteen files, **283
+Vitest, node environment, `requireAssertions: true`. Nineteen files, **341
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
-Three files are the exceptions and each earns it:
+Four files are the exceptions and each earns it:
 
 | File                  | Why it is not in `domain/`                                              |
 | --------------------- | ----------------------------------------------------------------------- |
 | `db/repo.test.ts`     | The backup **is** persistence; testing it in the abstract tests nothing |
 | `db/schema.test.ts`   | Migrations, run against a database actually built at the old version    |
 | `sync/engine.test.ts` | The outbox drain against a stubbed `fetch`                              |
+| `sync/pair.test.ts`   | The pre-flight probe — the sentence a wrong address produces            |
 
-All three use `fake-indexeddb/auto`.
+The first three use `fake-indexeddb/auto`.
 
 There are no component tests and no E2E suite in the repository. Single user,
 disproportionate maintenance cost — `PROJECT-PLAN.md` §13.
@@ -157,10 +160,12 @@ and opens it with the current code: a migration that has only ever run against
 an empty database has not been tested.
 
 `lib/db/repo.ts` is the only file that writes — with **one deliberate
-exception**: `sync/engine.ts` → `applyRemote` writes rows that arrived from the
-server. It has to. Going through `repo.ts` would re-stamp `updatedAt` with this
-device's clock and enqueue them straight back out, which is a sync loop with
-extra steps.
+exception**: `sync/engine.ts` → `applyRemotePage` writes rows that arrived from
+the server. It has to. Going through `repo.ts` would re-stamp `updatedAt` with
+this device's clock and enqueue them straight back out, which is a sync loop
+with extra steps. It writes a **page** at a time — one transaction, one
+`bulkGet`, one `bulkPut` per table — because row-at-a-time meant two implicit
+transactions per row on the main thread.
 
 Every mutation stamps `updatedAt` / `deviceId` and calls `enqueue()`, which is
 gated on whether this device has ever been paired. Adding a mutation means
@@ -182,4 +187,15 @@ Three things about it that are not obvious:
 - **Push before pull, always**, in one cycle.
 - **`adoptRemoteLedger` runs after every pull**, not only at pairing. Every
   device seeds its own account, so pairing two produces two — and pairing them in
-  quick succession is a race the protocol cannot order.
+  quick succession is a race the protocol cannot order. It answers the question
+  **once**: the `ledgerAdopted` meta flag is set the moment the answer stops
+  being able to change, because two live accounts is an ordinary steady state
+  and the scans behind it are not something to run every cycle forever.
+- **A cycle is scheduled, never polled.** The triggers are §10.7's: app
+  foreground, back online, after a write (debounced ten seconds, through
+  `setOutboxListener`), and the manual button. `IDLE_POLL_MS` is only the safety
+  net under them, for what another device pushed while this one sat open.
+- **The server address defaults to `location.origin`**, because the deployment
+  serves the client from the API's own origin (`deploy/`, `DEPLOYMENT.md`).
+  `pair()` asks `/api/v1/health` first, so a wrong address fails with a sentence
+  about the address rather than a status code from whatever else is on that host.

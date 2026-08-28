@@ -15,7 +15,7 @@ import { build, files, prerendered, version } from '$service-worker';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
-const CACHE = `vydaje-${version}`;
+const CACHE = `prosper-${version}`;
 const PRECACHE = [...build, ...files, ...prerendered];
 
 sw.addEventListener('install', (event) => {
@@ -44,6 +44,22 @@ sw.addEventListener('fetch', (event) => {
 
 	const url = new URL(request.url);
 	if (url.origin !== sw.location.origin) return;
+
+	/**
+	 * The sync server answers on this origin — that is the whole point of the
+	 * deployment in `deploy/` — so "same origin" stopped meaning "an app asset"
+	 * the day the client and the API became one nginx.
+	 *
+	 * Letting a pull through here is wrong twice over. Every distinct `since=`
+	 * is a new permanent cache entry holding a page of the ledger, which is the
+	 * storage pressure that gets IndexedDB evicted; and offline, a stale page
+	 * would be served as a fresh `200`, so the cursor would advance against old
+	 * rows and the sync status would report a success that never happened.
+	 * A cached `/api/v1/health` would likewise let `probe()` bless a dead server.
+	 *
+	 * The protocol has its own offline story: the outbox. It does not want ours.
+	 */
+	if (url.pathname.startsWith('/api/')) return;
 
 	event.respondWith(respond(request, url));
 });

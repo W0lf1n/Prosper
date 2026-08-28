@@ -1,0 +1,363 @@
+/**
+ * Design tokens — "graphite instrument", second edition.
+ *
+ * Same instrument, calmer machining. The green-grey graphite of v1 is retired
+ * for the neutral near-blacks of the DESIGN-apple system: a true-black ground
+ * (OLED, lights off), surfaces raised by luminance in micro-steps
+ * (#1d1d1f → #252527 → #2a2a2c), hairlines as low-alpha ink rather than
+ * painted greys, and shadows withdrawn from cards and buttons entirely —
+ * elevation is the surface colour change; shadow survives only where a layer
+ * genuinely floats (sheet, toast).
+ *
+ * The colour rules are unchanged:
+ *   · SIGNAL (blue, derived from the reference system's Action Blue) is the
+ *     chrome accent: primary action, current selection, links, focus ring.
+ *     Nothing else. It is never decoration and it is never a data colour.
+ *   · Money coming IN is mint (--in). Money going out has no hue at all — it
+ *     is the ink. Signal and in are now two roles, two hues.
+ *   · FLAG (amber) means look at this. DANGER (coral) means destroy or refuse.
+ *   · The four split classes stay apart at a glance; --split-left is a ghost.
+ *
+ * Data hues are re-tuned, not re-assigned: all four sit near the same oklch
+ * lightness and chroma per theme, so no class shouts over another.
+ *
+ * Weight ladder (enforced in components, not here): 400 / 600 / 700.
+ * Weight 500 is deliberately absent.
+ */
+
+:root {
+	color-scheme: light dark;
+
+	/* ═══ light: the daylight counterpart ════════════════════════════════ */
+
+	/* Parchment ground, paper-white slabs. Raised = lighter, same as ever. */
+	--ground: #f5f5f7;
+	--ground-2: #e8e8ec;
+	--surface: #ffffff;
+	--surface-2: #fafafc;
+	--surface-3: #f2f2f5;
+
+	/* Hairlines are ink at low alpha, so they sit correctly on every surface
+	   instead of being tuned to one. */
+	--hairline: rgb(29 29 31 / 8%);
+	--hairline-2: rgb(29 29 31 / 15%);
+
+	--raised: var(--surface);
+
+	--ink: #1d1d1f;
+	--ink-2: rgb(29 29 31 / 72%);
+	--ink-3: rgb(29 29 31 / 60%);
+
+	/* The one chrome accent — Action Blue. AA as text on every light surface. */
+	--signal: #0066cc;
+	--signal-ink: #ffffff;
+	--signal-wash: rgb(0 102 204 / 8%);
+	--signal-edge: rgb(0 102 204 / 20%);
+
+	/* ── money ─────────────────────────────────────────────────────────── */
+	--out: #1d1d1f;
+	--in: #007850;
+	--flag: #8a6400;
+	--danger: #c93f32;
+
+	--in-wash: rgb(0 120 80 / 8%);
+	--flag-wash: rgb(138 100 0 / 10%);
+	--danger-wash: rgb(201 63 50 / 9%);
+	--danger-edge: rgb(201 63 50 / 20%);
+
+	/* ── the 10/10/10/70 split ─────────────────────────────────────────── */
+	--split-give: #6353c4;
+	--split-save: #007850;
+	--split-debt: #8f6508;
+	--split-live: #6e7478;
+	--split-left: #e2e2e7;
+
+	/* ── elevation ─────────────────────────────────────────────────────────
+	   Withdrawn from resting surfaces: a card is raised by being lighter, not
+	   by throwing a shadow. --elev-1 is a valid no-op so existing comma lists
+	   (`var(--edge), var(--elev-1)`) keep parsing. Real shadow only where a
+	   layer floats over content. */
+	--elev-1: 0 0 0 0 rgb(0 0 0 / 0%);
+	--elev-2: 0 4px 16px rgb(0 0 0 / 8%);
+	--elev-3: 0 12px 32px rgb(0 0 0 / 12%);
+	--elev-sheet: 0 -10px 40px rgb(0 0 0 / 14%);
+
+	/* The lit top edge retires with the shadows — kept as valid no-ops. */
+	--edge: inset 0 1px 0 rgb(255 255 255 / 0%);
+	--edge-strong: inset 0 1px 0 rgb(255 255 255 / 0%);
+
+	/* The pool the amount floats in. Neutral by default now — the hue arrives
+	   only with a direction (--ambient-in / --ambient-out). */
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(255 255 255 / 55%) 0%,
+		rgb(255 255 255 / 20%) 40%,
+		transparent 72%
+	);
+	--ambient-out: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(201 63 50 / 6%) 0%,
+		rgb(201 63 50 / 2%) 40%,
+		transparent 72%
+	);
+	--ambient-in: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(0 120 80 / 6%) 0%,
+		rgb(0 120 80 / 2%) 40%,
+		transparent 72%
+	);
+
+	/* Quieter tooth. Still there, dialled down. */
+	--grain-opacity: 0.18;
+
+	/* ═══ theme-independent ══════════════════════════════════════════════ */
+
+	/* ── type ──────────────────────────────────────────────────────────────
+	   Labels move to the system stack: real SF Pro on Apple hardware, the
+	   platform sans elsewhere, zero bytes either way. Money stays IBM Plex
+	   Mono, tabular, tight — Instrument Sans can be dropped from /fonts once
+	   no rule references it. */
+	--font-ui:
+		system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+		sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+
+	--text-2xs: 0.6875rem; /* 11 — micro-labels only */
+	--text-xs: 0.75rem; /* 12 */
+	--text-sm: 0.8125rem; /* 13 */
+	--text-md: 0.875rem; /* 14 */
+	--text-base: 1rem; /* 16 — the floor for anything read on a phone */
+	--text-lg: 1.125rem; /* 18 */
+	--text-xl: 1.375rem; /* 22 */
+	--text-2xl: 1.75rem; /* 28 */
+	--text-3xl: 2.125rem; /* 34 */
+	--text-display: clamp(3rem, 14vw, 4.25rem); /* the keypad amount, bigger */
+
+	/* Apple-tight, not crushed: display tracking eases from -0.045em to the
+	   -0.025em the reference system actually uses at display sizes. */
+	--track-display: -0.025em;
+	--track-tight: -0.02em;
+	--track-label: 0.08em; /* the only place uppercase is allowed */
+
+	--leading-tight: 1.15;
+	--leading-snug: 1.35;
+	--leading-base: 1.5;
+	--leading-loose: 1.6;
+
+	/* ── space ── 4 px base, unchanged. Compression happens in components. */
+	--space-1: 0.25rem; /* 4 */
+	--space-2: 0.5rem; /* 8 */
+	--space-3: 0.75rem; /* 12 */
+	--space-4: 1rem; /* 16 */
+	--space-5: 1.5rem; /* 24 */
+	--space-6: 2rem; /* 32 */
+	--space-7: 2.5rem; /* 40 */
+	--space-8: 3.5rem; /* 56 */
+
+	/* ── radius ────────────────────────────────────────────────────────────
+	   The reference grammar: 8px utility, 11px capsule, 18px cards, pill for
+	   primary actions — and pill is *reserved* for actions. */
+	--radius-xs: 5px;
+	--radius-sm: 8px;
+	--radius: 11px;
+	--radius-md: 14px;
+	--radius-lg: 18px;
+	--radius-xl: 24px;
+	--radius-full: 9999px;
+
+	/* ── targets ── unchanged; thumbs did not get smaller. */
+	--touch: 44px;
+	--touch-lg: 54px;
+	--control: 24px;
+	--control-gap: calc(var(--touch) - var(--control));
+	--tabbar: 58px;
+
+	/* ── motion ── unchanged, plus the press state contract:
+	   every button presses with transform: scale(0.95) over --dur-press. */
+	--dur-press: 90ms;
+	--dur-fast: 150ms;
+	--dur-base: 220ms;
+	--dur-slow: 360ms;
+
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+	--ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+
+	--transition: var(--dur-fast) var(--ease-out);
+
+	/* ── layers ── unchanged. */
+	--z-raised: 1;
+	--z-nav: 20;
+	--z-sticky: 30;
+	--z-scenery: 50;
+	--z-toast: 60;
+}
+
+/**
+ * Dark — the primary theme. True black ground (this app is used in bed with
+ * the lights off, on an OLED), then the reference system's near-black
+ * micro-steps as the raised surfaces. Elevation is the luminance step itself;
+ * shadows only under the layers that float.
+ */
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--ground: #000000;
+		--ground-2: #0c0c0e;
+		--surface: #1d1d1f;
+		--surface-2: #252527;
+		--surface-3: #2a2a2c;
+
+		--hairline: rgb(255 255 255 / 9%);
+		--hairline-2: rgb(255 255 255 / 16%);
+
+		--raised: var(--surface-3);
+
+		--ink: #f5f5f7;
+		--ink-2: rgb(245 245 247 / 66%);
+		--ink-3: rgb(245 245 247 / 52%);
+
+		--signal: #409cff;
+		--signal-ink: #06213d;
+		--signal-wash: rgb(64 156 255 / 12%);
+		--signal-edge: rgb(64 156 255 / 28%);
+
+		--out: #f5f5f7;
+		--in: #4ccfa1;
+		--flag: #dfb567;
+		--danger: #ef6f5e;
+
+		--in-wash: rgb(76 207 161 / 12%);
+		--flag-wash: rgb(223 181 103 / 12%);
+		--danger-wash: rgb(239 111 94 / 12%);
+		--danger-edge: rgb(239 111 94 / 28%);
+
+		--split-give: #a294ec;
+		--split-save: #4ccfa1;
+		--split-debt: #d3a15e;
+		--split-live: #8b9299;
+		--split-left: #232326;
+
+		--elev-1: 0 0 0 0 rgb(0 0 0 / 0%);
+		--elev-2: 0 6px 24px rgb(0 0 0 / 45%);
+		--elev-3: 0 12px 40px rgb(0 0 0 / 55%);
+		--elev-sheet: 0 -12px 48px rgb(0 0 0 / 60%);
+
+		--edge: inset 0 1px 0 rgb(255 255 255 / 5%);
+		--edge-strong: inset 0 1px 0 rgb(255 255 255 / 8%);
+
+		--ambient: radial-gradient(
+			78% 46% at 50% 0%,
+			rgb(255 255 255 / 5%) 0%,
+			rgb(255 255 255 / 1.5%) 40%,
+			transparent 72%
+		);
+		--ambient-out: radial-gradient(
+			78% 46% at 50% 0%,
+			rgb(239 111 94 / 8%) 0%,
+			rgb(239 111 94 / 2.5%) 40%,
+			transparent 72%
+		);
+		--ambient-in: radial-gradient(
+			78% 46% at 50% 0%,
+			rgb(76 207 161 / 7%) 0%,
+			rgb(76 207 161 / 2.5%) 40%,
+			transparent 72%
+		);
+
+		--grain-opacity: 0.3;
+	}
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
+	--ground: #000000;
+	--ground-2: #0c0c0e;
+	--surface: #1d1d1f;
+	--surface-2: #252527;
+	--surface-3: #2a2a2c;
+
+	--hairline: rgb(255 255 255 / 9%);
+	--hairline-2: rgb(255 255 255 / 16%);
+
+	--raised: var(--surface-3);
+
+	--ink: #f5f5f7;
+	--ink-2: rgb(245 245 247 / 66%);
+	--ink-3: rgb(245 245 247 / 52%);
+
+	--signal: #409cff;
+	--signal-ink: #06213d;
+	--signal-wash: rgb(64 156 255 / 12%);
+	--signal-edge: rgb(64 156 255 / 28%);
+
+	--out: #f5f5f7;
+	--in: #4ccfa1;
+	--flag: #dfb567;
+	--danger: #ef6f5e;
+
+	--in-wash: rgb(76 207 161 / 12%);
+	--flag-wash: rgb(223 181 103 / 12%);
+	--danger-wash: rgb(239 111 94 / 12%);
+	--danger-edge: rgb(239 111 94 / 28%);
+
+	--split-give: #a294ec;
+	--split-save: #4ccfa1;
+	--split-debt: #d3a15e;
+	--split-live: #8b9299;
+	--split-left: #232326;
+
+	--elev-1: 0 0 0 0 rgb(0 0 0 / 0%);
+	--elev-2: 0 6px 24px rgb(0 0 0 / 45%);
+	--elev-3: 0 12px 40px rgb(0 0 0 / 55%);
+	--elev-sheet: 0 -12px 48px rgb(0 0 0 / 60%);
+
+	--edge: inset 0 1px 0 rgb(255 255 255 / 5%);
+	--edge-strong: inset 0 1px 0 rgb(255 255 255 / 8%);
+
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(255 255 255 / 5%) 0%,
+		rgb(255 255 255 / 1.5%) 40%,
+		transparent 72%
+	);
+	--ambient-out: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(239 111 94 / 8%) 0%,
+		rgb(239 111 94 / 2.5%) 40%,
+		transparent 72%
+	);
+	--ambient-in: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(76 207 161 / 7%) 0%,
+		rgb(76 207 161 / 2.5%) 40%,
+		transparent 72%
+	);
+
+	--grain-opacity: 0.3;
+}
+
+/**
+ * Compatibility aliases — unchanged mapping, resolves against whichever theme
+ * block won.
+ */
+:root {
+	--paper: var(--ground);
+	--paper-2: var(--ground-2);
+	--tape: var(--surface);
+	--tape-2: var(--surface-2);
+	--rule: var(--hairline);
+	--rule-strong: var(--hairline-2);
+	--accent: var(--signal);
+	--accent-ink: var(--signal-ink);
+	--out-wash: var(--danger-wash);
+	--shadow-1: var(--elev-1);
+	--shadow-2: var(--elev-2);
+	--shadow-hero: var(--elev-3);
+	--shadow-sheet: var(--elev-sheet);
+	--glow: var(--ambient);
+}

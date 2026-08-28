@@ -266,7 +266,7 @@
 		border-radius: var(--radius-sm);
 		background: var(--surface-2);
 		font-size: var(--text-md);
-		font-weight: 500;
+		font-weight: 400;
 		color: var(--ink-2);
 		transition:
 			background var(--dur-fast) var(--ease-out),

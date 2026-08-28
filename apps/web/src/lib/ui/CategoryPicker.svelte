@@ -255,11 +255,13 @@
 		 * over the last twenty pixels of travel instead of hiding the final chip
 		 * behind a gradient that never lifts.
 		 */
+		/* `black` here is an alpha stop, not a colour: a mask reads only the
+		   channel, and these two stops mean "fully opaque". Nothing themed. */
 		mask-image: linear-gradient(
 			90deg,
 			transparent 0,
-			#000 var(--fade-start, 0px),
-			#000 calc(100% - var(--fade-end, 0px)),
+			black var(--fade-start, 0px),
+			black calc(100% - var(--fade-end, 0px)),
 			transparent 100%
 		);
 	}
@@ -289,11 +291,11 @@
 		background: var(--surface);
 		color: var(--ink-2);
 		font-size: var(--text-xs);
-		font-weight: 500;
+		font-weight: 400;
 		line-height: 1.1;
 		white-space: nowrap;
 		scroll-snap-align: start;
-		box-shadow: var(--edge), var(--elev-1);
+		box-shadow: var(--edge);
 		transition:
 			background var(--dur-fast) var(--ease-out),
 			color var(--dur-fast) var(--ease-out),
