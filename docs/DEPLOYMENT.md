@@ -1,6 +1,6 @@
 # Deployment — running Prosper on a VPS
 
-**Revised:** 2026-08-27
+**Revised:** 2026-08-28
 **Audience:** whoever is holding the SSH key
 
 > This is the rest of P2, and none of it is application code. `TODO.md` §4.1 is
@@ -123,16 +123,29 @@ openssl rand -base64 32   # POSTGRES_PASSWORD
 ```
 
 ```bash
-openssl rand -hex 4       # PAIRING_CODE
+shuf --random-source=/dev/urandom -i 100000000000-999999999999 -n 1   # PAIRING_CODE
 ```
 
 `POSTGRES_PASSWORD` is read once, when the volume is first created. Changing it
 later does not change the password the database already has.
 
 `PAIRING_CODE` is what a device types once, in Settings, to be handed a token.
-It is short because it is typed on a phone — and it is the only thing between
+It is digits because it is typed on a phone — and it is the only thing between
 somebody and your ledger, so treat it as a password even though it does not look
 like one. The server compares it in constant time.
+
+**Digits, not hex.** The pairing field asks the phone for a numeric keypad, so a
+code with letters in it is one you cannot type on the device that has to type
+it. The server accepts any string — the keyboard is the constraint.
+
+**Twelve of them.** A device pairs once in its life, so length here costs one
+person ten seconds, once, and it is the only defence that does not depend on a
+fence holding. Both fences in front of `/api/v1/pair` count per client address,
+so a caller with ten thousand addresses draws ten thousand allowances: six
+digits would fall in twenty minutes, twelve takes thirty-four years, and from a
+single address three hundred and forty thousand. The leading digit is never
+zero, so a code is unambiguously twelve characters and nothing between here and
+the phone can quietly eat one.
 
 ### 3. Start the three containers
 
@@ -462,6 +475,20 @@ container rebuilt with a new IP is proxied to the old one until nginx reloads.
 `app.conf` goes through a variable and Docker's resolver for exactly this
 reason. If you see it anyway, `docker compose restart web` proves it, and the
 `resolver` line is what to look at.
+
+**Pairing 429s the wrong person, or never 429s at all.** Both fences in front of
+`/api/v1/pair` count per client address, and the address is only a client's
+because of the `real_ip` block in `deploy/nginx/app.conf`. The container's own
+access log is the check:
+
+```bash
+cd /srv/prosper/deploy && docker compose logs --tail=20 web
+```
+
+Public addresses in the first column mean it is working. A `172.` on every line
+means nginx is still seeing the host's proxy rather than the caller — everybody
+shares one bucket, and one stranger hammering the endpoint keeps your phone from
+pairing.
 
 **No install prompt on the phone.** The service worker only registers over
 `https://` or `localhost`. Check the certificate first; everything else is a

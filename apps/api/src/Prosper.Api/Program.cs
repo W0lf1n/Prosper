@@ -36,15 +36,20 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<DeviceAuth>();
 
-// The pairing code is short because it is typed on a phone with one thumb, and
-// it is the only thing between the internet and the whole ledger. Six digits is
-// a million guesses, which is minutes at line rate — `CodeMatches` being
+// The pairing code is the only thing between the internet and the whole ledger.
+// `DEPLOYMENT.md` generates twelve digits, because the code's own length is the
+// only defence here that does not depend on a fence holding. `CodeMatches` being
 // constant-time defends against timing, not against volume.
 //
-// Five attempts a minute per address turns that million into months, which is
-// long enough that the code's shortness stops being the weak part. Pairing
-// happens once in a device's life, so the limit is invisible to the person
-// actually doing it.
+// Five attempts a minute per address turns twelve digits into a number of years
+// nobody has. `ClientAddress` is what makes "per address" true — the header it
+// reads is one the caller cannot write, and the header it deliberately ignores
+// is the one that reads like the obvious choice. The second fence is `limit_req`
+// in `deploy/nginx/app.conf`, one layer out, because a limiter living in this
+// process resets every time `docker compose up -d --build` restarts it.
+//
+// Pairing happens once in a device's life, so the limit is invisible to the
+// person actually doing it.
 const string PairPolicy = "pair";
 
 builder.Services.AddRateLimiter(options =>
@@ -52,11 +57,9 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     options.AddPolicy(PairPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
-        // Behind the container's nginx and the host's, so the peer address is a
-        // proxy. `X-Forwarded-For`'s first hop is what both of them set.
-        http.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
-            ?? http.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown",
+        ClientAddress.PartitionKey(
+            http.Request.Headers["X-Real-IP"].FirstOrDefault(),
+            http.Connection.RemoteIpAddress),
         _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = 5,

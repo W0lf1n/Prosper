@@ -1,6 +1,6 @@
 # TODO — what is left
 
-**Revised:** 2026-08-27
+**Revised:** 2026-08-28
 **Audience:** Petr (decisions), Claude Code (implementation)
 
 > The only file in `docs/` that carries a backlog. Everything else describes the
@@ -13,15 +13,15 @@
 
 ---
 
-## State, 2026-08-27
+## State, 2026-08-28
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
 | `pnpm test`                | 341 pass, 19 files              |
-| `pnpm check`               | 0 errors, 0 warnings, 406 files |
+| `pnpm check`               | 0 errors, 0 warnings, 407 files |
 | `pnpm lint`                | passes                          |
-| `pnpm budget`              | 84.2 kB of 150 kB brotli        |
-| `dotnet test` (`apps/api`) | 32 pass                         |
+| `pnpm budget`              | 84.6 kB of 150 kB brotli        |
+| `dotnet test` (`apps/api`) | 50 pass                         |
 | Schema · backup format     | **v6** · **5**                  |
 
 P0, P1, P2 (sync) and P5 (reporting) ship, along with targeting, investments,
@@ -115,6 +115,11 @@ What is genuinely left needs a box, not a keyboard:
   The EF model is identical either way — but nothing in `deploy/` has been
   executed once, because there is no Docker on the development machine. Treat
   the runbook as unproven until step 3 answers `{"ok":true}` on a real VPS.
+- **The `real_ip` block in `app.conf`, at runtime.** CI parses it — the deploy
+  job runs `nginx -t` inside the built image — but parsing is not proof that the
+  address it derives is the caller's, and both pairing limiters count per client
+  only if it is. The check is in `DEPLOYMENT.md` under Troubleshooting: public
+  addresses in `docker compose logs web`, not a `172.` on every line.
 - **A restore.** Run `backup.sh`, then restore it into a throwaway database. A
   dump nobody has restored is a hypothesis.
 - **The domain** (`DECISIONS.md`, Q0 — Domain). Nothing in the repository

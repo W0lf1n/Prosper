@@ -128,16 +128,20 @@ has the schema, the inspection commands and the reset.
 dotnet test
 ```
 
-32 tests, against SQLite in memory rather than the EF in-memory provider: this
-code opens transactions and relies on a unique index, and the in-memory provider
-honours neither. A fake that cannot fail the way the real thing fails is a fake
-that proves nothing.
+50 tests. The ones that reach the database use SQLite in memory rather than the
+EF in-memory provider: this code opens transactions and relies on a unique
+index, and the in-memory provider honours neither. A fake that cannot fail the
+way the real thing fails is a fake that proves nothing.
 
 They cover the merge rule in both directions, the tie-break, the
 never-un-delete rule, idempotency, per-row rejection, the cursor staying
 monotonic across entities, and an update moving a row to the end of the cursor
 — which is the one that stops a device that has already pulled from missing an
 edit.
+
+Eighteen of them are `ClientAddress`, which needs no database at all: which peer
+may be believed about who a caller is, and which header is a claim rather than
+an observation.
 
 ---
 
@@ -149,8 +153,13 @@ edit.
 - **Tokens do not expire.** An expiry logs the phone out at the worst possible
   moment — somewhere with no signal — and recovery needs the code, which is on
   the machine the user is not holding. Revocation is deleting the row.
-- **The pairing code is compared in constant time.** It is short and
-  human-typed, which is exactly the shape a timing attack likes.
+- **The pairing code is compared in constant time.** It is human-typed,
+  which is exactly the shape a timing attack likes.
+- **`/api/v1/pair` is rate-limited per client address, and `ClientAddress`
+  decides what that means.** The key is `X-Real-IP`, which both nginx layers
+  overwrite with their own peer, and it is honoured only from a peer inside a
+  private range. `X-Forwarded-For` is deliberately not used: nginx *appends* to
+  it, so its first hop is written by the caller.
 - **An unset pairing code refuses to pair.** It must never mean "any code will
   do", which is how a private ledger becomes a public one.
 - **Row payloads are capped at 64 kB.** A transaction is a few hundred bytes; a

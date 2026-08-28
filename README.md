@@ -144,7 +144,7 @@ provision, no API key, no `.env`. The ledger lives in IndexedDB on the device.
 | `pnpm lint`     | Prettier + ESLint                                           |
 | `pnpm build`    | Precompressed static output in `apps/web/build`             |
 | `pnpm budget`   | The entry route against the 150 kB brotli budget, and fails over it |
-| `pnpm api:test` | The sync server's 32 tests                                  |
+| `pnpm api:test` | The sync server's 50 tests                                  |
 
 ### On the phone
 

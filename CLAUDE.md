@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-08-27 · schema v6 · 341 web tests · 32 API tests
+**Last revised:** 2026-08-28 · schema v6 · 341 web tests · 50 API tests
 
 ---
 
@@ -65,7 +65,7 @@ pnpm api:test
 watches. `pnpm check` is `svelte-kit sync && svelte-check` under TypeScript
 strict. `pnpm build` writes precompressed static output to `apps/web/build`.
 `pnpm budget` measures the entry route against the 150 kB brotli budget and
-fails over it — run it after a build. `pnpm api:test` runs the API's 32 tests;
+fails over it — run it after a build. `pnpm api:test` runs the API's 50 tests;
 `pnpm api` starts the server.
 
 To run a single test file:

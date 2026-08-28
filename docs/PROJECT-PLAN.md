@@ -801,8 +801,8 @@ Prosper/
 │  │  └─ vite.config.ts             # SvelteKit + adapter + Vitest, all inline
 │  └─ api/                          # ASP.NET Core 9 + EF Core + Postgres 16
 │     ├─ src/Prosper.Api/           #   pairing, push, pull, health
-│     ├─ tests/Prosper.Api.Tests/   #   32 tests against SQLite in memory
-│     └─ docker-compose.yml         #   the deployment
+│     └─ tests/Prosper.Api.Tests/   #   50 tests, SQLite in memory
+├─ deploy/                          # compose, both nginx configs, backup.sh
 ├─ packages/contracts/              # the sync protocol, shared with the client
 ├─ scripts/check-bundle.mjs         # the 150 kB budget, enforced
 ├─ .github/workflows/ci.yml         # lint · check · test · build · budget · api
@@ -813,6 +813,7 @@ Prosper/
 │  ├─ TRIMMING-AND-TRAINING.md      # laws 3 and 4 — design, not yet built
 │  ├─ INVESTMENTS.md                # /jmeni — shipped, plus what is left
 │  ├─ RECURRING.md                  # declared recurring payments — shipped
+│  ├─ DEPLOYMENT.md                 # the VPS runbook — Docker, nginx, backups
 │  └─ screens/                      # README screenshots
 ├─ CLAUDE.md                        # working rules for the whole repository
 ├─ LICENSE                          # MIT
@@ -861,9 +862,11 @@ earns it: `db/repo.test.ts` and `db/schema.test.ts` test persistence and
 migrations, which _are_ the thing being tested, and `sync/engine.test.ts` drives
 the outbox against a stubbed server.
 
-The API has **32 tests of its own** (`dotnet test`), against SQLite in memory
-rather than the EF in-memory provider — that code opens transactions and relies
-on a unique index, and the in-memory provider honours neither.
+The API has **50 tests of its own** (`dotnet test`). The ones that reach the
+database use SQLite in memory rather than the EF in-memory provider — that code
+opens transactions and relies on a unique index, and the in-memory provider
+honours neither. The rest are pure: the rate limiter's partition key, which is
+the one place a header decides something.
 
 - `money.ts` exhaustively, including the magnitudes where a float would round
   wrong. Tape building and gap days. Keypad state. Every check rule.
