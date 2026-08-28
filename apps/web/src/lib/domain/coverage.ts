@@ -1,56 +1,59 @@
 /**
- * Coverage and the streak — the Tracking law reporting on itself.
+ * No-spend days, and the run of them.
  *
- * `TRIMMING-AND-TRAINING.md` R1. The evidence is the strongest in the project:
- * the spreadsheet had **no dates at all**, so coverage was not merely low, it
- * was unmeasurable. This is the number that says whether the ledger can be
- * believed.
+ * **This module was rewritten on 2026-08-28, and the rewrite reverses a
+ * decision.** It used to answer "how many days did you record", counting a day
+ * as covered when it carried a transaction *or* an explicit `DayMark`, and
+ * calling everything else a hole. That question is gone: a day with no expense
+ * on it *is* a day without an expense, and the app no longer asks anybody to
+ * confirm that by tapping. See `DECISIONS.md` → "Every empty day is a no-spend
+ * day".
  *
- * Two rules do all the work here, and both are decisions rather than details:
+ * So what is left is the number that survived the change, and it is a Trimming
+ * figure rather than a Tracking one: **how many days this month cost nothing.**
+ * It is honest — it comes off the ledger with no second signal to maintain —
+ * and it is the one a frugal week should be proud of.
  *
- * **Covered means a transaction *or* an explicit `DayMark`.** That is the whole
- * reason `DayMark` exists — a day you spent nothing on is a real answer, and a
- * day you never opened the app is a hole. Counting only transactions would
- * punish a frugal week.
+ * Two rules do the work, and both are the same ones as before:
+ *
+ * **An expense is an outflow.** A day that only saw money arrive still cost
+ * nothing, and reads as quiet.
  *
  * **Measured against days *elapsed*, never days in the month.** Otherwise the
- * 3rd of the month reads as a 90 % failure, which is both wrong and the kind of
- * thing that makes somebody stop looking.
+ * 3rd of the month is a verdict on 28 days that have not happened.
  *
  * Pure (§13.6). No Dexie, no fetch, no DOM.
  */
 
 import { addDays, daysBetween, endOfMonth, monthKey, type IsoDate } from './datetime';
-import type { DayMark, Txn } from './types';
+import type { Txn } from './types';
 
 export interface CoverageInput {
 	month: string; // YYYY-MM
 	txns: readonly Txn[];
-	marks: readonly DayMark[];
 	today: IsoDate;
 }
 
 export interface Coverage {
 	month: string;
-	/** Days with a transaction or an explicit mark. */
-	covered: number;
 	/** Days of the month that have happened. Never days *in* the month. */
 	elapsed: number;
-	/** 0–100. Zero elapsed days reads as 100: nothing has been missed yet. */
+	/** Elapsed days that carry at least one expense. */
+	spending: number;
+	/** Elapsed days with no expense on them at all. */
+	quiet: number;
+	/** 0–100, the share of elapsed days that cost nothing. */
 	percent: number;
-	/** The holes, oldest first. Days nobody recorded and nobody marked. */
-	gaps: IsoDate[];
+	/** Those quiet days, oldest first. */
+	quietDays: IsoDate[];
 }
 
-/** Every date this month that carries a transaction or a mark. */
-function coveredDays(input: CoverageInput): Set<IsoDate> {
+/** Every date that carries an outflow. Income does not make a day expensive. */
+function spendingDays(txns: readonly Txn[]): Set<IsoDate> {
 	const days = new Set<IsoDate>();
-	for (const txn of input.txns) {
+	for (const txn of txns) {
 		if (txn.isDeleted) continue;
-		if (monthKey(txn.date) === input.month) days.add(txn.date);
-	}
-	for (const mark of input.marks) {
-		if (monthKey(mark.date) === input.month) days.add(mark.date);
+		if (txn.amount < 0) days.add(txn.date);
 	}
 	return days;
 }
@@ -64,28 +67,28 @@ export function monthCoverage(input: CoverageInput): Coverage {
 	const lastDay = month < current ? endOfMonth(month) : month === current ? today : `${month}-01`;
 	const elapsed = month > current ? 0 : Number(lastDay.slice(8, 10));
 
-	const days = coveredDays(input);
+	const spent = spendingDays(input.txns);
 
-	const gaps: IsoDate[] = [];
+	const quietDays: IsoDate[] = [];
 	for (let day = 1; day <= elapsed; day += 1) {
 		const date = `${month}-${String(day).padStart(2, '0')}`;
-		if (!days.has(date)) gaps.push(date);
+		if (!spent.has(date)) quietDays.push(date);
 	}
 
-	const covered = elapsed - gaps.length;
+	const quiet = quietDays.length;
 
 	return {
 		month,
-		covered,
 		elapsed,
-		percent: elapsed === 0 ? 100 : Math.round((covered / elapsed) * 100),
-		gaps
+		spending: elapsed - quiet,
+		quiet,
+		percent: elapsed === 0 ? 0 : Math.round((quiet / elapsed) * 100),
+		quietDays
 	};
 }
 
 export interface StreakInput {
 	txns: readonly Txn[];
-	marks: readonly DayMark[];
 	today: IsoDate;
 	/** How far back to walk before giving up. A year is more than enough. */
 	maxDays?: number;
@@ -93,42 +96,43 @@ export interface StreakInput {
 
 export interface Streak {
 	days: number;
-	/** True when today itself is covered — the streak is safe rather than at risk. */
-	includesToday: boolean;
 }
 
 const MAX_STREAK_WALK = 400;
 
 /**
- * Consecutive covered days, ending today **or yesterday**.
+ * Consecutive days without an expense, ending **yesterday**.
  *
- * Yesterday is included deliberately. A streak that dies at midnight punishes
- * the person who records at breakfast, and a streak you can lose in your sleep
- * is a streak you stop caring about. Until today is covered the count still
- * stands — `includesToday` is how the screen says it is at risk rather than
- * broken.
+ * Today is a condition rather than a term: spend anything today and the run is
+ * zero, but a today that is still quiet at ten in the morning does not get
+ * counted — the day is not over, and a streak that claims a day before it has
+ * been lived is the kind of flattery that makes a number worthless.
+ *
+ * It never reaches back past the first row in the ledger. The years before the
+ * app existed were not a frugal streak.
  */
-export function currentStreak(input: StreakInput): Streak {
+export function quietStreak(input: StreakInput): Streak {
 	const { today } = input;
 	const limit = input.maxDays ?? MAX_STREAK_WALK;
 
-	const days = new Set<IsoDate>();
+	let earliest: IsoDate | null = null;
 	for (const txn of input.txns) {
-		if (!txn.isDeleted) days.add(txn.date);
+		if (txn.isDeleted) continue;
+		if (earliest === null || txn.date < earliest) earliest = txn.date;
 	}
-	for (const mark of input.marks) days.add(mark.date);
+	if (earliest === null) return { days: 0 };
 
-	const includesToday = days.has(today);
-	let cursor = includesToday ? today : addDays(today, -1);
-	if (!days.has(cursor)) return { days: 0, includesToday: false };
+	const spent = spendingDays(input.txns);
+	if (spent.has(today)) return { days: 0 };
 
 	let count = 0;
-	while (count < limit && days.has(cursor)) {
+	let cursor = addDays(today, -1);
+	while (count < limit && cursor >= earliest && !spent.has(cursor)) {
 		count += 1;
 		cursor = addDays(cursor, -1);
 	}
 
-	return { days: count, includesToday };
+	return { days: count };
 }
 
 /**

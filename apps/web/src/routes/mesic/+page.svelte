@@ -9,7 +9,7 @@
 	import { openReceivables, totalOwed } from '$lib/domain/receivables';
 	import { readHoldings, staleValuationFindings } from '$lib/domain/holdings';
 	import { categoryTrends, TREND_WINDOW, type CategoryTrend } from '$lib/domain/trends';
-	import { currentStreak, monthCoverage } from '$lib/domain/coverage';
+	import { monthCoverage, quietStreak } from '$lib/domain/coverage';
 	import { refileCandidates } from '$lib/domain/refile';
 	import { DAYS, plural } from '$lib/domain/czech';
 	import { goalStatus, paceText, pickPrimary } from '$lib/domain/goals';
@@ -20,15 +20,7 @@
 		verdict,
 		type ProsperityClass
 	} from '$lib/domain/prosperity';
-	import type {
-		Category,
-		DayMark,
-		Goal,
-		Holding,
-		MonthTarget,
-		Txn,
-		Valuation
-	} from '$lib/domain/types';
+	import type { Category, Goal, Holding, MonthTarget, Txn, Valuation } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Doughnut, { type Segment } from '$lib/ui/Doughnut.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
@@ -57,7 +49,6 @@
 	);
 	const holdings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
 	const valuations = liveQuery(() => db().valuations.toArray());
-	const dayMarks = liveQuery(() => db().dayMarks.toArray());
 
 	/**
 	 * Subscribed by hand rather than through the `$txns` auto-subscription.
@@ -85,32 +76,24 @@
 			month,
 			txns: rows,
 			categories: ($categories ?? []) as Category[],
-			marks: ($dayMarks ?? []) as DayMark[],
 			today: today()
 		})
 	);
 
 	/**
-	 * The Tracking law reporting on itself (`TRIMMING-AND-TRAINING.md` R1).
+	 * How many days this month cost nothing.
 	 *
-	 * Against days **elapsed**, never days in the month — otherwise the 3rd reads
-	 * as a 90 % failure. A day counts if it has a row *or* an explicit mark,
-	 * which is the whole reason `DayMark` exists.
+	 * Against days **elapsed**, never days in the month — otherwise the 3rd is a
+	 * verdict on 28 days that have not happened. It used to count days
+	 * *recorded* against days elapsed, which was the Tracking law reporting on
+	 * itself; that question died with the day mark on 2026-08-28, and this is
+	 * the one that survived it.
 	 */
-	const coverage = $derived(
-		monthCoverage({
-			month,
-			txns: rows,
-			marks: ($dayMarks ?? []) as DayMark[],
-			today: today()
-		})
-	);
+	const coverage = $derived(monthCoverage({ month, txns: rows, today: today() }));
 
 	/** Only meaningful for the month you are actually in. */
 	const streak = $derived(
-		month === monthKey(today())
-			? currentStreak({ txns: rows, marks: ($dayMarks ?? []) as DayMark[], today: today() })
-			: null
+		month === monthKey(today()) ? quietStreak({ txns: rows, today: today() }) : null
 	);
 
 	// ── draining a bucket (T4) ──────────────────────────────────────────────
@@ -143,10 +126,9 @@
 		navigator.vibrate?.(10);
 	}
 
-	function streakLine(days: number, includesToday: boolean): string {
-		if (days === 0) return 'Série přetržená. Zítra se dá začít znovu.';
-		const counted = `${days} ${plural(days, DAYS)} v řadě`;
-		return includesToday ? `${counted}.` : `${counted} — dnešek zatím chybí.`;
+	function streakLine(days: number): string {
+		if (days === 0) return 'Včera se utrácelo. Série začíná od nuly.';
+		return `${days} ${plural(days, DAYS)} v řadě bez výdaje.`;
 	}
 
 	/**
@@ -363,24 +345,30 @@
 	{/if}
 
 	<!--
-	  Zápisy — the Tracking law's own report card (R1).
+	  Dny bez výdaje.
 
-	  It sits above Kontrola on purpose: coverage is a statement about whether
-	  every number further up this screen can be believed, and that belongs before
-	  the findings rather than among them.
+	  This card used to be "Zápisy": days recorded against days elapsed, the
+	  Tracking law marking its own homework. That question stopped existing on
+	  2026-08-28, when a day with nothing on it became a day that cost nothing
+	  rather than a hole — the report card would have read 100 % for ever.
+
+	  What is left is a Trimming figure and a better one: how many days this
+	  month you did not spend anything at all. It keeps its place above Kontrola,
+	  because it is a statement about the month as a whole rather than one of the
+	  month's findings.
 	-->
 	<section class="card coverage">
-		<h2 class="u-label">Zápisy</h2>
+		<h2 class="u-label">Dny bez výdaje</h2>
 
 		<div class="coverage__body">
 			<Doughnut
 				segments={[
-					{ value: coverage.covered, colour: 'var(--signal)', label: 'zapsáno' },
-					{ value: coverage.gaps.length, colour: 'var(--split-left)', label: 'bez zápisu' }
+					{ value: coverage.quiet, colour: 'var(--signal)', label: 'bez výdaje' },
+					{ value: coverage.spending, colour: 'var(--split-left)', label: 's výdajem' }
 				]}
 				size={104}
 				thickness={14}
-				title="Zapsané dny"
+				title="Dny bez výdaje"
 			>
 				{#snippet centre()}
 					<span class="coverage__percent">{coverage.percent}&nbsp;%</span>
@@ -389,24 +377,24 @@
 
 			<div class="coverage__facts">
 				<p class="coverage__count">
-					<strong>{coverage.covered}</strong> z {coverage.elapsed}
+					<strong>{coverage.quiet}</strong> z {coverage.elapsed}
 					{plural(coverage.elapsed, DAYS)}
 				</p>
 
 				{#if streak}
-					<p class="coverage__streak" class:coverage__streak--risk={!streak.includesToday}>
-						{streakLine(streak.days, streak.includesToday)}
+					<p class="coverage__streak" class:coverage__streak--none={streak.days === 0}>
+						{streakLine(streak.days)}
 					</p>
 				{/if}
 
-				{#if coverage.gaps.length > 0}
+				{#if coverage.spending > 0}
 					<p class="coverage__gaps">
-						{coverage.gaps.length}
-						{plural(coverage.gaps.length, DAYS)} bez zápisu. Ve výpisu se dají doplnit — nebo označit
-						jako den bez výdaje.
+						{coverage.spending}
+						{plural(coverage.spending, DAYS)} se něco utratilo. Den, na který jsi zapomněl, se dá doplnit
+						ve výpisu kdykoliv potom.
 					</p>
 				{:else if coverage.elapsed > 0}
-					<p class="coverage__gaps">Žádná díra. Čísla nahoře sedí na skutečnost.</p>
+					<p class="coverage__gaps">Tenhle měsíc zatím neodešla ani koruna.</p>
 				{/if}
 			</div>
 		</div>
@@ -876,17 +864,18 @@
 		color: var(--ink);
 	}
 
-	/* The signal is earned: a streak that is alive *and* includes today. Anything
-	   else — at risk, or broken — is the flag. Never the danger colour; a missed
-	   day is a thing to notice, not an alarm. */
+	/* The signal is earned: a run of days that cost nothing. A broken one is not
+	   a failure and does not get the flag — spending money is what money is for,
+	   and an alarm every time somebody buys lunch is a line nobody reads. */
 	.coverage__streak {
 		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--signal);
 	}
 
-	.coverage__streak--risk {
-		color: var(--flag);
+	.coverage__streak--none {
+		font-weight: 400;
+		color: var(--ink-3);
 	}
 
 	.coverage__gaps {

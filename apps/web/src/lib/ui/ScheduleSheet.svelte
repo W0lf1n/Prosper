@@ -10,28 +10,42 @@
 	 * The sign is never asked for. It comes off the category — an income bucket
 	 * makes the amount positive, anything else makes it negative — because
 	 * "should this be minus" is a question about the app's internals, not about
-	 * the salary or the mortgage being described.
+	 * the salary or the mortgage being described. Which is also how a payment
+	 * that *arrives* every month is declared: pick an income bucket, and the
+	 * same form describes it (Q46).
+	 *
+	 * The second half of Q46 is the share that comes back. It is asked for only
+	 * on an outgoing payment, it is optional, and it changes nothing about the
+	 * amount — 32 000 Kč still leaves the account on the 15th. What it changes
+	 * is the year: the figure under the fields switches to what the payment
+	 * actually costs, which for a half-shared mortgage is a different decision
+	 * from the one the gross would lead to.
 	 */
 	import { MODE_LABEL } from '$lib/domain/recurring';
-	import { formatMoney, parseAmount, neg, abs } from '$lib/domain/money';
+	import { formatMoney, parseAmount, neg, abs, type Minor } from '$lib/domain/money';
 	import { monthKey, today } from '$lib/domain/datetime';
 	import type { Category, Schedule } from '$lib/domain/types';
 
 	import Sheet from './Sheet.svelte';
+
+	export interface ScheduleInput {
+		payee: string;
+		categoryId: string;
+		amount: number;
+		dayOfMonth: number;
+		endMonth: string | null;
+		mode: Schedule['mode'];
+		/** Positive magnitude, or null. Always null on an incoming schedule. */
+		owedAmount: Minor | null;
+		owedBy: string | null;
+	}
 
 	interface Props {
 		open: boolean;
 		/** The schedule being edited, or null to declare a new one. */
 		schedule: Schedule | null;
 		categories: Category[];
-		onsave: (input: {
-			payee: string;
-			categoryId: string;
-			amount: number;
-			dayOfMonth: number;
-			endMonth: string | null;
-			mode: Schedule['mode'];
-		}) => Promise<void>;
+		onsave: (input: ScheduleInput) => Promise<void>;
 		onarchive: (() => Promise<void>) | null;
 		onclose: () => void;
 	}
@@ -44,6 +58,8 @@
 	let dayOfMonth = $state(15);
 	let endMonth = $state('');
 	let mode = $state<Schedule['mode']>('confirm');
+	let owedText = $state('');
+	let owedBy = $state('');
 	let error = $state('');
 	let confirmingArchive = $state(false);
 
@@ -63,6 +79,10 @@
 		dayOfMonth = schedule?.dayOfMonth ?? 15;
 		endMonth = schedule?.endMonth ?? '';
 		mode = schedule?.mode ?? 'confirm';
+		owedText = schedule?.owedAmount
+			? formatMoney(abs(schedule.owedAmount), { currency: false })
+			: '';
+		owedBy = schedule?.owedBy ?? '';
 		error = '';
 		confirmingArchive = false;
 	});
@@ -70,12 +90,25 @@
 	const chosen = $derived(categories.find((c) => c.id === categoryId) ?? null);
 	const isIncome = $derived(chosen?.isIncome ?? false);
 
-	/** The year, which is the figure worth showing while the month is being typed. */
-	const yearly = $derived.by(() => {
+	const monthly = $derived.by(() => {
 		const parsed = parseAmount(amountText);
-		if (!parsed.ok || parsed.value === 0) return null;
-		return (abs(parsed.value) * 12) as typeof parsed.value;
+		return parsed.ok && parsed.value !== 0 ? abs(parsed.value) : null;
 	});
+
+	/** The declared share, once it parses to something usable. Null otherwise. */
+	const owed = $derived.by(() => {
+		if (isIncome || !owedText.trim()) return null;
+		const parsed = parseAmount(owedText);
+		return parsed.ok && parsed.value > 0 ? abs(parsed.value) : null;
+	});
+
+	/** The year, which is the figure worth showing while the month is being typed. */
+	const yearly = $derived(monthly === null ? null : ((monthly * 12) as Minor));
+
+	/** The same year, less what comes back. Null when nothing does. */
+	const netYearly = $derived(
+		monthly === null || owed === null ? null : ((Math.max(monthly - owed, 0) * 12) as Minor)
+	);
 
 	async function commit() {
 		const trimmed = payee.trim();
@@ -96,6 +129,14 @@
 			error = 'Konec je v minulosti.';
 			return;
 		}
+		if (!isIncome && owedText.trim() && owed === null) {
+			error = 'Vrácená částka není číslo.';
+			return;
+		}
+		if (owed !== null && owed > abs(parsed.value)) {
+			error = 'Vrací se víc, než kolik platíš.';
+			return;
+		}
 
 		error = '';
 		await onsave({
@@ -104,19 +145,25 @@
 			amount: isIncome ? abs(parsed.value) : neg(abs(parsed.value)),
 			dayOfMonth,
 			endMonth: endMonth || null,
-			mode
+			mode,
+			owedAmount: owed,
+			owedBy: owed === null ? null : owedBy.trim() || null
 		});
 	}
 </script>
 
-<Sheet {open} title={schedule ? schedule.payee : 'Nová pravidelná platba'} {onclose}>
+<Sheet
+	{open}
+	title={schedule ? schedule.payee : isIncome ? 'Nový pravidelný příjem' : 'Nová pravidelná platba'}
+	{onclose}
+>
 	<div class="form">
 		<label class="field">
 			<span class="field__label">Co to je</span>
 			<input
 				class="field__input"
 				bind:value={payee}
-				placeholder="Netflix, hypotéka, pojištění"
+				placeholder={isIncome ? 'nájem, vratka, podpora' : 'Netflix, hypotéka, pojištění'}
 				autocomplete="off"
 			/>
 		</label>
@@ -128,6 +175,12 @@
 					<option value={category.id}>{category.name}</option>
 				{/each}
 			</select>
+			<!-- The sign is never asked for; this is where the answer shows up. -->
+			<span class="field__hint">
+				{isIncome
+					? 'Příjmová kategorie — tahle částka bude každý měsíc přicházet.'
+					: 'Výdajová kategorie — tahle částka bude každý měsíc odcházet.'}
+			</span>
 		</label>
 
 		<div class="pair">
@@ -161,10 +214,57 @@
 		-->
 		{#if yearly !== null}
 			<p class="yearly">
-				{isIncome ? 'Přijde' : 'Stojí'}
-				<strong>{formatMoney(yearly)}</strong> za rok. 31. se v kratším měsíci posune na jeho poslední
-				den.
+				{#if netYearly !== null}
+					Odejde <strong>{formatMoney(yearly)}</strong> za rok, ale stojí tě to
+					<strong>{formatMoney(netYearly)}</strong>. 31. se v kratším měsíci posune na jeho poslední
+					den.
+				{:else}
+					{isIncome ? 'Přijde' : 'Stojí'}
+					<strong>{formatMoney(yearly)}</strong> za rok. 31. se v kratším měsíci posune na jeho poslední
+					den.
+				{/if}
 			</p>
+		{/if}
+
+		<!--
+		  ── vrací se ti část? ────────────────────────────────────────────
+
+		  The mortgage paid 50/50: the whole payment leaves the account and half
+		  of it comes back from the same person, every month. Declared once here
+		  instead of retyped onto twelve rows a year — every posted row carries
+		  it as a receivable, and it is settled on `/mesic` like any other.
+
+		  Only on an outgoing payment. "Part of this income comes back" is not a
+		  thing anybody means.
+		-->
+		{#if !isIncome}
+			<fieldset class="group">
+				<legend class="field__label"
+					>Vrací se ti část? <span class="optional">nepovinné</span></legend
+				>
+
+				<div class="pair pair--owed">
+					<label class="field">
+						<span class="field__label">Kolik za měsíc</span>
+						<input
+							class="field__input field__input--mono"
+							bind:value={owedText}
+							inputmode="decimal"
+							placeholder="0"
+						/>
+					</label>
+
+					<label class="field">
+						<span class="field__label">Od koho</span>
+						<input class="field__input" bind:value={owedBy} placeholder="kdo ti to vrací" />
+					</label>
+				</div>
+
+				<p class="field__hint">
+					Celá částka jde ze zůstatku — platíš ji ty. Tohle jen pamatuje, kolik se má vrátit: každý
+					zapsaný měsíc se objeví v přehledu měsíce k odškrtnutí.
+				</p>
+			</fieldset>
 		{/if}
 
 		<fieldset class="group">
@@ -202,13 +302,13 @@
 		{/if}
 
 		<button type="button" class="btn btn--primary btn--block" onclick={commit}>
-			{schedule ? 'Uložit' : 'Přidat'}
+			{schedule ? 'Uložit' : isIncome ? 'Přidat příjem' : 'Přidat platbu'}
 		</button>
 
 		{#if onarchive}
 			{#if confirmingArchive}
 				<div class="archive">
-					<p class="archive__ask">Zrušit „{schedule?.payee}“? Zapsané platby zůstanou.</p>
+					<p class="archive__ask">Zrušit „{schedule?.payee}“? Zapsané záznamy zůstanou.</p>
 					<div class="archive__actions">
 						<button type="button" class="btn" onclick={() => (confirmingArchive = false)}>
 							Zpět
@@ -224,7 +324,7 @@
 					class="btn btn--quiet btn--block"
 					onclick={() => (confirmingArchive = true)}
 				>
-					Zrušit pravidelnou platbu
+					{isIncome ? 'Zrušit pravidelný příjem' : 'Zrušit pravidelnou platbu'}
 				</button>
 			{/if}
 		{/if}
@@ -243,6 +343,18 @@
 		/* The amount gets the room; the day never needs more than two digits. */
 		grid-template-columns: 1fr 7.5rem;
 		gap: var(--space-3);
+	}
+
+	/* Two fields of equal weight rather than a number and a stub: a name needs
+	   at least as much room as the figure beside it. */
+	.pair--owed {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	@media (max-width: 360px) {
+		.pair--owed {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	.group {

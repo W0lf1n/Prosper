@@ -12,13 +12,8 @@ export const prerender = true;
 export const load: LayoutLoad = async () => {
 	if (!browser) return { accountId: null };
 
-	const { ensureSeeded, closePreviousDay, catchUpSchedules } = await import('$lib/db/repo');
+	const { ensureSeeded, catchUpSchedules } = await import('$lib/db/repo');
 	const { accountId } = await ensureSeeded();
-
-	// Yesterday is over. If the app was open on it and nothing went in, that is a
-	// zero rather than a gap — see `closePreviousDay` for why it only ever
-	// reaches back one day.
-	await closePreviousDay();
 
 	// Standing orders do not post themselves while the app is closed — there is
 	// no server. They are settled on the way in: `auto` schedules write their

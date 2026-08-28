@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { currentStreak, daysSinceLastEntry, monthCoverage } from './coverage';
+import { daysSinceLastEntry, monthCoverage, quietStreak } from './coverage';
 import { minor } from './money';
-import type { DayMark, Txn } from './types';
+import type { Txn } from './types';
 
 const SYNCED = { updatedAt: '2026-08-01T00:00:00.000Z', deviceId: 'dev', isDeleted: false };
 
@@ -30,60 +30,63 @@ function txn(date: string, patch: Partial<Txn> = {}): Txn {
 	};
 }
 
-const mark = (date: string): DayMark => ({
-	date,
-	deviceId: 'dev',
-	updatedAt: `${date}T23:00:00.000Z`
-});
-
 describe('monthCoverage', () => {
 	it('measures against days elapsed, not days in the month', () => {
-		// The 3rd, with two days recorded. Against 31 this would read as 6 %.
+		// The 3rd, with one day spent on. Against 31 the quiet share would read
+		// as 97 % on a month that has barely started.
 		const result = monthCoverage({
 			month: '2026-08',
 			txns: [txn('2026-08-01'), txn('2026-08-02')],
-			marks: [],
 			today: '2026-08-03'
 		});
 
 		expect(result.elapsed).toBe(3);
-		expect(result.covered).toBe(2);
-		expect(result.percent).toBe(67);
+		expect(result.spending).toBe(2);
+		expect(result.quiet).toBe(1);
+		expect(result.percent).toBe(33);
 	});
 
-	it('counts an explicit mark as a recorded day — the reason DayMark exists', () => {
+	it('counts a day nobody recorded as a day without an expense', () => {
+		// The whole reversal: no mark, no tap, no hole. Nothing was spent.
 		const result = monthCoverage({
 			month: '2026-08',
 			txns: [txn('2026-08-01')],
-			marks: [mark('2026-08-02'), mark('2026-08-03')],
 			today: '2026-08-03'
 		});
 
-		expect(result.covered).toBe(3);
-		expect(result.percent).toBe(100);
-		expect(result.gaps).toEqual([]);
+		expect(result.quiet).toBe(2);
+		expect(result.quietDays).toEqual(['2026-08-02', '2026-08-03']);
 	});
 
-	it('lists the holes, oldest first', () => {
+	it('lists the quiet days, oldest first', () => {
 		const result = monthCoverage({
 			month: '2026-08',
 			txns: [txn('2026-08-01'), txn('2026-08-04')],
-			marks: [],
 			today: '2026-08-05'
 		});
 
-		expect(result.gaps).toEqual(['2026-08-02', '2026-08-03', '2026-08-05']);
+		expect(result.quietDays).toEqual(['2026-08-02', '2026-08-03', '2026-08-05']);
 	});
 
-	it('treats several rows on one day as one covered day', () => {
+	it('leaves a day that only saw money arrive quiet', () => {
 		const result = monthCoverage({
 			month: '2026-08',
-			txns: [txn('2026-08-01'), txn('2026-08-01'), txn('2026-08-01')],
-			marks: [],
+			txns: [txn('2026-08-02', { amount: minor(4500000) })],
 			today: '2026-08-02'
 		});
 
-		expect(result.covered).toBe(1);
+		expect(result.spending).toBe(0);
+		expect(result.quiet).toBe(2);
+	});
+
+	it('treats several rows on one day as one spending day', () => {
+		const result = monthCoverage({
+			month: '2026-08',
+			txns: [txn('2026-08-01'), txn('2026-08-01'), txn('2026-08-01')],
+			today: '2026-08-02'
+		});
+
+		expect(result.spending).toBe(1);
 		expect(result.elapsed).toBe(2);
 	});
 
@@ -91,115 +94,107 @@ describe('monthCoverage', () => {
 		const result = monthCoverage({
 			month: '2026-08',
 			txns: [txn('2026-08-01', { isDeleted: true })],
-			marks: [],
 			today: '2026-08-01'
 		});
 
-		expect(result.covered).toBe(0);
+		expect(result.spending).toBe(0);
+		expect(result.quiet).toBe(1);
 	});
 
 	it('runs a past month to its own end, not to today', () => {
 		const result = monthCoverage({
 			month: '2026-07',
 			txns: [txn('2026-07-01')],
-			marks: [],
 			today: '2026-08-15'
 		});
 
 		expect(result.elapsed).toBe(31);
-		expect(result.covered).toBe(1);
+		expect(result.spending).toBe(1);
+		expect(result.quiet).toBe(30);
 	});
 
-	it('reads a future month as nothing missed yet rather than as total failure', () => {
+	it('reads a future month as nothing yet rather than as a perfect one', () => {
 		const result = monthCoverage({
 			month: '2026-12',
 			txns: [],
-			marks: [],
 			today: '2026-08-15'
 		});
 
 		expect(result.elapsed).toBe(0);
-		expect(result.percent).toBe(100);
-		expect(result.gaps).toEqual([]);
+		expect(result.percent).toBe(0);
+		expect(result.quietDays).toEqual([]);
 	});
 
 	it('ignores rows from a different month', () => {
 		const result = monthCoverage({
 			month: '2026-08',
 			txns: [txn('2026-07-31'), txn('2026-09-01')],
-			marks: [mark('2026-07-15')],
 			today: '2026-08-02'
 		});
 
-		expect(result.covered).toBe(0);
+		expect(result.spending).toBe(0);
+		expect(result.quiet).toBe(2);
 	});
 });
 
-describe('currentStreak', () => {
-	it('counts consecutive days ending today', () => {
-		const days = ['2026-08-25', '2026-08-26', '2026-08-27'];
-
-		const streak = currentStreak({
-			txns: days.map((d) => txn(d)),
-			marks: [],
+describe('quietStreak', () => {
+	it('counts consecutive days without an expense, ending yesterday', () => {
+		const streak = quietStreak({
+			txns: [txn('2026-08-23')],
 			today: '2026-08-27'
 		});
 
-		expect(streak).toEqual({ days: 3, includesToday: true });
+		// 24th, 25th, 26th. Today is still open and is not claimed.
+		expect(streak.days).toBe(3);
 	});
 
-	it('survives a today that has nothing in it yet', () => {
-		// A streak that dies at midnight punishes the person who records at
-		// breakfast, so yesterday still counts — flagged as at risk, not broken.
-		const streak = currentStreak({
-			txns: [txn('2026-08-25'), txn('2026-08-26')],
-			marks: [],
-			today: '2026-08-27'
-		});
-
-		expect(streak).toEqual({ days: 2, includesToday: false });
-	});
-
-	it('is broken once yesterday is empty too', () => {
-		const streak = currentStreak({
-			txns: [txn('2026-08-24'), txn('2026-08-25')],
-			marks: [],
+	it('is zero the moment something is spent today', () => {
+		const streak = quietStreak({
+			txns: [txn('2026-08-20'), txn('2026-08-27')],
 			today: '2026-08-27'
 		});
 
 		expect(streak.days).toBe(0);
 	});
 
-	it('counts a marked day as covered', () => {
-		const streak = currentStreak({
-			txns: [txn('2026-08-27')],
-			marks: [mark('2026-08-26'), mark('2026-08-25')],
+	it('is zero when yesterday cost money, however quiet today is', () => {
+		const streak = quietStreak({
+			txns: [txn('2026-08-26')],
 			today: '2026-08-27'
 		});
 
-		expect(streak.days).toBe(3);
+		expect(streak.days).toBe(0);
 	});
 
-	it('walks across a month boundary', () => {
-		const streak = currentStreak({
-			txns: [txn('2026-07-30'), txn('2026-07-31'), txn('2026-08-01')],
-			marks: [],
-			today: '2026-08-01'
+	it('never reaches back past the first row in the ledger', () => {
+		// Two days of history, both quiet — not four hundred.
+		const streak = quietStreak({
+			txns: [txn('2026-08-25', { amount: minor(1000) })],
+			today: '2026-08-27'
 		});
 
-		expect(streak.days).toBe(3);
+		expect(streak.days).toBe(2);
 	});
 
 	it('is zero on an empty ledger', () => {
-		expect(currentStreak({ txns: [], marks: [], today: '2026-08-27' }).days).toBe(0);
+		expect(quietStreak({ txns: [], today: '2026-08-27' }).days).toBe(0);
+	});
+
+	it('walks across a month boundary', () => {
+		const streak = quietStreak({
+			txns: [txn('2026-07-28')],
+			today: '2026-08-02'
+		});
+
+		expect(streak.days).toBe(4);
 	});
 
 	it('stops walking rather than running forever', () => {
-		const days = Array.from({ length: 40 }, (_, i) =>
-			txn(`2026-08-${String(27 - (i % 27)).padStart(2, '0')}`)
-		);
-
-		const streak = currentStreak({ txns: days, marks: [], today: '2026-08-27', maxDays: 5 });
+		const streak = quietStreak({
+			txns: [txn('2020-01-01')],
+			today: '2026-08-27',
+			maxDays: 5
+		});
 
 		expect(streak.days).toBe(5);
 	});

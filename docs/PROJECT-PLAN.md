@@ -57,14 +57,19 @@ nothing.
 | Whole koruny first: typing `249` means 249 Kč. Haléře only after an explicit comma.                                                                                                            | `domain/amount-input.ts`            |
 | Three most-used buckets are one tap away; the rest are behind a search sheet.                                                                                                                  | `ui/CategoryPicker.svelte`          |
 | Payee autocompletes from history, so the second "oběd" costs no typing.                                                                                                                        | `domain/ledger.ts` → `recentPayees` |
-| Days with no record render as **visible holes** in the tape, not as absence.                                                                                                                   | `domain/ledger.ts` → `buildTape`    |
-| An explicit "spent nothing today" mark, so a real zero is distinguishable from a forgotten day.                                                                                                | `DayMark`                           |
-| The previous day closes itself — but **only if the app was open on it** and nothing went in. Having it in your hand and recording nothing is evidence; a day you never opened it stays a hole. | `db/repo.ts` → `closePreviousDay`   |
-| The monthly check reports coverage — "Zapsáno 12 z 23 dní" — and says plainly that the totals are therefore too low.                                                                           | `checks.ts` → `coverage`            |
+| Every day is materialised in the tape, including the ones nothing happened on. A day with no expense reads `bez výdaje`, as a statement rather than a hole.                                     | `domain/ledger.ts` → `buildTape`    |
+| A forgotten day is fixed by typing the row with its date, days later if need be. Nothing has to be cleared first.                                                                              | `/` → the date sheet                |
+| The month says how many days cost nothing — a figure off the ledger alone, with no second signal to maintain.                                                                                  | `domain/coverage.ts`                |
 
 **The original spreadsheet had no dates at all** — only which month sheet a row
 sat on. Tracking was, strictly speaking, impossible. That single observation
 justifies most of this section.
+
+Three of these rows are new on 2026-08-28 and they replace three that asked the
+person to confirm an absence: an explicit `DayMark`, a launch step that closed
+off yesterday, and a `coverage` check that called an unmarked day a hole. An
+empty day is now simply a day nothing was spent on. What that cost is written
+down in `DECISIONS.md` → "Every empty day is a no-spend day".
 
 ### 2.2 Targeting — _unwritten goals are wishes_
 
@@ -98,7 +103,7 @@ law is enforced at entry time rather than at review time.
 | A vague description on a large amount is challenged while it can still be fixed.                                                                                                                                              | `checks.ts` → `vague`                              |
 | The **10 / 10 / 10 / 70 split**, measured against income rather than outflow — a share of outflow always sums to 100 % and can never say whether more went out than came in. Two rings: what you did, and what the book says. | `domain/prosperity.ts`, `/mesic`                   |
 | `give` is a spend type of its own. Money given away with nothing expected back is not a want, and filed as one it vanishes into the discretionary pile.                                                                       | `domain/types.ts` — DECISIONS.md Q33               |
-| A recurring payment can be **declared** — what is owed, to whom, out of which bucket, on which day — with its annual cost stated where it is set.                                                                             | `domain/recurring.ts`, `/settings`                 |
+| A recurring payment can be **declared** — what is owed, to whom, out of which bucket, on which day, and how much of it somebody pays back — with its annual cost, net, where it is set.                                       | `domain/recurring.ts`, `/platby`                   |
 
 **Evidence this law needed teeth:** 25 286 Kč of food was filed under BYDLENÍ,
 LIFESTYLE, DARY and PROJEKTY across eight months while JÍDLO reported 13 083 Kč.
@@ -118,8 +123,9 @@ The law has enforcement and a target _shape_. It still has no _cap_ —
 | The record of months against a written target — ✓ or ✗, four in a row being the book's actual claim about training.       | `/cil` → `monthHistory`              |
 | Undo on every save.                                                                                                       | `ui/Toaster.svelte`                  |
 
-This is still the least finished of the four laws, though less so: the coverage
-ring and the streak shipped 2026-08-27. The monthly close ritual and the nudge
+This is still the least finished of the four laws, though less so: the ring and
+the streak shipped 2026-08-27, and both changed meaning on 2026-08-28 — they
+count days without an expense now, not days recorded. The monthly close ritual and the nudge
 are designed in `TRIMMING-AND-TRAINING.md` and not built. The **health score is proposed for rejection** (R4): a single compounded
 number is uninterpretable when it moves, which is the one thing a training
 signal must never be.
@@ -135,12 +141,19 @@ signal must never be.
 | JS bundle, brotli, entry route                            | ≤ 150 kB             | **80.4 kB**                                                     |
 | CSS, brotli, entry route                                  | —                    | 9.5 kB                                                          |
 | Self-hosted fonts                                         | —                    | 96.9 kB, cached once, offline-safe                              |
-| Days-covered                                              | ≥ 90 % after month 2 | pending                                                         |
+| Days-covered                                              | _struck 2026-08-28_  | no longer measurable, and no longer a question — see below      |
 | Reconciliation delta vs bank, month end                   | 0 Kč                 | pending (P3)                                                    |
 | Still in daily use                                        | month 3              | **the real metric**                                             |
 
 Excel failed on friction, not features. Every design decision defers to entry
-speed. The three unmeasured rows are tracked in `TODO.md` §3.
+speed. The two unmeasured rows are tracked in `TODO.md` §3.
+
+**Days-covered was struck rather than missed.** It measured days carrying a
+record against days elapsed, and it could only tell a frugal Tuesday from a
+forgotten one because the app asked for a tap to say which. That tap is gone
+(`DECISIONS.md` → "Every empty day is a no-spend day"), so the metric would read
+100 % for ever. Tracking is now judged by what it is for: whether the expenses
+that happened are in the book.
 
 ### Non-goals (v1)
 
@@ -305,6 +318,8 @@ interface Schedule extends Synced {
 	startMonth: string; // YYYY-MM
 	endMonth: string | null; // null = open-ended
 	mode: ScheduleMode; // default 'confirm'
+	owedAmount: Minor | null; // the share that comes back — DECISIONS.md Q46
+	owedBy: string | null;
 	lastPostedMonth: string | null; // a watermark, not a derivation
 	isArchived: boolean;
 	sortOrder: number;
@@ -362,7 +377,9 @@ interface Valuation extends Synced {
 }
 
 interface DayMark {
-	// explicit "I spent nothing today"
+	// explicit "I spent nothing today". NOTHING WRITES ONE since 2026-08-28 —
+	// an empty day is a no-spend day. Kept: rows exist on the device and on the
+	// server, and dropping a synced entity is a protocol change.
 	date: string; // PK
 	deviceId: string;
 	updatedAt: string;
@@ -418,10 +435,14 @@ interface MetaEntry {
 - **A value is never shown without its date once it is older than its holding's
   cadence** — including inside `celkem`, which names the oldest reading it rests
   on.
-- **A day is covered by a transaction _or_ an explicit `DayMark`.** That is the
-  entire reason `DayMark` exists, and coverage is measured against days
-  **elapsed**, never days in the month — otherwise the 3rd reads as a 90 %
-  failure.
+- **A day with no expense on it is a day without an expense.** Nothing has to
+  be tapped to say so, and a forgotten day is fixed by typing the row. What the
+  month reports is how many days cost nothing, measured against days **elapsed**,
+  never days in the month — otherwise the 3rd is a verdict on 28 days that have
+  not happened.
+- **A schedule's declared share is a property of the payment, not a second
+  payment.** It rides onto every row the schedule posts, it never changes the
+  amount that leaves the account, and it is clamped to the row it is on.
 - **A reconciliation delta is a missing transaction, not an error.** The bank is
   right about the balance and the ledger is right about the reasons. The fix is
   an ordinary row; the balance is never overwritten, and there is no tolerance —
@@ -479,7 +500,6 @@ expense is worse than the mistake it prevents.
 | ------------------- | ------------------------------------------------------------------------------------------------- |
 | `other-overflow`    | OSTATNÍ past 15 % of _recurring_ outflow — measured against recurring so a one-off cannot hide it |
 | `uncategorised`     | Legacy rows with no bucket                                                                        |
-| `coverage`          | Days with no record, stated as "the totals are lower than reality"                                |
 | `overspend`         | The month spent more than it earned                                                               |
 | `missing-recurring` | A subscription present in the last three months and absent from this one                          |
 
@@ -490,17 +510,21 @@ KVĚTEN −45 937, ČERVENEC −10 048 — and no screen he looked at ever said 
 
 ## 8. Screens
 
-Six. Four of them sit in the tab bar — `/tape`, `/mesic`, `/cil`, `/settings` —
-with a record disc between them that returns to the entry screen. **The entry
-screen carries no tab bar**: the keypad owns the bottom of the phone and needs
-every pixel on a short screen. `/jmeni` is not a tab either, on purpose — it is
-the screen you open once a month, and it is reached from the `/` header.
+Seven. Six of them sit in the tab bar — `/tape`, `/mesic`, `/platby`, `/cil`,
+`/jmeni`, `/settings` — three each side of a record disc that returns to the
+entry screen. **The entry screen carries no tab bar**: the keypad owns the bottom
+of the phone and needs every pixel on a short screen, so its four destinations
+live as glyphs in the header slab instead.
+
+Six is the bar's ceiling, reached on 2026-08-28 when `/platby` became a screen
+and `/jmeni` was asked for down there rather than only in the corner. Seven cells
+on a 320 px phone give each label 46 px; an eighth would give it nothing.
 
 ### `/` — Entry (the launch route)
 
 ```
 ┌────────────────────────────────────┐
-│ SRPEN 2026        [tape][jmění][⚙]│  ← the header slab
+│ SRPEN 2026   [tape][jmění][↻][⚙] │  ← the header slab
 │ −22 301,00 Kč      ↑59 400 ↓81 701 │  ← the month, tap = /mesic
 │ zůstatek měsíce                    │
 │ ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ │
@@ -539,9 +563,9 @@ reason (`ui/DueStrip.svelte`).
 ### `/tape` — Výpis
 
 Reverse-chronological, the account balance on a slab at the top, one floating
-card per month, days separated by score lines, running balance per row, gap days
-rendered as holes, explicit zero days marked, open receivables flagged. Tap a row
-to edit or delete.
+card per month, days separated by score lines, running balance per row, days with
+nothing on them reading `bez výdaje` on a recessed surface, open receivables
+flagged. Tap a row to edit or delete.
 
 The balance slab carries **Srovnat s bankou** and how long it has been since it
 was last done. The sheet shows the ledger's figure first and unprompted, takes
@@ -563,9 +587,11 @@ the **Kontrola** panel listing the month's findings; **Dluží mi** — everythi
 outstanding, with a one-tap _Přijato_ that creates the repayment; **Rozdělení
 příjmu**; and **Kam to šlo**, buckets ranked by spend with spend-type colouring.
 
-**Zápisy** sits above Kontrola: a ring of days recorded against days _elapsed_,
-the streak, and how many holes are left. It is placed there because coverage is a
-statement about whether every number above it can be believed.
+**Dny bez výdaje** sits above Kontrola: a ring of days that cost nothing against
+days _elapsed_, and the current run of them. It was **Zápisy** — days recorded —
+until 2026-08-28, when a day with nothing on it stopped being a hole and the
+report card would have read 100 % for ever. It keeps its place: this is a
+statement about the month as a whole rather than one of the month's findings.
 
 Rozdělení příjmu is the 10 / 10 / 10 / 70 split as two rings, what you did above
 what the book says, sharing one set of colours so the comparison is made by eye.
@@ -598,12 +624,31 @@ Below it, a line that has to stay there: the values are what you copied off a
 statement, nothing is fetched, and growth is neither income nor part of the
 month's split.
 
+### `/platby` — Pravidelné platby
+
+The standing orders, and what they cost. The figure at the top is the **net
+year**: the gross is what the balance sees on the 15th, the net is what the
+decision is made against once a shared payment's half comes back (Q46).
+
+Two lists, because they answer two questions. **Odchází** — every declared
+outflow, with its day, its bucket, its mode, and either the year or how many
+payments are left on a mortgage; a shared one carries a second line naming who
+pays back how much and what it leaves. **Přichází** — money that turns up every
+month on its own, declared the same way on an income category.
+
+The confirmation strip is here as well as on the entry screen. There because it
+must not be missed; here because this is the screen somebody opens *to deal
+with* standing orders.
+
 ### `/settings`
 
 Account name and opening balance · category management (rename, spend type,
-archive, add) · **Pravidelné platby**, with each schedule's mode and the annual
-cost · theme · JSON export/import backup, storage-persistence status, schema
-version.
+archive, add) · **Jmění**, the holdings themselves rather than their values ·
+theme · sync pairing and the last cycle, to the minute · JSON export/import
+backup, storage-persistence status, schema version.
+
+Pravidelné platby lived here until 2026-08-28 and is now `/platby`: a standing
+order is not a setting, it is the part of the ledger that has not happened yet.
 
 ---
 
@@ -795,8 +840,8 @@ Prosper/
 │  │  ├─ src/lib/sync/              # outbox drain, pull, pairing, status
 │  │  ├─ src/lib/ui/                # hand-rolled components, no UI kit
 │  │  ├─ src/lib/styles/            # tokens.css, app.css, self-hosted fonts
-│  │  ├─ src/routes/                # / · /tape · /mesic · /cil · /jmeni
-│  │  │                             #   · /settings
+│  │  ├─ src/routes/                # / · /tape · /mesic · /platby · /cil
+│  │  │                             #   · /jmeni · /settings
 │  │  ├─ src/service-worker.ts      # app shell cache, hand-rolled
 │  │  └─ vite.config.ts             # SvelteKit + adapter + Vitest, all inline
 │  └─ api/                          # ASP.NET Core 9 + EF Core + Postgres 16

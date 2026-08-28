@@ -20,10 +20,12 @@ has nothing useful to render on a server, and Dexie must not be constructed
 where `indexedDB` does not exist. That is also why `db()` in `lib/db/schema.ts`
 is lazy.
 
-The layout's `load` runs three things on every launch, in this order:
-`ensureSeeded()` → `closePreviousDay()` → `catchUpSchedules()`, then requests
-storage persistence. Anything that must happen "when the app opens" belongs
-there — there is no server and no background worker to do it anywhere else.
+The layout's `load` runs two things on every launch, in this order:
+`ensureSeeded()` → `catchUpSchedules()`, then requests storage persistence.
+Anything that must happen "when the app opens" belongs there — there is no server
+and no background worker to do it anywhere else. It was three until 2026-08-28:
+`closePreviousDay()` sat in the middle and marked yesterday as a zero-spend day,
+and it went with the day mark itself.
 
 ---
 
@@ -80,6 +82,7 @@ controls from the system preference.
 | `.money`               | Mono, `tabular-nums`, right-aligned. **All money, always**            |
 | `.money--out` / `--in` | The direction's colour                                                |
 | `.slab`                | A raised surface: hairline, lit top edge, `--radius-lg`. No shadow    |
+| `.tile`                | One pressable list row inside a card: name + figure, context + figure |
 | `.u-label`             | The micro-label. The only place uppercase is allowed                  |
 | `.perforation`         | The score line separating two parts of one slab                       |
 | `.field`, `.btn`       | Form and button primitives, with `--primary` / `--quiet` / `--danger` |
@@ -105,24 +108,27 @@ the bottom of the phone, and the bar's centre disc is how you get back there.
 
 ## Routes
 
-| Route       | Screen                                                                  |
-| ----------- | ----------------------------------------------------------------------- |
-| `/`         | Entry. The launch route, and the one protected hardest                  |
-| `/tape`     | The ledger — reverse chronological, running balance, gap days as holes  |
-| `/mesic`    | The month — totals, Kontrola, Dluží mi, the split, buckets ranked       |
-| `/cil`      | The goal — the why, this month's figure, the record of months           |
-| `/jmeni`    | Holdings and the `celkem` total. Reached from the `/` header, not a tab |
-| `/settings` | Account, categories, recurring payments, theme, backup                  |
+| Route       | Screen                                                                   |
+| ----------- | ------------------------------------------------------------------------ |
+| `/`         | Entry. The launch route, and the one protected hardest                   |
+| `/tape`     | The ledger — reverse chronological, running balance, every day of it     |
+| `/mesic`    | The month — totals, Kontrola, Dluží mi, the split, buckets ranked        |
+| `/platby`   | Pravidelné platby — what goes out, what comes in, the year net of shares |
+| `/cil`      | The goal — the why, this month's figure, the record of months            |
+| `/jmeni`    | Holdings and the `celkem` total                                          |
+| `/settings` | Account, categories, holdings, sync, theme, backup                       |
 
-Four of the six are in the tab bar (`/tape`, `/mesic`, `/cil`, `/settings`) with
-the record disc between them. `/jmeni` is not, on purpose: it is the screen you
-open once a month.
+Six of the seven are in the tab bar — everything but `/`, three each side of the
+record disc. That is the bar's ceiling: seven cells on a 320 px phone give each
+label 46 px, and the label steps down to 10 px under 400 px rather than being
+cut. The entry screen carries no bar, so it keeps its four destinations as glyphs
+in the header slab.
 
 ---
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Nineteen files, **341
+Vitest, node environment, `requireAssertions: true`. Nineteen files, **349
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -153,7 +159,7 @@ force-close → reopen → reconnect → verify.
 
 ## Data layer
 
-`lib/db/schema.ts` holds the `migrations` array, currently at **v6**. Add a new
+`lib/db/schema.ts` holds the `migrations` array, currently at **v7**. Add a new
 entry; never edit an existing one, even in development — a released version is
 already on the phone. `schema.test.ts` builds a database at the _old_ version
 and opens it with the current code: a migration that has only ever run against

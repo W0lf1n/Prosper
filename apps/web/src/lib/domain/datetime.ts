@@ -102,6 +102,12 @@ const dayWithYearFormat = new Intl.DateTimeFormat(LOCALE, {
 
 const monthFormat = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric' });
 const shortFormat = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'numeric' });
+const stampFormat = new Intl.DateTimeFormat(LOCALE, {
+	day: 'numeric',
+	month: 'numeric',
+	hour: '2-digit',
+	minute: '2-digit'
+});
 
 /** "dnes", "včera", "ne 23. srpna", or with the year once it is not this year. */
 export function formatDayHeading(iso: IsoDate, reference: IsoDate = today()): string {
@@ -122,6 +128,19 @@ export function formatMonthHeading(iso: IsoDate): string {
 /** "23. 8." — for dense rows where the day heading already carries the context. */
 export function formatShortDate(iso: IsoDate): string {
 	return shortFormat.format(fromIsoDate(iso));
+}
+
+/**
+ * "23. 8. 14:07" — an **instant**, not a calendar day.
+ *
+ * The one thing in this app that is a moment rather than a date is a sync: two
+ * cycles on the same day are the normal case, and a line reading "28. 8." twice
+ * in a row cannot tell "just now" from "this morning" — which is the only
+ * question anybody asks it. Parsed as a real datetime and shown in local time,
+ * because that is the clock the person reading it is holding.
+ */
+export function formatDateTime(iso: IsoDateTime): string {
+	return stampFormat.format(new Date(iso));
 }
 
 /** Czech plural: 1 den / 2 dny / 5 dní. */

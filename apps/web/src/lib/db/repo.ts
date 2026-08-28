@@ -34,7 +34,6 @@ import { seedCategories } from './seed';
 
 const META_DEVICE_ID = 'deviceId';
 const META_ACTIVE_ACCOUNT = 'activeAccountId';
-const META_LAST_SEEN = 'lastSeenDate';
 const META_SYNC_BASE_URL = 'syncBaseUrl';
 const META_ADOPTED = 'ledgerAdopted';
 
@@ -236,8 +235,6 @@ export async function createTxn(input: NewTxn): Promise<Txn> {
 	};
 
 	await db().txns.put(txn);
-	// Recording a transaction is itself proof the day was not a blank.
-	await db().dayMarks.delete(txn.date);
 	await enqueue('txn', txn.id, txn);
 	return txn;
 }
@@ -429,7 +426,7 @@ export async function archiveCategory(id: string): Promise<void> {
 
 export async function createSchedule(
 	input: Pick<Schedule, 'payee' | 'categoryId' | 'amount' | 'dayOfMonth'> &
-		Partial<Pick<Schedule, 'startMonth' | 'endMonth' | 'mode'>>
+		Partial<Pick<Schedule, 'startMonth' | 'endMonth' | 'mode' | 'owedAmount' | 'owedBy'>>
 ): Promise<Schedule> {
 	const database = db();
 	const { updatedAt, deviceId } = await stamp();
@@ -442,6 +439,11 @@ export async function createSchedule(
 		startMonth: input.startMonth ?? monthKey(today()),
 		endMonth: input.endMonth ?? null,
 		mode: input.mode ?? 'confirm',
+		/* The share that comes back, if the payment is shared. Clamped to a
+		   positive magnitude here rather than at the form, because the sheet is
+		   not the only thing that will ever call this. */
+		owedAmount: input.owedAmount ? abs(input.owedAmount) : null,
+		owedBy: input.owedBy?.trim() || null,
 		/**
 		 * Written as settled for the month before it starts, so a schedule added
 		 * on the 20th for a payment that went out on the 5th does not immediately
@@ -472,6 +474,8 @@ export async function updateSchedule(
 			| 'startMonth'
 			| 'endMonth'
 			| 'mode'
+			| 'owedAmount'
+			| 'owedBy'
 			| 'lastPostedMonth'
 			| 'sortOrder'
 			| 'isArchived'
@@ -482,7 +486,17 @@ export async function updateSchedule(
 	const existing = await database.schedules.get(id);
 	if (!existing) return;
 
-	const next: Schedule = { ...existing, ...patch, ...(await stamp()) };
+	const next: Schedule = {
+		...existing,
+		...patch,
+		/* Same normalisation as `createSchedule`: a positive magnitude, and zero
+		   means nothing comes back rather than "a share of nothing". */
+		...(patch.owedAmount === undefined
+			? {}
+			: { owedAmount: patch.owedAmount ? abs(patch.owedAmount) : null }),
+		...(patch.owedBy === undefined ? {} : { owedBy: patch.owedBy?.trim() || null }),
+		...(await stamp())
+	};
 	await database.schedules.put(next);
 	await enqueue('schedule', next.id, next);
 }
@@ -508,14 +522,27 @@ export async function confirmScheduled(
 	item: DueItem,
 	options: { accountId: string; amount?: Minor }
 ): Promise<Txn> {
+	const amount = options.amount ?? item.schedule.amount;
 	const txn = await createTxn({
 		accountId: options.accountId,
-		amount: options.amount ?? item.schedule.amount,
+		amount,
 		date: item.date,
 		categoryId: item.schedule.categoryId,
 		payee: item.schedule.payee,
 		source: 'recurring',
-		scheduleId: item.schedule.id
+		scheduleId: item.schedule.id,
+		/**
+		 * The declared share rides onto the row, so a shared mortgage produces an
+		 * open receivable every month without anybody retyping who owes what
+		 * (Q46). Only on an outflow, and never more than the row itself — an
+		 * overridden amount smaller than the share would otherwise book back more
+		 * than went out.
+		 */
+		owedAmount:
+			amount < 0 && item.schedule.owedAmount
+				? (Math.min(abs(item.schedule.owedAmount), abs(amount)) as Minor)
+				: null,
+		owedBy: amount < 0 ? item.schedule.owedBy : null
 	});
 	await settle(item.schedule, item.month);
 	return txn;
@@ -748,48 +775,20 @@ export async function deleteReconciliation(id: string): Promise<void> {
 }
 
 // ── day marks ───────────────────────────────────────────────────────────────
-
-/** "I spent nothing today" — the explicit alternative to a gap. */
-export async function markZeroSpendDay(date: string): Promise<void> {
-	const mark: DayMark = { date, deviceId: await getDeviceId(), updatedAt: nowIso() };
-	await db().dayMarks.put(mark);
-	await enqueue('dayMark', date, mark);
-}
-
-export async function clearZeroSpendDay(date: string): Promise<void> {
-	await db().dayMarks.delete(date);
-}
-
-/**
- * Close off the previous day, automatically.
- *
- * The rule, decided 2026-08-24: **a day is marked zero-spend only if the app was
- * actually open on it and nothing was recorded.** That is a real signal — you
- * had the thing in your hand and there was nothing to put in it. A day you never
- * opened the app is not a zero, it is a day you did not look, and it stays a
- * visible hole in the tape (§2.1).
- *
- * So this marks exactly one date: the last day the app was seen, once that day
- * is over. It never reaches backwards past the first run, which is why the
- * history he already has keeps its honest gaps and `coverage` keeps working.
- */
-export async function closePreviousDay(): Promise<string | null> {
-	const database = db();
-	const now = today();
-	const lastSeen = await getMeta<string>(META_LAST_SEEN);
-	await setMeta(META_LAST_SEEN, now);
-
-	// First run ever: nothing to close, and nothing historical to invent.
-	if (!lastSeen || lastSeen >= now) return null;
-
-	if (await database.dayMarks.get(lastSeen)) return null;
-
-	const rows = await database.txns.where('date').equals(lastSeen).toArray();
-	if (rows.some((t) => !t.isDeleted)) return null;
-
-	await markZeroSpendDay(lastSeen);
-	return lastSeen;
-}
+//
+// There is nothing here any more, and the emptiness is the decision.
+//
+// Until 2026-08-28 this section wrote `DayMark` rows: "I spent nothing today",
+// tapped by hand in the tape, plus a `closePreviousDay` that closed off exactly
+// one date on launch — the last day the app was open, if nothing was recorded
+// on it. The mark was what told `coverage` a genuine zero from a day nobody
+// looked at.
+//
+// That distinction is gone. A day with no expense on it is a day without an
+// expense; the app no longer asks anybody to confirm it, and a forgotten
+// Tuesday is filled in by typing the row, not by clearing a flag
+// (`DECISIONS.md` → "Every empty day is a no-spend day"). The table stays —
+// rows exist on the device and on the server — and nothing writes to it.
 
 // ── goals — the Targeting law (§2.2) ─────────────────────────────────────────
 

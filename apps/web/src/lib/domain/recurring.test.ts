@@ -5,7 +5,9 @@ import {
 	dueGroups,
 	dueSchedules,
 	partitionByMode,
+	netOfSchedule,
 	recurringCost,
+	recurringIncome,
 	remainingPayments,
 	remainingThisMonth
 } from './recurring';
@@ -24,6 +26,8 @@ function schedule(id: string, patch: Partial<Schedule> = {}): Schedule {
 		startMonth: '2026-01',
 		endMonth: null,
 		mode: 'confirm',
+		owedAmount: null,
+		owedBy: null,
 		lastPostedMonth: null,
 		isArchived: false,
 		sortOrder: 0,
@@ -220,6 +224,75 @@ describe('recurringCost', () => {
 
 	it('is zero, not NaN, with nothing declared', () => {
 		expect(recurringCost([]).yearly).toBe(0);
+	});
+
+	it('counts a shared payment at what it actually costs', () => {
+		// The mortgage paid whole, halved by the person it is halved with. The
+		// balance sees 32 000 on the 15th; the decision is made against 16 000.
+		const total = recurringCost([
+			schedule('hypo', { amount: minor(-32_000_00), owedAmount: minor(16_000_00), owedBy: 'Jana' })
+		]);
+
+		const row = total.rows[0]!;
+		expect(row.monthly).toBe(32_000_00);
+		expect(row.reimbursed).toBe(16_000_00);
+		expect(row.net).toBe(16_000_00);
+		expect(row.yearly).toBe(192_000_00);
+		expect(row.grossYearly).toBe(384_000_00);
+
+		expect(total.monthly).toBe(32_000_00);
+		expect(total.reimbursed).toBe(16_000_00);
+		expect(total.net).toBe(16_000_00);
+		expect(total.yearly).toBe(192_000_00);
+	});
+
+	it('never lets a share turn a payment into income', () => {
+		const total = recurringCost([
+			schedule('odd', { amount: minor(-1_000_00), owedAmount: minor(4_000_00) })
+		]);
+
+		expect(total.rows[0]!.net).toBe(0);
+		expect(total.rows[0]!.reimbursed).toBe(1_000_00);
+	});
+});
+
+describe('netOfSchedule', () => {
+	it('is the whole payment when nothing comes back', () => {
+		expect(netOfSchedule(schedule('netflix', { amount: minor(-379_00) }))).toBe(379_00);
+	});
+
+	it('subtracts the declared share', () => {
+		expect(
+			netOfSchedule(schedule('hypo', { amount: minor(-32_000_00), owedAmount: minor(12_500_00) }))
+		).toBe(19_500_00);
+	});
+});
+
+describe('recurringIncome', () => {
+	it('lists what arrives on its own, biggest first', () => {
+		const total = recurringIncome([
+			schedule('najem', { amount: minor(8_500_00) }),
+			schedule('vratka', { amount: minor(16_000_00) }),
+			schedule('netflix', { amount: minor(-379_00) })
+		]);
+
+		expect(total.rows.map((r) => r.schedule.id)).toEqual(['vratka', 'najem']);
+		expect(total.monthly).toBe(24_500_00);
+		expect(total.yearly).toBe(294_000_00);
+	});
+
+	it('skips what is archived or deleted', () => {
+		const total = recurringIncome([
+			schedule('gone', { amount: minor(8_500_00), isArchived: true }),
+			schedule('dead', { amount: minor(8_500_00), isDeleted: true })
+		]);
+
+		expect(total.rows).toHaveLength(0);
+		expect(total.monthly).toBe(0);
+	});
+
+	it('is zero, not NaN, with nothing declared', () => {
+		expect(recurringIncome([]).yearly).toBe(0);
 	});
 });
 

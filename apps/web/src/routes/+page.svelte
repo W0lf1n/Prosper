@@ -27,11 +27,10 @@
 	import { checkDraft, summariseMonth, type Finding } from '$lib/domain/checks';
 	import { dueGroups, type DueGroup } from '$lib/domain/recurring';
 	import { readHoldings, wealthTotal } from '$lib/domain/holdings';
-	import { currentStreak } from '$lib/domain/coverage';
+	import { quietStreak } from '$lib/domain/coverage';
 	import { goalCategoryIds, goalStatus, pickPrimary } from '$lib/domain/goals';
 	import type {
 		Category,
-		DayMark,
 		Goal,
 		Holding,
 		MonthTarget,
@@ -75,20 +74,17 @@
 
 	const allSchedules = liveQuery(() => db().schedules.orderBy('sortOrder').toArray());
 
-	const allDayMarks = liveQuery(() => db().dayMarks.toArray());
-
 	/**
-	 * The streak — one figure, in the corner of the totals slab, and that is R1's
-	 * whole footprint on this screen. Coverage is a review number; the amount and
-	 * the keypad own the primary column.
+	 * Days in a row that cost nothing — one figure, in the corner of the totals
+	 * slab, and that is its whole footprint on this screen.
+	 *
+	 * It used to count days *recorded*, which stopped being a question anybody
+	 * could get wrong on 2026-08-28: a day with nothing on it is now a day that
+	 * cost nothing, so the honest version of the same badge counts the quiet
+	 * ones. Either way it never reaches the primary column — the amount and the
+	 * keypad own that.
 	 */
-	const streak = $derived(
-		currentStreak({
-			txns: ($allTxns ?? []) as Txn[],
-			marks: ($allDayMarks ?? []) as DayMark[],
-			today: today()
-		})
-	);
+	const streak = $derived(quietStreak({ txns: ($allTxns ?? []) as Txn[], today: today() }));
 
 	const allHoldings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
 	const allValuations = liveQuery(() => db().valuations.toArray());
@@ -430,6 +426,14 @@
 						{#if staleHoldings > 0}
 							<span class="icon-link__flag" aria-hidden="true"></span>
 						{/if}
+					</a>
+					<!--
+					  Pravidelné platby. It is a tab like the others, but the entry screen
+					  is the one place with no tab bar — the keypad owns the bottom of the
+					  phone — so the corner is where its destinations live.
+					-->
+					<a class="icon-link" href={resolve('/platby')} aria-label="Pravidelné platby">
+						<Icon name="repeat" size={20} />
 					</a>
 					<a class="icon-link" href={resolve('/settings')} aria-label="Nastavení">
 						<Icon name="settings" size={20} />

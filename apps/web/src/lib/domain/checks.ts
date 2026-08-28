@@ -14,10 +14,9 @@
  */
 
 import { abs, percentOf, sum, type Minor } from './money';
-import { DAYS, RECORDS, counted, plural } from './czech';
+import { RECORDS, counted } from './czech';
 import { daysBetween, monthKey, shiftMonth, type IsoDate } from './datetime';
-import type { Category, DayMark, Txn } from './types';
-import { monthCoverage } from './coverage';
+import type { Category, Txn } from './types';
 import { isVagueDescription, normalize, numbersIn, suggestBucket } from './vocabulary';
 
 export type Severity = 'warn' | 'info';
@@ -226,12 +225,7 @@ export interface MonthContext {
 	txns: Txn[]; // every live transaction of the account
 	categories: Category[];
 	today: IsoDate;
-	/** Explicit "spent nothing" days. Optional: absent reads as none marked. */
-	marks?: DayMark[];
 }
-
-/** Below this share of elapsed days, the month's totals are worth doubting. */
-const COVERAGE_FLOOR = 0.6;
 
 export interface BucketTotal {
 	category: Category | null; // null = uncategorised
@@ -323,7 +317,7 @@ function checkMonth(
 	totals: { income: Minor; outflow: Minor; buckets: BucketTotal[] }
 ): Finding[] {
 	const findings: Finding[] = [];
-	const { month, txns, today } = context;
+	const { month, txns } = context;
 	const rows = txns.filter((t) => !t.isDeleted && monthKey(t.date) === month);
 
 	// OSTATNÍ carried 100 895 Kč across eight months — the second largest bucket
@@ -359,27 +353,13 @@ function checkMonth(
 		});
 	}
 
-	// SUMA reported six months while the workbook held eight: ČERVENEC and SRPEN
-	// had data and no formula. The totals here are computed, never dragged.
-	// Coverage counts a day with an explicit `DayMark` as recorded, which is the
-	// entire reason `DayMark` exists: "I spent nothing" is an answer, and only a
-	// day nobody looked at is a hole. Counting transactions alone punished a
-	// frugal week, which this check did until R1.
-	const { covered, elapsed } = monthCoverage({
-		month,
-		txns: rows,
-		marks: context.marks ?? [],
-		today
-	});
-	if (elapsed > 0 && covered / elapsed < COVERAGE_FLOOR) {
-		findings.push({
-			id: `coverage:${month}`,
-			rule: 'coverage',
-			severity: 'info',
-			title: `Zapsáno ${covered} z ${elapsed} ${plural(elapsed, DAYS)}`,
-			detail: 'Díry v zápisu znamenají, že měsíční čísla jsou nižší než skutečnost.'
-		});
-	}
+	// There used to be a `coverage` finding here — "zapsáno 11 z 27 dní", raised
+	// when too few days carried a row. It was retired on 2026-08-28 along with
+	// the day mark it was built on: once a day with nothing on it counts as a
+	// day that cost nothing, there are no holes left for it to point at and it
+	// would fire on every frugal month. `coverage.ts` now answers the question
+	// that survived — how many days cost nothing — and `/mesic` shows it as a
+	// figure rather than as a complaint.
 
 	// LEDEN −23 355. BŘEZEN −238. KVĚTEN −45 937. ČERVENEC −10 048.
 	// Four of eight months in the red, and the spreadsheet never said so.

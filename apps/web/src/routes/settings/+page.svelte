@@ -4,34 +4,29 @@
 	import {
 		archiveCategory,
 		archiveHolding,
-		archiveSchedule,
 		createCategory,
 		createHolding,
-		createSchedule,
 		exportBackup,
 		importBackup,
 		updateAccount,
 		updateCategory,
 		updateHolding,
-		updateSchedule,
 		type Backup
 	} from '$lib/db/repo';
-	import { formatMoney, parseAmount, type Minor } from '$lib/domain/money';
-	import { formatShortDate, today } from '$lib/domain/datetime';
-	import { MODE_LABEL, recurringCost, remainingPayments } from '$lib/domain/recurring';
+	import { formatMoney, parseAmount } from '$lib/domain/money';
+	import { formatDateTime, today } from '$lib/domain/datetime';
 	import { summariseMonth } from '$lib/domain/checks';
-	import { DAYS, PAYMENTS, RECORDS, counted } from '$lib/domain/czech';
+	import { DAYS, RECORDS, counted } from '$lib/domain/czech';
 	import { KIND_LABEL } from '$lib/domain/holdings';
 	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
-	import type { Category, Holding, Schedule, SpendType } from '$lib/domain/types';
+	import type { Category, Holding, SpendType } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
 	import { defaultBaseUrl, pair, unpair } from '$lib/sync/pair';
 	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import HoldingSheet, { type HoldingInput } from '$lib/ui/HoldingSheet.svelte';
-	import ScheduleSheet from '$lib/ui/ScheduleSheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
@@ -43,38 +38,10 @@
 	);
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
 	const txnCount = liveQuery(() => db().txns.count());
-	const schedules = liveQuery(() => db().schedules.orderBy('sortOrder').toArray());
 
-	// ── recurring payments ──────────────────────────────────────────────────
-	const liveSchedules = $derived(
-		(($schedules ?? []) as Schedule[]).filter((s) => !s.isDeleted && !s.isArchived)
-	);
-	const cost = $derived(recurringCost(liveSchedules));
 	const pickable = $derived(
 		(($categories ?? []) as Category[]).filter((c) => !c.isDeleted && !c.isArchived)
 	);
-
-	let editing = $state<Schedule | null>(null);
-	let sheetOpen = $state(false);
-
-	function openSchedule(schedule: Schedule | null) {
-		editing = schedule;
-		sheetOpen = true;
-	}
-
-	async function saveSchedule(input: {
-		payee: string;
-		categoryId: string;
-		amount: number;
-		dayOfMonth: number;
-		endMonth: string | null;
-		mode: Schedule['mode'];
-	}) {
-		if (editing) await updateSchedule(editing.id, { ...input, amount: input.amount as Minor });
-		else await createSchedule({ ...input, amount: input.amount as Minor });
-		sheetOpen = false;
-		toast.show(editing ? 'Uloženo' : 'Pravidelná platba přidána');
-	}
 
 	// ── holdings ────────────────────────────────────────────────────────────
 	//
@@ -111,14 +78,6 @@
 		await archiveHolding(editingHolding.id);
 		holdingSheetOpen = false;
 		toast.show(`„${name}“ schováno`);
-	}
-
-	async function removeSchedule() {
-		if (!editing) return;
-		const name = editing.payee;
-		await archiveSchedule(editing.id);
-		sheetOpen = false;
-		toast.show(`„${name}“ zrušeno`);
 	}
 
 	function categoryName(id: string): string {
@@ -519,85 +478,6 @@
 	</section>
 
 	<!--
-	  ── pravidelné platby ──────────────────────────────────────────
-
-	  Under the buckets, because that is where he went looking for it — but its
-	  own list, not a field on a category: Netflix and Spotify are both LIFESTYLE
-	  and they are two different standing orders.
-
-	  The year is the number this section exists for. Twelve subscriptions at a
-	  few hundred a month each is a rounding error twelve times over; the same
-	  twelve as one annual figure is a decision.
-	-->
-	<section class="card">
-		<h2 class="u-label">Pravidelné platby</h2>
-
-		{#if liveSchedules.length === 0}
-			<p class="hint prose">
-				Nic tu zatím není. Zapiš předplatné, hypotéku nebo pojištění a app ti je každý měsíc nabídne
-				sáma — a hlavně spočítá, na kolik přijdou za rok.
-			</p>
-		{:else}
-			<ul class="schedules">
-				{#each liveSchedules as schedule (schedule.id)}
-					{@const left = remainingPayments(schedule, today())}
-					<li>
-						<button type="button" class="schedule" onclick={() => openSchedule(schedule)}>
-							<span class="schedule__head">
-								<span class="schedule__name">{schedule.payee}</span>
-								<span class="schedule__amount">
-									{formatMoney(schedule.amount, { sign: 'never' })}
-								</span>
-							</span>
-
-							<span class="schedule__foot">
-								<span class="schedule__where">
-									{schedule.dayOfMonth}. · {categoryName(schedule.categoryId)}
-									<span class="schedule__mode" data-mode={schedule.mode}>
-										{MODE_LABEL[schedule.mode]}
-									</span>
-								</span>
-
-								<span class="schedule__year">
-									{#if left}
-										zbývá {counted(left.payments, PAYMENTS)} · {formatMoney(left.total, {
-											sign: 'never'
-										})}
-									{:else if schedule.amount < 0}
-										{formatMoney((Math.abs(schedule.amount) * 12) as Minor)} / rok
-									{/if}
-								</span>
-							</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-
-			{#if cost.rows.length > 0}
-				<dl class="standing">
-					<div>
-						<dt>Za měsíc</dt>
-						<dd class="mono">{formatMoney(cost.monthly)}</dd>
-					</div>
-					<div>
-						<dt>Za rok</dt>
-						<dd class="mono standing__year">{formatMoney(cost.yearly)}</dd>
-					</div>
-				</dl>
-			{/if}
-		{/if}
-
-		<div class="row-actions">
-			<button type="button" class="btn" onclick={() => openSchedule(null)}>Přidat platbu</button>
-		</div>
-
-		<p class="hint prose">
-			<strong>Potvrdit</strong> ti platbu v den splatnosti nabídne na úvodní obrazovce.
-			<strong>Automaticky</strong> ji zapíše samo při otevření app — jen pro částky, které se nemění.
-		</p>
-	</section>
-
-	<!--
 	  Jmění — the holdings themselves, not their values.
 
 	  A value is typed on `/jmeni`, where the keypad is. What a holding *is* — its
@@ -613,23 +493,23 @@
 				zapíše i první hodnota.
 			</p>
 		{:else}
-			<ul class="schedules">
+			<ul class="tiles">
 				{#each liveHoldings as holding (holding.id)}
 					<li>
-						<button type="button" class="schedule" onclick={() => openHolding(holding)}>
-							<span class="schedule__head">
-								<span class="schedule__name">
+						<button type="button" class="tile" onclick={() => openHolding(holding)}>
+							<span class="tile__head">
+								<span class="tile__name">
 									<span class="kind-dot" data-kind={holding.kind}></span>
 									{holding.name}
 								</span>
-								<span class="schedule__amount">{KIND_LABEL[holding.kind]}</span>
+								<span class="tile__figure tile__figure--word">{KIND_LABEL[holding.kind]}</span>
 							</span>
 
-							<span class="schedule__foot">
-								<span class="schedule__where">
+							<span class="tile__foot">
+								<span class="tile__where">
 									připomenout po {counted(holding.reminderDays, DAYS)}
 								</span>
-								<span class="schedule__year">
+								<span class="tile__note tile__note--word">
 									{holding.categoryId ? categoryName(holding.categoryId) : 'bez kategorie'}
 								</span>
 							</span>
@@ -721,7 +601,9 @@
 				</div>
 				<div>
 					<dt>Naposledy</dt>
-					<dd>{sync.lastSyncedAt ? formatShortDate(sync.lastSyncedAt.slice(0, 10)) : '—'}</dd>
+					<!-- The date alone could not tell "právě teď" from "ráno", and two
+					     cycles in one day is the normal case. -->
+					<dd class="mono">{sync.lastSyncedAt ? formatDateTime(sync.lastSyncedAt) : '—'}</dd>
 				</div>
 			</dl>
 
@@ -820,15 +702,6 @@
 	onsave={saveHolding}
 	onarchive={editingHolding ? removeHolding : null}
 	onclose={() => (holdingSheetOpen = false)}
-/>
-
-<ScheduleSheet
-	open={sheetOpen}
-	schedule={editing}
-	categories={pickable}
-	onsave={saveSchedule}
-	onarchive={editing ? removeSchedule : null}
-	onclose={() => (sheetOpen = false)}
 />
 
 <TabBar />
@@ -992,52 +865,8 @@
 		cursor: pointer;
 	}
 
-	/* ── theme ───────────────────────────────────────────────────────────
-	   A three-position switch, built from the same parts as the direction
-	   switch on the entry screen. */
+	/* ── sync ────────────────────────────────────────────────────────────── */
 
-	/* ── recurring ────────────────────────────────────────────────── */
-
-	.schedules {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-
-	.schedule {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		width: 100%;
-		min-height: var(--touch-lg);
-		padding: var(--space-2) var(--space-3);
-		border-radius: var(--radius-sm);
-		text-align: left;
-		transition: background var(--dur-fast) var(--ease-out);
-	}
-
-	.schedule:active {
-		background: var(--surface-2);
-	}
-
-	@media (hover: hover) {
-		.schedule:hover {
-			background: var(--surface-2);
-		}
-	}
-
-	.schedule__head {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--space-3);
-	}
-
-	/* The same colour language the holding rows on /jmeni speak, so a kind is
-	   legible before its name is read. */
 	.pair-row {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
@@ -1058,6 +887,8 @@
 		color: var(--in);
 	}
 
+	/* The same colour language the holding rows on /jmeni speak, so a kind is
+	   legible before its name is read. */
 	.kind-dot {
 		display: inline-block;
 		width: 7px;
@@ -1080,101 +911,26 @@
 		background: var(--flag);
 	}
 
-	.schedule__name {
-		min-width: 0;
-		font-size: var(--text-base);
-		font-weight: 600;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.schedule__amount {
-		flex: none;
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-		font-size: var(--text-md);
-		font-weight: 600;
-		letter-spacing: var(--track-tight);
-	}
-
-	.schedule__foot {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-3);
+	/* A holding's kind and its bucket are words, not figures: the tile's own
+	   two slots are mono because most screens put money in them. */
+	.tile__figure--word {
+		font-family: inherit;
 		font-size: var(--text-xs);
+		font-weight: 400;
+		letter-spacing: 0;
 		color: var(--ink-3);
 	}
 
-	.schedule__where {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	.tile__note--word {
+		font-family: inherit;
+		letter-spacing: 0;
 	}
 
-	/* Which way it reaches the ledger, said once and quietly. `auto` takes the
-	   signal because it is the one that writes without being asked. */
-	.schedule__mode {
-		flex: none;
-		padding: 1px var(--space-2);
-		border-radius: var(--radius-full);
-		background: var(--surface-3);
-		font-size: var(--text-2xs);
-		font-weight: 600;
-		color: var(--ink-3);
-	}
+	/* ── theme ───────────────────────────────────────────────────────────
+	   A three-position switch, built from the same parts as the direction
+	   switch on the entry screen.
 
-	.schedule__mode[data-mode='auto'] {
-		background: var(--signal-wash);
-		color: var(--in);
-	}
-
-	.schedule__year {
-		flex: none;
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
-		letter-spacing: var(--track-tight);
-	}
-
-	/* The figure the whole section is for. */
-	.standing {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		margin: var(--space-3) 0 0;
-		padding-top: var(--space-3);
-		border-top: 1px solid var(--hairline);
-	}
-
-	.standing > div {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--space-3);
-	}
-
-	.standing dt {
-		font-size: var(--text-md);
-		color: var(--ink-3);
-	}
-
-	.standing dd {
-		margin: 0;
-		font-size: var(--text-md);
-	}
-
-	.standing__year {
-		font-size: var(--text-lg);
-		font-weight: 600;
-		color: var(--ink);
-	}
-
-	/* The track is the pocket, the selection is raised: `--ground-2` up to
+	   The track is the pocket, the selection is raised: `--ground-2` up to
 	   `--raised`. One rule, and it steps the right way in both themes. */
 	.segments {
 		display: flex;

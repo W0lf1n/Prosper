@@ -159,6 +159,33 @@ export const migrations: Migration[] = [
 					row.startDate = seen ? `${seen.slice(0, 7)}-01` : fallback;
 				});
 		}
+	},
+	{
+		/**
+		 * `Schedule.owedAmount` / `Schedule.owedBy` — the share of a standing
+		 * payment that comes back every month (DECISIONS Q46).
+		 *
+		 * No index changes, so `schedules` is not restated — Dexie replaces a
+		 * table's whole declaration and restating it wrongly is how indexes get
+		 * dropped.
+		 *
+		 * The backfill writes `null` rather than leaving the fields absent, for
+		 * the reason v5 did the same to `scheduleId`: `row.owedAmount === null`
+		 * would otherwise answer false for every schedule declared before today,
+		 * and that is the class of difference that surfaces months later as one
+		 * screen disagreeing with another.
+		 */
+		version: 7,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			await tx
+				.table('schedules')
+				.toCollection()
+				.modify((row: { owedAmount?: number | null; owedBy?: string | null }) => {
+					if (row.owedAmount === undefined) row.owedAmount = null;
+					if (row.owedBy === undefined) row.owedBy = null;
+				});
+		}
 	}
 ];
 

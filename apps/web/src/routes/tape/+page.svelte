@@ -1,14 +1,7 @@
 <script lang="ts">
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
-	import {
-		clearZeroSpendDay,
-		deleteTxn,
-		markZeroSpendDay,
-		reconcileAccount,
-		restoreTxn,
-		updateTxn
-	} from '$lib/db/repo';
+	import { deleteTxn, reconcileAccount, restoreTxn, updateTxn } from '$lib/db/repo';
 	import { formatDayHeading, formatMonthHeading, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
 	import { buildTape } from '$lib/domain/ledger';
@@ -40,17 +33,12 @@
 	);
 
 	const categories = liveQuery(() => db().categories.toArray());
-	const dayMarks = liveQuery(() => db().dayMarks.toArray());
 
 	const categoryById = $derived(new Map(($categories ?? []).map((c: Category) => [c.id, c])));
 
 	const months = $derived(
 		$account
-			? buildTape($txns ?? [], {
-					openingBalance: $account.openingBalance,
-					dayMarks: ($dayMarks ?? []).map((m) => m.date),
-					today: today()
-				})
+			? buildTape($txns ?? [], { openingBalance: $account.openingBalance, today: today() })
 			: []
 	);
 
@@ -161,11 +149,6 @@
 		await deleteTxn(doomed.id);
 		toast.show('Záznam smazán', { undo: () => restoreTxn(doomed.id) });
 	}
-
-	async function toggleDayMark(date: string, marked: boolean) {
-		if (marked) await clearZeroSpendDay(date);
-		else await markZeroSpendDay(date);
-	}
 </script>
 
 <svelte:head>
@@ -228,7 +211,7 @@
 			</header>
 
 			{#each month.days as day (day.date)}
-				<div class="day" class:day--gap={day.isGap}>
+				<div class="day" class:day--quiet={day.rows.length === 0}>
 					<div class="day__head">
 						<span class="day__date">{formatDayHeading(day.date)}</span>
 						{#if day.rows.length > 0}
@@ -237,20 +220,18 @@
 					</div>
 
 					{#if day.rows.length === 0}
-						<button
-							type="button"
-							class="blank"
-							class:blank--marked={day.hasDayMark}
-							onclick={() => toggleDayMark(day.date, day.hasDayMark)}
-						>
-							{#if day.hasDayMark}
-								<span class="blank__tick"><Icon name="check" size={15} stroke={2.4} /></span>
-								<span class="blank__mark">bez výdaje</span>
-							{:else}
-								<span class="blank__gap">žádný záznam</span>
-								<span class="blank__hint">označit jako den bez výdaje</span>
-							{/if}
-						</button>
+						<!--
+						  Nothing on the day, so nothing was spent on it. It used to be a
+						  button — "označit jako den bez výdaje" — and the tap it asked for
+						  bought nothing: forgetting to press it made a frugal Tuesday look
+						  like a hole in the book. Now it is a statement, and a day that
+						  turns out to have had something on it is fixed by typing the row
+						  with its date, days later if need be.
+						-->
+						<p class="blank">
+							<span class="blank__tick"><Icon name="check" size={15} stroke={2.4} /></span>
+							<span class="blank__mark">bez výdaje</span>
+						</p>
 					{:else}
 						<ul class="rows">
 							{#each day.rows as row (row.txn.id)}
@@ -495,19 +476,17 @@
 	}
 
 	/**
-	 * A day with nothing in it is a hole in the ledger, not an absence — so it
-	 * is drawn as a hole: the surface is pressed in rather than raised, and the
-	 * light that lands on every other row does not land here.
+	 * A day with nothing on it is not a hole any more — it is an answer, and a
+	 * cheap one. It keeps the recessed surface all the same, because a row with
+	 * nothing to read on it should not sit at the same level as one that has
+	 * five figures: `--ground-2` is darker than the card in both themes, so
+	 * "pressed in" reads the same way with the lights on and off.
 	 */
-	/**
-	 * A hole is a pocket, not a shadow. `--ground-2` is darker than the card in
-	 * both themes, so "pressed in" reads the same way with the lights on and off.
-	 */
-	.day--gap {
+	.day--quiet {
 		background: var(--ground-2);
 	}
 
-	.day--gap .day__date {
+	.day--quiet .day__date {
 		opacity: 0.72;
 	}
 
@@ -582,32 +561,15 @@
 		color: var(--ink-3);
 	}
 
+	/* A line, not a control: there is nothing left to press here. */
 	.blank {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
 		gap: var(--space-3);
 		width: 100%;
 		min-height: var(--touch);
 		padding: 0 var(--space-4);
-		text-align: left;
 		font-size: var(--text-md);
-		transition: background var(--dur-fast) var(--ease-out);
-	}
-
-	/* The press has to go *up* out of the pocket now, not further down. */
-	.blank:active {
-		background: var(--surface-2);
-	}
-
-	@media (hover: hover) {
-		.blank:hover {
-			background: var(--surface-2);
-		}
-	}
-
-	.blank__gap {
-		color: var(--ink-3);
 	}
 
 	.blank__tick {
@@ -624,13 +586,6 @@
 	.blank__mark {
 		flex: 1;
 		color: var(--ink-2);
-	}
-
-	.blank__hint {
-		font-size: var(--text-2xs);
-		color: var(--ink-3);
-		opacity: 0.78;
-		text-align: right;
 	}
 
 	/* ── edit form ───────────────────────────────────────────────────────── */

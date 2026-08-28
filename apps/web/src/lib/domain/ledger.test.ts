@@ -57,7 +57,7 @@ describe('buildTape()', () => {
 		expect(days[1]!.balance).toBe(75000); // 1000 - 250
 	});
 
-	it('renders untouched days as gaps', () => {
+	it('materialises the days nothing happened on, rather than skipping them', () => {
 		const tape = buildTape([txn('2026-08-18', -5000)], {
 			openingBalance: OPENING,
 			today: '2026-08-20'
@@ -65,19 +65,8 @@ describe('buildTape()', () => {
 
 		const days = tape[0]!.days;
 		expect(days.map((d) => d.date)).toEqual(['2026-08-20', '2026-08-19', '2026-08-18']);
-		expect(days.map((d) => d.isGap)).toEqual([true, true, false]);
-	});
-
-	it('an explicit zero-spend mark is not a gap', () => {
-		const tape = buildTape([txn('2026-08-18', -5000)], {
-			openingBalance: OPENING,
-			today: '2026-08-19',
-			dayMarks: ['2026-08-19']
-		});
-
-		const [first] = tape[0]!.days;
-		expect(first!.isGap).toBe(false);
-		expect(first!.hasDayMark).toBe(true);
+		// An empty day carries no flag of its own: no rows is the whole story.
+		expect(days.map((d) => d.rows.length)).toEqual([0, 0, 1]);
 	});
 
 	it('totals inflow and outflow per month', () => {
@@ -104,7 +93,7 @@ describe('buildTape()', () => {
 		const tape = buildTape([], { openingBalance: OPENING, today: '2026-08-20' });
 		expect(tape).toHaveLength(1);
 		expect(tape[0]!.days).toEqual([
-			expect.objectContaining({ date: '2026-08-20', isGap: true, balance: OPENING })
+			expect.objectContaining({ date: '2026-08-20', rows: [], balance: OPENING })
 		]);
 	});
 

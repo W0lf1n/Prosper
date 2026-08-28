@@ -16,8 +16,8 @@ checks the entry _before_ it is saved.
 ![SvelteKit 2](https://img.shields.io/badge/SvelteKit-2.63-FF3E00.svg)
 ![Svelte 5](https://img.shields.io/badge/Svelte-5%20runes-FF3E00.svg)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-6%20strict-3178C6.svg)
-![373 tests](https://img.shields.io/badge/tests-341%20web%20%2B%2032%20api-007850.svg)
-![84.4 kB brotli](https://img.shields.io/badge/JS-84.4%20kB%20brotli-007850.svg)
+![399 tests](https://img.shields.io/badge/tests-349%20web%20%2B%2050%20api-007850.svg)
+![85.3 kB brotli](https://img.shields.io/badge/JS-85.3%20kB%20brotli-007850.svg)
 ![One dependency](https://img.shields.io/badge/runtime%20deps-1-007850.svg)
 ![Offline first](https://img.shields.io/badge/offline-first-0066CC.svg)
 
@@ -40,7 +40,7 @@ serves no law does not get built.
 
 | Law           | What the app actually does                                                                                                                                                                                                                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tracking**  | Opens straight into the keypad — no dashboard, no menu, no decision. Days with no record show as **holes** in the ledger, not as absence. A real zero is a separate, explicit mark.                                                                                                                                   |
+| **Tracking**  | Opens straight into the keypad — no dashboard, no menu, no decision. Every day is in the ledger, including the ones nothing happened on: a day with no expense reads **bez výdaje** and needs no tap to say so. A day you forgot is fixed by typing the row, whenever you remember.                                    |
 | **Targeting** | A goal cannot be saved without a why, an amount and a date; the save button names the missing piece rather than accepting the tap and complaining. Each month gets a written commitment, and it sits on the launch screen so it cannot stop being seen.                                                               |
 | **Trimming**  | Every bucket carries a `need` / `want` / `give` / `save` / `debt` type. Misfiled spending is caught **while you type**. One-off purchases are kept out of the monthly average. The month splits income the book's way — 10 % given, 10 % saved, 10 % debt or reserve, 70 % living — and names the share furthest off. |
 | **Training**  | The checks run on every keystroke — a hundred small corrections, not one monthly reckoning. The goal screen keeps the record of months, ✓ or ✗ against a number you actually agreed to.                                                                                                                               |
@@ -71,7 +71,6 @@ comment so nobody later deletes it as theoretical.
 | `duplicate`         | Same amount and description within three days                 | HBO Max entered as −18 Kč, twice             |
 | `other-overflow`    | The dumping-ground bucket past 15 % of recurring outflow      | OSTATNÍ took 100 895 Kč in eight months      |
 | `missing-recurring` | A payee seen three months running, absent from this one       | a subscription cancelled, or a month missed  |
-| `coverage`          | Days with no record — "your totals are lower than reality"    | the spreadsheet had no dates at all          |
 | `overspend`         | The month spent more than it earned                           | four of eight months ran a deficit, silently |
 
 **Nothing blocks a save.** A check that stops you recording an expense is worse
@@ -89,7 +88,7 @@ than the mistake it prevents.
 </td>
 <td width="33%" valign="top">
 <img src="docs/screens/tape-dark.png" alt="The ledger tape">
-<p align="center"><b>Výpis — the tape</b><br><sub>Reverse-chronological, running balance per row, days separated by score lines, gap days rendered as holes and real zeros marked.</sub></p>
+<p align="center"><b>Výpis — the tape</b><br><sub>Reverse-chronological, running balance per row, days separated by score lines, days that cost nothing recessed and marked <i>bez výdaje</i>.</sub></p>
 </td>
 <td width="33%" valign="top">
 <img src="docs/screens/split-dark.png" alt="The 10/10/10/70 split as two rings">
@@ -139,7 +138,7 @@ provision, no API key, no `.env`. The ledger lives in IndexedDB on the device.
 
 | Script          | What it does                                                |
 | --------------- | ----------------------------------------------------------- |
-| `pnpm test`     | 341 unit tests against the pure domain layer, 19 files      |
+| `pnpm test`     | 349 unit tests against the pure domain layer, 19 files      |
 | `pnpm check`    | `svelte-check` under TypeScript strict — 0 errors           |
 | `pnpm lint`     | Prettier + ESLint                                           |
 | `pnpm build`    | Precompressed static output in `apps/web/build`             |
@@ -177,8 +176,8 @@ apps/web/src/
 ├─ lib/sync/       Outbox drain, pull, pairing. Never awaited by the UI.
 ├─ lib/ui/         Hand-rolled components. No component library.
 ├─ lib/styles/     tokens.css — the only place colour exists — and app.css,
-│                  which owns .slab / .card / .meter / .btn / .field once each.
-└─ routes/         / · /tape · /mesic · /cil · /jmeni · /settings
+│                  which owns .slab / .card / .meter / .tile / .btn / .field.
+└─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /settings
 
 apps/api/          ASP.NET Core 9 + EF Core + Postgres 16 — optional sync server
 packages/contracts The sync protocol, shared by both sides
@@ -345,16 +344,16 @@ between two devices; it does not become the ledger.
 | Phase                             | State                                                 |
 | --------------------------------- | ----------------------------------------------------- |
 | P0 · Foundation                   | ✅ shipped                                            |
-| P1 · MVP, local only              | ✅ shipped — six screens, checks, PWA                 |
+| P1 · MVP, local only              | ✅ shipped — seven screens, checks, PWA               |
 | Targeting · goals                 | ✅ shipped ahead of schedule                          |
 | Investments · `/jmeni`            | ✅ shipped, items 5–8 outstanding                     |
-| Recurring payments                | ✅ shipped                                            |
+| Recurring payments                | ✅ shipped — `/platby`, incoming ones and shared ones  |
 | P2 · Sync                         | ✅ shipped — protocol, engine, pairing, and `deploy/` |
 | Design · second edition           | ✅ shipped — tokens, all six screens, one font fewer  |
 | P3 · Caps, close ritual, nudge    | designed, not built                                   |
 | P4 · Bank import · P5 · Reporting | not started                                           |
 
-Schema **v6**, backup format **5**. `deploy/` is written but has never been run
+Schema **v7**, backup format **5**. `deploy/` is written but has never been run
 against real Docker or real Postgres — treat the runbook as unproven until a VPS
 answers `{"ok":true}`.
 

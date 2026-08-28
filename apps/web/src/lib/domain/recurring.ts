@@ -20,11 +20,17 @@
  * **The annual figure is the point.** `379 Kč/měs` is a rounding error;
  * `4 548 Kč/rok` is a decision, and it is the number the Trimming law acts on.
  *
+ * **And it is the *net* annual figure.** A payment that is shared — the mortgage
+ * paid whole and halved by the person it is halved with — costs what stays
+ * gone, not what leaves the account (Q46). The gross is still shown, because
+ * the gross is what the balance sees on the 15th; the net is what the decision
+ * is made against.
+ *
  * Pure (§11.6). No Dexie, no fetch, no DOM.
  */
 
 import { daysInMonth, monthKey, shiftMonth, type IsoDate } from './datetime';
-import { ZERO, abs, sum, type Minor } from './money';
+import { ZERO, abs, minor, sum, type Minor } from './money';
 import type { Schedule } from './types';
 
 export const MODE_LABEL: Record<Schedule['mode'], string> = {
@@ -144,24 +150,48 @@ export function partitionByMode(items: readonly DueItem[]): {
 
 export interface RecurringCost {
 	schedule: Schedule;
-	/** Positive magnitude per month. */
+	/** Positive magnitude per month, before anything comes back. */
 	monthly: Minor;
-	/** The number that changes decisions. */
+	/** The share somebody else pays back each month. Zero on most rows. */
+	reimbursed: Minor;
+	/** `monthly` less `reimbursed`: what the payment actually costs. */
+	net: Minor;
+	/** The number that changes decisions — net, over twelve months. */
 	yearly: Minor;
+	/** Gross over twelve months, for the rows that are shared. */
+	grossYearly: Minor;
 }
 
 export interface RecurringTotal {
 	rows: RecurringCost[];
+	/** Everything that leaves the account, per month. */
 	monthly: Minor;
+	/** Everything expected back, per month. Zero when nothing is shared. */
+	reimbursed: Minor;
+	/** What the standing orders cost, per month, once the shares come back. */
+	net: Minor;
+	/** Twelve times `net` — the figure this whole list exists for. */
 	yearly: Minor;
+	/** Twelve times `monthly`. Equal to `yearly` when nothing is shared. */
+	grossYearly: Minor;
+}
+
+/** What a schedule really costs each month, once its share comes back. */
+export function netOfSchedule(schedule: Schedule): Minor {
+	const gross = abs(schedule.amount);
+	if (!schedule.owedAmount) return gross;
+	// A share larger than the payment would make it earn money; clamp, never lie.
+	return minor(Math.max(gross - abs(schedule.owedAmount), 0));
 }
 
 /**
  * The standing cost of everything declared, per month and per year.
  *
- * Outflows only. A salary on a schedule is a real and useful thing to declare,
- * but adding it here would net the two off and produce a figure that answers no
- * question anybody asks.
+ * Outflows only. Incoming schedules are a real and useful thing to declare, but
+ * netting them off here would produce a figure that answers no question anybody
+ * asks — `recurringIncome` counts those separately. What *is* netted off is the
+ * share of an outflow that comes back, because that is not a second payment: it
+ * is a property of this one.
  */
 export function recurringCost(schedules: readonly Schedule[]): RecurringTotal {
 	const rows = schedules
@@ -169,14 +199,55 @@ export function recurringCost(schedules: readonly Schedule[]): RecurringTotal {
 		.sort((a, b) => a.amount - b.amount)
 		.map((schedule) => {
 			const monthly = abs(schedule.amount);
-			return { schedule, monthly, yearly: (monthly * 12) as Minor };
+			const net = netOfSchedule(schedule);
+			return {
+				schedule,
+				monthly,
+				reimbursed: minor(monthly - net),
+				net,
+				yearly: minor(net * 12),
+				grossYearly: minor(monthly * 12)
+			};
 		});
+
+	const monthly = rows.length ? sum(rows.map((r) => r.monthly)) : ZERO;
+	const net = rows.length ? sum(rows.map((r) => r.net)) : ZERO;
 
 	return {
 		rows,
-		monthly: rows.length ? sum(rows.map((r) => r.monthly)) : ZERO,
-		yearly: rows.length ? sum(rows.map((r) => r.yearly)) : ZERO
+		monthly,
+		reimbursed: minor(monthly - net),
+		net,
+		yearly: minor(net * 12),
+		grossYearly: minor(monthly * 12)
 	};
+}
+
+export interface RecurringIncome {
+	rows: { schedule: Schedule; monthly: Minor; yearly: Minor }[];
+	monthly: Minor;
+	yearly: Minor;
+}
+
+/**
+ * Money that arrives on a schedule — Q46's second half.
+ *
+ * Its own list rather than a negative row in the one above, because it answers
+ * a different question. "What do the standing orders cost" is a Trimming
+ * number; "what turns up every month without being chased" is a fact about
+ * income, and averaging the two together hides both.
+ */
+export function recurringIncome(schedules: readonly Schedule[]): RecurringIncome {
+	const rows = schedules
+		.filter((s) => !s.isDeleted && !s.isArchived && s.amount > 0)
+		.sort((a, b) => b.amount - a.amount)
+		.map((schedule) => {
+			const monthly = abs(schedule.amount);
+			return { schedule, monthly, yearly: minor(monthly * 12) };
+		});
+
+	const monthly = rows.length ? sum(rows.map((r) => r.monthly)) : ZERO;
+	return { rows, monthly, yearly: minor(monthly * 12) };
 }
 
 /**

@@ -315,6 +315,104 @@ a {
 }
 
 /**
+ * The tile: one pressable row of a list inside a card.
+ *
+ * Two lines, and the same two lines every time — a name with a figure opposite
+ * it, and under them the context with a second, quieter figure. A standing
+ * order, an investment, anything a screen keeps a list of and lets you open.
+ *
+ * It is here rather than in a route for the reason `.card` and `.meter` are:
+ * `/nastaveni` and `/platby` draw the identical row, and the recipe had already
+ * been copied once — the holdings list on Settings was styled with class names
+ * that said `schedule`, which is what a copy looks like just before it drifts.
+ *
+ * A screen that needs a variant declares only the difference.
+ */
+.tiles {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.tile {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+	min-height: var(--touch-lg);
+	padding: var(--space-2) var(--space-3);
+	border-radius: var(--radius-sm);
+	text-align: left;
+	transition: background var(--dur-fast) var(--ease-out);
+}
+
+/* Full-bleed rows press by luminance, never by scale: there is no edge here to
+   watch move. */
+.tile:active {
+	background: var(--surface-2);
+}
+
+@media (hover: hover) {
+	.tile:hover {
+		background: var(--surface-2);
+	}
+}
+
+.tile__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-3);
+}
+
+.tile__name {
+	min-width: 0;
+	font-size: var(--text-base);
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tile__figure {
+	flex: none;
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--text-md);
+	font-weight: 600;
+	letter-spacing: var(--track-tight);
+}
+
+.tile__foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+}
+
+.tile__where {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tile__note {
+	flex: none;
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: var(--track-tight);
+}
+
+/**
  * The micro-label. Uppercase is allowed here and nowhere else, because these
  * are machine labels on an instrument rather than headings in a document.
  */

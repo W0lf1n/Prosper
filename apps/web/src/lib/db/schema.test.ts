@@ -172,3 +172,41 @@ describe('v4 → v5 — Txn.scheduleId', () => {
 		upgraded.close();
 	});
 });
+
+describe('v6 → v7 — the share of a schedule that comes back', () => {
+	it('backfills null on a schedule declared before the field existed', async () => {
+		const name = `mig-owed-${Date.now()}`;
+		const old = await openAtVersion(name, 6);
+		await old.table('schedules').put({
+			id: 's1',
+			payee: 'Hypotéka',
+			categoryId: 'cat-home',
+			amount: -32_000_00,
+			dayOfMonth: 15,
+			startMonth: '2026-01',
+			endMonth: '2051-12',
+			mode: 'auto',
+			lastPostedMonth: '2026-07',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const schedule = await upgraded.schedules.get('s1');
+
+		// Absent is not null: `row.owedAmount === null` has to answer true for
+		// every schedule that existed before the field did.
+		expect(schedule).toHaveProperty('owedAmount');
+		expect(schedule?.owedAmount).toBeNull();
+		expect(schedule?.owedBy).toBeNull();
+		// And the payment itself is untouched.
+		expect(schedule).toMatchObject({
+			amount: -32_000_00,
+			mode: 'auto',
+			lastPostedMonth: '2026-07'
+		});
+		upgraded.close();
+	});
+});

@@ -21,14 +21,13 @@
 		 */
 		footer?: Snippet;
 		/**
-		 * The streak, beside the month label — R1's entire budget on this screen.
+		 * Days in a row without an expense, beside the month label.
 		 *
-		 * Coverage is a *review* number and this is the entry screen, so it gets
-		 * one figure in the corner and nothing else. It must never reach the
+		 * One figure in the corner and nothing else. It must never reach the
 		 * primary column: the amount and the keypad own that, and a habit counter
 		 * competing with them is how a five-second entry becomes a six-second one.
 		 */
-		streak?: { days: number; includesToday: boolean } | null;
+		streak?: { days: number } | null;
 	}
 
 	let { month, income, outflow, net, href, actions, footer, streak = null }: Props = $props();
@@ -51,12 +50,8 @@
 		<h2 class="totals__month u-label">{formatMonthHeading(`${month}-01`)}</h2>
 
 		{#if streak && streak.days > 0}
-			<span
-				class="totals__streak"
-				class:totals__streak--risk={!streak.includesToday}
-				title={streak.includesToday ? 'Dní v řadě' : 'Dní v řadě — dnešek zatím chybí'}
-			>
-				<Icon name="check" size={11} stroke={2.6} />
+			<span class="totals__streak" title="Dní v řadě bez výdaje">
+				<Icon name="zero-day" size={11} stroke={2.2} />
 				{streak.days}
 			</span>
 		{/if}
@@ -144,11 +139,6 @@
 		font-weight: 600;
 		font-variant-numeric: tabular-nums;
 		color: var(--signal);
-	}
-
-	.totals__streak--risk {
-		background: var(--flag-wash);
-		color: var(--flag);
 	}
 
 	.totals__month {

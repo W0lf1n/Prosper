@@ -2,9 +2,15 @@
  * The tape.
  *
  * Turns a flat list of transactions into the structure the ledger screen draws:
- * months, days, running balance, and — the part that matters — the gap days
- * where nothing was recorded at all. A gap is not an empty row, it is a hole in
- * the book, and it renders as one.
+ * months, days, running balance, and every day in between — including the ones
+ * nothing happened on. Those are materialised rather than skipped, because a
+ * day that cost nothing is an answer and the tape should say so.
+ *
+ * It used to say something else. A day with no rows and no explicit mark was a
+ * *gap* — a hole in the book, drawn as one — and clearing it took a tap. That
+ * distinction was retired on 2026-08-28: nothing recorded means nothing spent
+ * (`DECISIONS.md` → "Every empty day is a no-spend day"), so an empty day
+ * carries no flag at all and the screen reads it off `rows.length`.
  *
  * Pure. No Dexie, no fetch, no DOM (§11.6).
  */
@@ -26,10 +32,6 @@ export interface TapeDay {
 	net: Minor;
 	/** Balance at the end of the day. */
 	balance: Minor;
-	/** No transactions and no explicit zero-spend mark: a hole in the book. */
-	isGap: boolean;
-	/** The user said "spent nothing today". */
-	hasDayMark: boolean;
 }
 
 export interface TapeMonth {
@@ -45,11 +47,9 @@ export interface TapeMonth {
 
 export interface TapeOptions {
 	openingBalance: Minor;
-	/** Dates the user explicitly marked as zero-spend. */
-	dayMarks?: Iterable<IsoDate>;
 	/** Defaults to the real today. Injected so the tape is testable. */
 	today?: IsoDate;
-	/** Safety valve: never materialise more than this many gap days. */
+	/** Safety valve: never materialise more than this many empty days. */
 	maxGapDays?: number;
 }
 
@@ -67,7 +67,6 @@ function byCreation(a: Txn, b: Txn): number {
  */
 export function buildTape(txns: readonly Txn[], options: TapeOptions): TapeMonth[] {
 	const { openingBalance, today = todayIso(), maxGapDays = 400 } = options;
-	const marks = new Set(options.dayMarks ?? []);
 
 	const ordered = [...txns].sort((a, b) =>
 		a.date === b.date ? byCreation(a, b) : a.date < b.date ? -1 : 1
@@ -110,14 +109,7 @@ export function buildTape(txns: readonly Txn[], options: TapeOptions): TapeMonth
 		const net = sum(dayTxns.map((t) => t.amount));
 		const endOfDay = runningEnd;
 
-		days.push({
-			date: cursor,
-			rows,
-			net,
-			balance: endOfDay,
-			hasDayMark: marks.has(cursor),
-			isGap: dayTxns.length === 0 && !marks.has(cursor)
-		});
+		days.push({ date: cursor, rows, net, balance: endOfDay });
 
 		runningEnd = minor(endOfDay - net);
 		cursor = addDays(cursor, -1);

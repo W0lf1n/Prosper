@@ -26,12 +26,24 @@
 	 * so the link checker can see it, and so a renamed route fails the build here
 	 * instead of at the tap.
 	 */
-	type Destination = '/tape' | '/mesic' | '/cil' | '/settings';
+	type Destination = '/tape' | '/mesic' | '/platby' | '/cil' | '/jmeni' | '/settings';
 
+	/**
+	 * Six, three each side of the disc — up from four on 2026-08-28, when
+	 * Pravidelné platby became a screen of its own and Jmění was asked for down
+	 * here rather than only in the corner of the entry screen.
+	 *
+	 * Six is the ceiling and this is at it: seven cells on a 320 px phone give
+	 * each label 38 px, which is where a Czech word stops fitting and starts
+	 * being an ellipsis. The labels below are all short for that reason, and the
+	 * one long one shrinks a step on a narrow screen rather than being cut.
+	 */
 	const tabs: { path: Destination; label: string; icon: IconName }[] = [
 		{ path: '/tape', label: 'Výpis', icon: 'tape' },
 		{ path: '/mesic', label: 'Měsíc', icon: 'month' },
+		{ path: '/platby', label: 'Platby', icon: 'repeat' },
 		{ path: '/cil', label: 'Cíl', icon: 'goal' },
+		{ path: '/jmeni', label: 'Jmění', icon: 'wealth' },
 		{ path: '/settings', label: 'Nastavení', icon: 'settings' }
 	];
 
@@ -44,7 +56,7 @@
 </script>
 
 <nav class="tabbar" aria-label="Hlavní navigace">
-	{#each tabs.slice(0, 2) as tab (tab.path)}
+	{#each tabs.slice(0, 3) as tab (tab.path)}
 		<a
 			class="tab"
 			class:tab--on={isCurrent(tab.path)}
@@ -60,7 +72,7 @@
 		<span class="record__disc"><Icon name="plus" size={24} stroke={2} /></span>
 	</a>
 
-	{#each tabs.slice(2) as tab (tab.path)}
+	{#each tabs.slice(3) as tab (tab.path)}
 		<a
 			class="tab"
 			class:tab--on={isCurrent(tab.path)}
@@ -77,7 +89,7 @@
 	.tabbar {
 		flex: none;
 		display: grid;
-		grid-template-columns: repeat(5, 1fr);
+		grid-template-columns: repeat(7, 1fr);
 		align-items: stretch;
 		padding-bottom: env(safe-area-inset-bottom, 0px);
 		background: var(--surface);
@@ -96,7 +108,9 @@
 		min-width: 0;
 		min-height: var(--tabbar);
 		padding-block: var(--space-2);
-		padding-inline: var(--space-1);
+		/* Seven cells across a 320 px phone: every pixel of inline padding is a
+		   pixel the label does not get. */
+		padding-inline: 1px;
 		color: var(--ink-3);
 		text-decoration: none;
 		transition: color var(--dur-fast) var(--ease-out);
@@ -117,8 +131,8 @@
 
 	/**
 	 * One line, always. A label that wraps on a 320 px phone takes the whole row
-	 * with it — five cells of 64 px, and the tallest one sets the height of the
-	 * bar. It shortens instead.
+	 * with it — the tallest cell sets the height of the bar. It shortens
+	 * instead.
 	 */
 	.tab__label {
 		max-width: 100%;
@@ -129,6 +143,23 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	/**
+	 * Under 400 px the six cells stop being able to hold "Nastavení" at 11 px.
+	 * A step down in size keeps the whole word, and a whole word is worth more
+	 * here than a consistent type scale: the alternative is `Nastav…`, which is
+	 * not a label.
+	 */
+	@media (max-width: 400px) {
+		.tab__label {
+			font-size: 0.625rem; /* 10 */
+			letter-spacing: 0;
+		}
+
+		.tab__glyph {
+			width: 34px;
+		}
 	}
 
 	.tab--on {

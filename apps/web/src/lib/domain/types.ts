@@ -127,13 +127,17 @@ export type ScheduleMode = 'confirm' | 'auto';
 /**
  * A payment that repeats — a subscription, a standing order, a mortgage.
  *
+ * Or one that arrives: `amount` is signed, so a positive schedule is money that
+ * turns up every month on its own. The sign comes off the category, never off a
+ * switch.
+ *
  * A *declaration*, not a detection. `findMissingRecurring` infers repetition
  * from three months of history and can only ever be statistical; this row says
  * what is owed, to whom, out of which bucket and on which day, so a payment
  * that did not arrive is a fact rather than a guess.
  *
  * It never posts by itself while the app is closed — there is no server. The
- * catch-up runs on launch, the same way `closePreviousDay` does.
+ * catch-up runs on launch, out of the layout load.
  */
 export interface Schedule extends Synced {
 	id: string;
@@ -149,6 +153,22 @@ export interface Schedule extends Synced {
 	/** YYYY-MM, inclusive. Null is open-ended — most subscriptions are. */
 	endMonth: string | null;
 	mode: ScheduleMode;
+	/**
+	 * The part of this payment somebody else pays back, every month — DECISIONS
+	 * Q46.
+	 *
+	 * The mortgage is the case it was written for: 32 000 Kč leaves the account
+	 * and half of it comes back, every month, from the same person. The whole
+	 * payment is still the payment — `amount` is untouched and the balance sees
+	 * all of it — and this rides along onto every row the schedule posts, as
+	 * `Txn.owedAmount` / `Txn.owedBy`, so a recurring reimbursement is settled
+	 * on `/mesic` exactly like one typed by hand (Q25).
+	 *
+	 * Positive magnitude, never larger than the payment. Null on a schedule
+	 * nobody shares, which is most of them, and on every incoming one.
+	 */
+	owedAmount: Minor | null;
+	owedBy: string | null;
 	/**
 	 * The last month this schedule was settled in, whether by posting a row or
 	 * by being skipped. A watermark rather than a derivation: it makes the
@@ -277,7 +297,16 @@ export interface Valuation extends Synced {
 	createdAt: IsoDateTime;
 }
 
-/** Explicit "I spent nothing that day". Keyed by the date itself. */
+/**
+ * Explicit "I spent nothing that day". Keyed by the date itself.
+ *
+ * **Nothing writes one any more.** Since 2026-08-28 a day with no expense on it
+ * is a day without an expense, full stop — no tap, no mark, no hole
+ * (`DECISIONS.md` → "Every empty day is a no-spend day"). The table and the
+ * entity survive because rows already exist on the device and on the server,
+ * and because dropping a synced entity is a protocol change for a table that
+ * now costs nothing to carry.
+ */
 export interface DayMark {
 	date: IsoDate;
 	deviceId: string;

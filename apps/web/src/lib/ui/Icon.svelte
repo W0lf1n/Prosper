@@ -3,7 +3,7 @@
 	 * The icon set.
 	 *
 	 * Drawn here rather than pulled from a library, for the same reason the ring
-	 * on the month screen is drawn by hand: there are eleven shapes in this app
+	 * on the month screen is drawn by hand: there are a dozen shapes in this app
 	 * and a dependency would cost more than it saves. What matters is that they
 	 * are one set — one grid, one stroke weight, one cap — because mismatched
 	 * stroke widths are the fastest way to make an interface look assembled.
@@ -53,9 +53,23 @@
 		wealth:
 			'<rect x="3.8" y="15.6" width="16.4" height="4.6" rx="2.3"/><rect x="5.9" y="9.8" width="12.2" height="4.6" rx="2.3"/><rect x="8" y="4" width="8" height="4.6" rx="2.3"/>',
 
-		/** Označit den bez výdaje — a day closed with nothing in it. */
+		/**
+		 * Den bez výdaje — a day with nothing on it.
+		 *
+		 * It used to label the button that marked one. Nothing marks one any more
+		 * (`DECISIONS.md` → "Every empty day is a no-spend day"), so it labels the
+		 * count instead: how many days in a row have cost nothing.
+		 */
 		'zero-day':
-			'<rect x="4.2" y="5.4" width="15.6" height="14.4" rx="2.4"/><path d="M4.2 10h15.6M8.6 3.6v3.2M15.4 3.6v3.2"/><path d="m9.9 14.9 4.2 0"/>'
+			'<rect x="4.2" y="5.4" width="15.6" height="14.4" rx="2.4"/><path d="M4.2 10h15.6M8.6 3.6v3.2M15.4 3.6v3.2"/><path d="m9.9 14.9 4.2 0"/>',
+
+		/**
+		 * Pravidelné platby — a loop, because that is the whole idea: the same
+		 * payment, round again next month. Two arrows rather than a circular one,
+		 * so it does not read as "reload" at 21 px.
+		 */
+		repeat:
+			'<path d="M4.4 11.4V9.8a3.4 3.4 0 0 1 3.4-3.4h11.8"/><path d="m16.4 3.6 3.2 2.8-3.2 2.8"/><path d="M19.6 12.6v1.6a3.4 3.4 0 0 1-3.4 3.4H4.4"/><path d="m7.6 20.8-3.2-2.8 3.2-2.8"/>'
 	} as const;
 
 	export type IconName = keyof typeof PATHS;

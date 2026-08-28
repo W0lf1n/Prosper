@@ -26,8 +26,8 @@ split against income · declared recurring payments with the annual figure ·
 draining OSTATNÍ one row at a time.
 
 **Training** — checks on every keystroke, none of which block · the record of
-months against a written target · days covered and the streak · gap days as
-visible holes · undo on every save.
+months against a written target · days without an expense and the run of them ·
+undo on every save.
 
 **What is missing is the same thing in both laws: a number to aim at, and a
 moment to look back.** T2 is the first. R2 is the second.
@@ -88,7 +88,7 @@ each step one tap, the whole thing under two minutes:
 
 | Step | What it asks                                                                               | Reads from               |
 | ---- | ------------------------------------------------------------------------------------------ | ------------------------ |
-| 1    | **Zkontroluj díry.** Days with no record, each with "nic jsem neutratil" or a quick entry. | `coverage` — **built**   |
+| 1    | **Doplň, na co sis vzpomněl.** The month's days, each one a quick entry away.               | the tape — **built**     |
 | 2    | **Srovnej se s bankou.** Statement balance in; the delta becomes an adjustment row.        | `reconcile` — **built**  |
 | 3    | **Podívej se na rozdělení.** The split, and last month beside it.                          | `prosperity` — **built** |
 | 4    | **Nastav jeden limit.** One bucket, one number, proposed from evidence.                    | T2                       |
@@ -131,8 +131,10 @@ yes, like `Goal.why`. An unfinished close is a wish._
 
 # R3 — The nudge
 
-One notification, at most, per day: **21:00, only if today has no record and no
-`DayMark`.** Not a summary, not a tip. One line:
+One notification, at most, per day: **21:00, only if today has no record.** (It
+said "no record and no `DayMark`" until 2026-08-28; there is no mark any more,
+and the question it guarded — is this a real zero or a forgotten day — is one the
+app has stopped asking.) Not a summary, not a tip. One line:
 
 > Dnešek je zatím prázdný.
 
@@ -173,14 +175,14 @@ than any score because each mark refers to a specific number he committed to.
 
 `PROJECT-PLAN.md` §2.4 lists one. It should not be built.
 
-A single number compounded from coverage, savings rate, cap adherence and net is
+A single number compounded from no-spend days, savings rate, cap adherence and net is
 **uninterpretable when it moves** — the one thing a training signal must never
 be. If it drops four points he cannot tell whether he missed two days or blew the
 food budget, and a signal you cannot act on is noise with a reputation.
 
-The three real numbers — coverage, the want share, caps held — are each
-individually actionable and two of the three are already on screen. That is the
-replacement.
+The three real numbers — days without an expense, the want share, caps held —
+are each individually actionable and two of the three are already on screen. That
+is the replacement.
 
 _Recorded as Q30 in `TODO.md` §5, and still needing one word to become a formal
 decision rather than a strong recommendation._

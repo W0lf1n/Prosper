@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-08-28 · schema v6 · 341 web tests · 50 API tests
+**Last revised:** 2026-08-28 · schema v7 · 349 web tests · 50 API tests
 
 ---
 
@@ -18,10 +18,10 @@ not get built.** Before adding anything, name which law it serves.
 
 | Law           | Mechanism in the app                                                         |
 | ------------- | ---------------------------------------------------------------------------- |
-| **Tracking**  | Launch straight into the keypad; missing days render as holes, not absence   |
+| **Tracking**  | Launch straight into the keypad; a day with no expense says so, and stays fixable |
 | **Targeting** | A goal needs a why, an amount and a date; a month gets a written target      |
 | **Trimming**  | `spendType` on every bucket; the 10/10/10/70 split measured against income   |
-| **Training**  | Checks on every keystroke; the record of months; days covered and the streak |
+| **Training**  | Checks on every keystroke; the record of months; days without an expense     |
 
 ---
 
@@ -86,8 +86,8 @@ apps/web/src/
 ├─ lib/ui/         Hand-rolled components. No component library.
 ├─ lib/styles/     tokens.css (the only place colours exist), app.css, fonts.
 │                  app.css also owns the shared primitives: slab, card, meter,
-│                  btn, field. One definition each, no per-route copies.
-├─ routes/         / · /tape · /mesic · /cil · /jmeni · /settings
+│                  tile, btn, field. One definition each, no per-route copies.
+├─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /settings
 └─ service-worker.ts
 ```
 
@@ -112,14 +112,14 @@ The runbook is `docs/DEPLOYMENT.md`.
 | `types.ts`        | The data model. Mirrors the server, when there is one           |
 | `vocabulary.ts`   | A hand-written dictionary of Petr's own words. Not ML, ever     |
 | `checks.ts`       | The four laws, enforced. Every rule cites its workbook figure   |
-| `ledger.ts`       | Tape building, gap days, bucket rankings, recent payees         |
+| `ledger.ts`       | Tape building, every day of it, bucket rankings, recent payees  |
 | `receivables.ts`  | Money owed to you                                               |
 | `goals.ts`        | Targeting — validation, pace, required monthly, the record      |
 | `prosperity.ts`   | The 10/10/10/70 split, measured against income                  |
 | `holdings.ts`     | Stated values, staleness, the wealth total                      |
-| `recurring.ts`    | Declared schedules — due dates, catch-up, annual cost           |
+| `recurring.ts`    | Declared schedules — due dates, catch-up, the year net of shares |
 | `trends.ts`       | Month over month per bucket, against what it usually costs      |
-| `coverage.ts`     | Days covered against days elapsed, and the streak               |
+| `coverage.ts`     | Days without an expense, against days elapsed, and the run       |
 | `reconcile.ts`    | The ledger against a bank statement                             |
 | `refile.ts`       | Draining a bucket — the month's rows, and where they belong     |
 | `xlsx.ts`         | A spreadsheet, hand-rolled, no dependency                       |
@@ -144,7 +144,7 @@ Violations are bugs regardless of test status. The long version is
 7. **No check may block a save.** Checks advise, offer a one-tap fix, and get out
    of the way. The one exception in the whole app is the goal form.
 8. **No component library.** Hand-rolled against the token set. `.slab`,
-   `.card`, `.meter` and the `.btn` / `.field` families live once, in
+   `.card`, `.meter`, `.tile` and the `.btn` / `.field` families live once, in
    `app.css`. A screen that needs a variant declares only the difference — a
    scoped rule outranks the global one, so it never restates the recipe.
 9. **Colours only from `tokens.css`**, and the weight ladder is **400 / 600 /
@@ -195,6 +195,11 @@ into 422 and silently truncated. Any card inside a scrolling flex column needs
 
 **IndexedDB cannot index booleans.** `isDeleted`, `isArchived` and `isOneOff` are
 stored but not indexed, and filtered in memory.
+
+**A day with nothing on it is a day nothing was spent on.** `DayMark`,
+`closePreviousDay` and the `coverage` check were retired on 2026-08-28: the app
+never asks for a tap to confirm an absence, and a forgotten day is fixed by
+typing the row with its date. The table still exists and nothing writes to it.
 
 **Dexie replaces a table's whole index declaration.** Adding one index to `txns`
 means restating every existing index in the same `stores` entry, or they are

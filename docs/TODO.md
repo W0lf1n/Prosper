@@ -1,6 +1,6 @@
 # TODO — what is left
 
-**Revised:** 2026-08-28
+**Revised:** 2026-08-28 (second pass)
 **Audience:** Petr (decisions), Claude Code (implementation)
 
 > The only file in `docs/` that carries a backlog. Everything else describes the
@@ -17,17 +17,25 @@
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 341 pass, 19 files              |
-| `pnpm check`               | 0 errors, 0 warnings, 407 files |
+| `pnpm test`                | 349 pass, 19 files              |
+| `pnpm check`               | 0 errors, 0 warnings, 409 files |
 | `pnpm lint`                | passes                          |
-| `pnpm budget`              | 84.6 kB of 150 kB brotli        |
+| `pnpm budget`              | 85.3 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v6** · **5**                  |
+| Schema · backup format     | **v7** · **5**                  |
 
 P0, P1, P2 (sync) and P5 (reporting) ship, along with targeting, investments,
-recurring payments, coverage and the streak, reconciliation, and draining
+recurring payments, no-spend days and the streak, reconciliation, and draining
 OSTATNÍ. **Everything left in P3 is blocked on a question below.** P4 has not
 been started.
+
+**Five changes landed on 2026-08-28, all of them asked for out of use rather
+than planned** (`DECISIONS.md`, the last section). The sync line now carries a
+clock; Pravidelné platby is a screen (`/platby`) and, with `/jmeni`, is in the
+tab bar; a standing payment can declare the share somebody pays back, and a
+payment that *arrives* every month can be declared at all; and an empty day is a
+no-spend day, which retired `DayMark`, `closePreviousDay`, the `coverage` check
+and the days-covered success metric.
 
 The app was renamed **Výdaje → Prosper** on 2026-08-27 (`DECISIONS.md`, Q0 —
 Name). The IndexedDB database is still called `finance` and stays that way:
@@ -69,8 +77,8 @@ close and the nudge — which is the whole of the Training law.
 
 ## 3. Owed by hand, not by code
 
-Three targets in `PROJECT-PLAN.md` §3 have never been measured, and nothing in
-the repository can measure them. They need a phone and a stopwatch.
+Two targets in `PROJECT-PLAN.md` §3 have never been measured, and nothing in the
+repository can measure them. They need a phone and a stopwatch.
 
 1. **Entry speed.** Phone locked, in your pocket. Start a stopwatch, take it
    out, open Prosper from the home screen, record a real 249 Kč of groceries,
@@ -80,8 +88,11 @@ the repository can measure them. They need a phone and a stopwatch.
 2. **Cold start.** Force-close, wait, tap the icon, time it until the keypad
    answers. Target **1 second**, on the actual phone — not a desktop, not
    Lighthouse.
-3. **Days covered.** Off `/mesic` at the end of the second month; the `coverage`
-   check already computes it. Target **90 %**.
+
+Days covered used to be the third. It was **struck on 2026-08-28**: with no day
+mark left, every elapsed day counts as answered and the figure would read 100 %
+for ever. `PROJECT-PLAN.md` §3 records why, and `/mesic` now reports days without
+an expense instead — a Trimming figure, not a report card.
 
 Over five seconds means the app has the spreadsheet's problem and the fix is
 friction, not features. Comfortably under means the mandatory category cost less
@@ -167,7 +178,9 @@ days + exact amount + fuzzy payee, review-before-apply. **Never auto-apply.**
 - **Recurring payments**, four things named "not now" and still not now:
   promotion to `auto` after three identical confirmed months, exact
   missing-payment detection, the T3 panel on `/mesic`, cadences other than
-  monthly. Reasoning in `RECURRING.md` §6.
+  monthly. Reasoning in `RECURRING.md` §6. Two more joined them on 2026-08-28
+  with the shared-payment work: a reimbursement that lands on a different day
+  from the payment, and a share that varies month to month (`DECISIONS.md` Q46).
 
 ---
 
@@ -183,7 +196,15 @@ observation has happened.
 - **Does any check fire constantly?** A rule that fires every time is a wrong
   rule, and the fix is the rule, not the threshold.
 - **Is the confirm strip for recurring payments used, or dismissed?** If every
-  schedule is confirmed unchanged, the promotion rule earns itself.
+  schedule is confirmed unchanged, the promotion rule earns itself. It is now on
+  two screens — the entry screen and `/platby` — so this also answers whether one
+  of them is the one that gets used.
+- **Does a six-cell tab bar read, or become a row of unlabelled glyphs?** The bar
+  is at its ceiling. If a destination is never reached from it, the fix is
+  fewer tabs, not smaller ones.
+- **Is the no-spend streak motivating or ignorable?** It replaced the recording
+  streak, which was measuring the app rather than the money. If it is wallpaper
+  by the end of the month, it should go rather than get louder.
 - **Does a trend line ever say something you did not already know?** It is new
   and unproven. If every month reads "±20 % oproti obvyklým", the window is too
   short or the threshold too low.

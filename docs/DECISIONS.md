@@ -554,7 +554,7 @@ subscribe explicitly rather than relying on `$store`. The auto-subscription is
 fine where it already works; it is not to be trusted for new bindings without
 checking them on a cold load.
 
-### Auto-marking empty days · decided 2026-08-24
+### Auto-marking empty days · decided 2026-08-24 · _reversed 2026-08-28, see the bottom of this file_
 
 Asked for: empty days should read "day without expenses" without waiting for a
 tap. Raised against it: a `DayMark` is the exact signal `coverage` uses to tell a
@@ -570,6 +570,12 @@ The condition is deliberately "the app was open that day", not "the day passed".
 Having the thing in your hand and putting nothing in it is evidence. A day you
 never opened it is not a zero, it is a day you did not look, and it stays a hole.
 `repo.ts` → `closePreviousDay`, called from the layout load.
+
+> **Reversed on 2026-08-28.** Asked for again, and granted: an empty day is a
+> no-spend day, full stop. `closePreviousDay` and the mark are gone, and so is
+> the coverage measurement they existed to protect. The argument, and what
+> replaced the measurement, is under "Every empty day is a no-spend day" at the
+> end of this file.
 
 ### Still worth doing with receivables
 
@@ -794,10 +800,12 @@ bucket in month two read as a catastrophe: POTRAVINY showed **+1594 %** against
 a "typical" of 381 Kč, which was one real month divided by five imaginary ones.
 
 **Rule this establishes:** a month before the first transaction is not a month
-you spent nothing in, it is a month that does not exist. This is the same
-distinction the tape already makes between a gap day and an explicit `DayMark`,
-one level up. A genuine zero month _inside_ the ledger still counts — spending
-nothing on JÍDLO in June is a fact.
+you spent nothing in, it is a month that does not exist. A genuine zero month
+_inside_ the ledger still counts — spending nothing on JÍDLO in June is a fact.
+
+The same line is drawn one level down in `coverage.ts`: the quiet-day streak
+stops at the first row in the ledger, because the years before the app existed
+were not a frugal streak.
 
 ---
 
@@ -1108,3 +1116,129 @@ genuinely cannot take a custom property, so they carry the ground as a literal
 and were retuned by hand to `#F5F5F7` / `#000000`. They are the only place in
 the app where a colour is written twice, and they are the first thing to check
 if the PWA's status bar ever stops matching the page.
+
+---
+
+## The 2026-08-28 pass — five things Petr asked for
+
+Five requests, in one sitting, all of them from actual use rather than from the
+plan. Four are additive; the fifth reverses a decision made four days earlier,
+and reversing it retired two mechanisms.
+
+### Q46 — A standing payment somebody else pays half of · answered 2026-08-28
+
+Asked for: the mortgage is paid 50/50. The whole thing leaves the account on the
+15th and half of it comes back from the same person, every month. The app could
+describe the payment and could describe the reimbursement — `Txn.owedAmount` has
+existed since Q25 — but only one row at a time, typed by hand, twelve times a
+year.
+
+**Answer: two fields on `Schedule`, and a second list on the screen.**
+
+`Schedule.owedAmount` / `Schedule.owedBy` (schema **v7**) are the share that
+comes back, declared once. Every row the schedule posts carries them onto the
+`Txn`, so a shared mortgage produces an open receivable each month and it is
+settled on `/mesic` exactly like one typed by hand. The amount itself is
+untouched: 32 000 Kč leaves the account, because 32 000 Kč leaves the account.
+An overridden confirmation amount clamps the share rather than booking back more
+than went out.
+
+**The annual figure became the net one.** `recurringCost` now reports gross,
+reimbursed and net per row and in total, and the figure at the top of `/platby`
+is the net year — 192 000 Kč, not 384 000 Kč. Both are true; only one of them is
+a decision. The gross is still on the row, because the gross is what the balance
+sees.
+
+**The second half — money that arrives on a schedule — needed no new mechanism
+at all.** `Schedule.amount` has always been signed, and the sheet has always
+taken its sign from the category. What was missing was a way to *reach* it: the
+only entry point was "Přidat platbu" in Settings, offering every bucket, so
+declaring a rent or a standing transfer meant knowing that picking an income
+category would silently flip the sign. `/platby` now has two add buttons that
+differ only in which buckets they offer, and two lists. Netting the two together
+was rejected: "what do the standing orders cost" and "what turns up without
+being chased" are different questions and one average hides both.
+
+**Not built:** a reimbursement that arrives on a different day from the payment,
+and shares that vary month to month. Both are the same answer as Q40's cadence
+question — every case in the workbook is monthly, on the payment's own day.
+
+### Pravidelné platby became a screen · 2026-08-28
+
+It shipped inside Settings, under the buckets, because that is where he went
+looking for it. Six weeks of that was enough: a standing order is not a setting,
+it is the part of the ledger that has not happened yet. `/platby` is now a route
+of its own, in the tab bar and in the entry screen's corner.
+
+**The tab bar went from four destinations to six** — `/platby` and `/jmeni`
+joined `/tape`, `/mesic`, `/cil` and `/settings`, three each side of the record
+disc. Seven cells is the ceiling and the bar is now at it: on a 320 px phone each
+cell is 46 px, which holds `Nastavení` at 10 px and would hold nothing at all at
+eight cells. The label steps down a size under 400 px rather than being cut,
+because `Nastav…` is not a label.
+
+`/jmeni` was deliberately *not* a tab until now — "the screen you open once a
+month". That reasoning was sound and is now overruled by the person opening it.
+
+**One row recipe was extracted rather than copied.** The list row on `/platby`
+is the same two-line pressable row Settings already drew for holdings — with
+class names that said `schedule`, which is what a copy looks like just before it
+drifts. It is now `.tile` in `app.css`, beside `.card` and `.meter`, and both
+screens declare only their differences.
+
+### Every empty day is a no-spend day · reverses the 2026-08-24 decision
+
+Asked for, again and more plainly: **a day with no expense on it is a day
+without an expense.** Do not ask for a tap to say so. And a day that turns out to
+have had something on it gets fixed by typing the row, days later if need be.
+
+On 2026-08-24 this was answered "mark forward only" — the app closed off exactly
+one date on launch, the last day it was open, and only if nothing was recorded on
+it. The objection recorded then was that `DayMark` is the signal `coverage` uses
+to tell a genuine zero from a day nobody looked at, and that filling days in
+wholesale takes days-covered to 100 % permanently.
+
+**That objection was correct, and it is no longer a reason.** It defended a
+measurement, not a habit — and the measurement was of the app's own prompting
+rather than of anything about the money. So both went:
+
+- **`DayMark` is no longer written.** `markZeroSpendDay`, `clearZeroSpendDay`
+  and `closePreviousDay` are gone, and with them the launch step that made the
+  layout load do three things instead of two. The table and the synced entity
+  stay: rows exist on the device and on the server, dropping a synced entity is a
+  protocol change, and an inert table costs nothing.
+- **The tap is gone from the tape.** An empty day reads `bez výdaje`, as a line
+  rather than a button. It keeps the recessed surface, because a row with nothing
+  to read on it should not sit at the same level as one with five figures — but
+  it is no longer drawn as a *hole*, because it is not one.
+- **The `coverage` finding is gone.** "Zapsáno 11 z 27 dní" had nothing left to
+  point at and would have fired on every frugal month.
+
+**What replaced the report card is a better number.** `coverage.ts` now answers
+*how many days this month cost nothing* — measured the same way, against days
+elapsed, and off the ledger alone with no second signal to maintain. `/mesic`
+shows it as **Dny bez výdaje**, and the streak in the corner of the entry screen
+counts consecutive days without an expense instead of consecutive days recorded.
+
+Two rules the new streak keeps, both deliberate:
+
+- **Today is a condition, not a term.** Spend anything today and the run is
+  zero; a today that is still quiet at ten in the morning is not counted, because
+  the day is not over. A streak that claims a day before it has been lived is
+  flattery.
+- **It never reaches back past the first row in the ledger.** The years before
+  the app existed were not a frugal streak.
+
+**What this costs, stated plainly:** the app can no longer tell a day with
+nothing on it from a day nobody opened it. `PROJECT-PLAN.md` §3's third target —
+90 % of days covered — is therefore no longer measurable and has been struck.
+Tracking is now measured by what it is for: whether the expenses that happened
+are in the book.
+
+### Last sync got a clock · 2026-08-28
+
+`Naposledy` in Settings showed `28. 8.` — and two cycles in one day is the normal
+case, so the one question it is asked ("just now, or this morning?") was the one
+it could not answer. `formatDateTime` in `domain/datetime.ts`, through `Intl`
+like everything else, local time because that is the clock in the hand holding
+the phone.

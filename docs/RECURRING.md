@@ -82,8 +82,10 @@ than computed from the ledger:
 ## 2. When it fires
 
 There is no server, so nothing happens while the app is closed. The catch-up
-runs on launch, in `+layout.ts`, next to `closePreviousDay()` — which is the
-same shape of problem and already the established answer.
+runs on launch, in `+layout.ts`, straight after `ensureSeeded()`. It used to have
+company there — `closePreviousDay()`, the step that closed off yesterday as a
+zero-spend day — and since 2026-08-28 it is the only thing the launch load does
+besides seeding (`DECISIONS.md` → "Every empty day is a no-spend day").
 
 A month is due when its day has **passed** (the day itself counts, the day after
 is not required) and the schedule is not yet settled for it.
