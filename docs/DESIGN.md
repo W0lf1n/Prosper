@@ -137,8 +137,21 @@ living share. The gap between segments is taken out of the share it follows,
 so the four still sum to the whole circle. The stem is the only thing added to
 make it read as a letter, and it is what the ring is clipped against.
 
-The **ring alone** is the same geometry with the stem taken off. It has no
-assigned use yet and is parked here until it earns one.
+The P is also the **app icon** — the favicon, the apple-touch icon and every
+manifest PNG are rasterised from the dark cut, since an icon sits on the
+true-black ground of the installed app. The maskable cut scales the mark to
+90 % so the stem's foot clears a round mask's safe zone. It is the first thing
+seen on launch too: the splash in `app.html` opens on the mark alone, the bowl
+gives way to a set letter, and the rest of the name arrives letter by letter —
+with the ring taking the **o** — until the lockup stands. The sequence plays
+out in full on every launch, about a second, by Petr's explicit choice: the
+app renders and gets ready underneath it, only the reveal waits. Under reduced
+motion there is no sequence, so the still lockup leaves as soon as the app is
+up.
+
+The **ring alone** is the same geometry with the stem taken off. It earned its
+use in the wordmark: it is the **o** of Prosper, in the lockup and at the end
+of the launch animation.
 
 Six files — a light and a dark cut of each, plus a `currentColor` cut of each
 that takes the colour of whatever it is placed in. All of them are stroked

@@ -32,8 +32,245 @@
 			}
 		</script>
 		%sveltekit.head%
+		<style>
+			/*
+				The launch splash. Static markup below the app mount point, so it is
+				on screen from the first paint — covering exactly the window in which
+				the bundle loads, the layout seeds and the schedules catch up — and
+				the layout removes it the moment the app has rendered. The sequence
+				usually loses that race and is cut short; that is by design, the
+				keypad always wins.
+
+				Colours are the token roles, which are resolved by the time anything
+				paints because the bundle's stylesheet is render-blocking in <head> —
+				so both themes come out right with no colour written here.
+			*/
+			#splash {
+				position: fixed;
+				inset: 0;
+				z-index: 100;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: var(--ground);
+				pointer-events: none;
+				transition: opacity 300ms var(--ease-out);
+			}
+			#splash.splash-out {
+				opacity: 0;
+			}
+			.splash-word {
+				font-family: var(--font-ui);
+				font-size: clamp(2.5rem, 13vw, 3.5rem);
+				font-weight: 700;
+				letter-spacing: var(--track-display);
+				line-height: 1;
+				color: var(--ink);
+				/* Starts shifted so the P slot sits at the centre of the screen —
+				   the logo alone — and slides home as the word arrives. */
+				transform: translateX(1.4em);
+				animation: splash-home 225ms var(--ease-settle) 250ms forwards;
+			}
+			.splash-slot {
+				position: relative;
+				display: inline-block;
+			}
+			/* The mark: the icon's P, stem and ring-bowl. It opens large, settles
+			   to letter size, and gives way to the set letter underneath. */
+			.splash-mark {
+				position: absolute;
+				left: 0;
+				bottom: 0.14em;
+				height: 0.72em;
+				transform: scale(2.2);
+				transform-origin: 50% 50%;
+				animation: splash-mark 350ms var(--ease-settle) 175ms forwards;
+			}
+			.splash-cap {
+				opacity: 0;
+				animation: splash-in 150ms var(--ease-out) 425ms forwards;
+			}
+			.splash-run {
+				display: inline-block;
+				opacity: 0;
+				transform: translateY(0.12em);
+				animation: splash-in 140ms var(--ease-out) forwards;
+			}
+			.splash-d1 {
+				animation-delay: 525ms;
+			}
+			.splash-d2 {
+				animation-delay: 565ms;
+			}
+			.splash-d3 {
+				animation-delay: 605ms;
+			}
+			.splash-d4 {
+				animation-delay: 645ms;
+			}
+			.splash-d5 {
+				animation-delay: 685ms;
+			}
+			.splash-d6 {
+				animation-delay: 725ms;
+			}
+			/* The ring is the o, sized from the lockup: its outer diameter there is
+			   384/512 of a 0.732em box — 0.55em — with the barest dip under the
+			   baseline, the way a round lowercase letter overshoots. */
+			svg.splash-run {
+				width: 0.55em;
+				height: 0.55em;
+				vertical-align: -0.02em;
+			}
+			.splash-ink {
+				fill: var(--ink);
+			}
+			.splash-seg-1 {
+				stroke: var(--signal);
+			}
+			.splash-seg-2 {
+				stroke: var(--in);
+			}
+			.splash-seg-3 {
+				stroke: var(--flag);
+			}
+			.splash-seg-4 {
+				stroke: var(--ink);
+			}
+			@keyframes splash-home {
+				to {
+					transform: translateX(0);
+				}
+			}
+			@keyframes splash-mark {
+				0% {
+					transform: scale(2.2);
+				}
+				55% {
+					transform: scale(1);
+					opacity: 1;
+				}
+				100% {
+					transform: scale(1);
+					opacity: 0;
+				}
+			}
+			@keyframes splash-in {
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				#splash * {
+					animation: none;
+				}
+				.splash-word {
+					transform: none;
+				}
+				.splash-mark {
+					visibility: hidden;
+				}
+				.splash-cap,
+				.splash-run {
+					opacity: 1;
+					transform: none;
+				}
+			}
+		</style>
 	</head>
 	<body data-sveltekit-preload-data="tap">
 		<div style="display: contents">%sveltekit.body%</div>
+		<div id="splash" aria-hidden="true">
+			<div class="splash-word">
+				<span class="splash-slot"
+					><svg class="splash-mark" viewBox="151 82 210 348" xmlns="http://www.w3.org/2000/svg">
+						<defs>
+							<clipPath id="splash-pcut">
+								<rect x="151" y="0" width="361" height="512"></rect>
+							</clipPath>
+						</defs>
+						<g clip-path="url(#splash-pcut)">
+							<g transform="rotate(-90 243 200)" fill="none" stroke-width="60">
+								<circle
+									class="splash-seg-1"
+									cx="243"
+									cy="200"
+									r="88"
+									stroke-dasharray="41.3 511.6"
+									stroke-dashoffset="-7.0"
+								></circle>
+								<circle
+									class="splash-seg-2"
+									cx="243"
+									cy="200"
+									r="88"
+									stroke-dasharray="41.3 511.6"
+									stroke-dashoffset="-62.3"
+								></circle>
+								<circle
+									class="splash-seg-3"
+									cx="243"
+									cy="200"
+									r="88"
+									stroke-dasharray="41.3 511.6"
+									stroke-dashoffset="-117.6"
+								></circle>
+								<circle
+									class="splash-seg-4"
+									cx="243"
+									cy="200"
+									r="88"
+									stroke-dasharray="373.0 179.9"
+									stroke-dashoffset="-172.9"
+								></circle>
+							</g>
+						</g>
+						<rect class="splash-ink" x="151" y="82" width="60" height="348" rx="30"></rect></svg
+					><span class="splash-cap">P</span></span
+				><span class="splash-run splash-d1">r</span
+				><svg
+					class="splash-run splash-d2"
+					viewBox="64 64 384 384"
+					xmlns="http://www.w3.org/2000/svg"
+				>
+					<g transform="rotate(-90 256 256)" fill="none" stroke-width="88">
+						<circle
+							class="splash-seg-1"
+							cx="256"
+							cy="256"
+							r="148"
+							stroke-dasharray="79 850.9"
+							stroke-dashoffset="-7"
+						></circle>
+						<circle
+							class="splash-seg-2"
+							cx="256"
+							cy="256"
+							r="148"
+							stroke-dasharray="79 850.9"
+							stroke-dashoffset="-100"
+						></circle>
+						<circle
+							class="splash-seg-3"
+							cx="256"
+							cy="256"
+							r="148"
+							stroke-dasharray="79 850.9"
+							stroke-dashoffset="-193"
+						></circle>
+						<circle
+							class="splash-seg-4"
+							cx="256"
+							cy="256"
+							r="148"
+							stroke-dasharray="650.9 279.0"
+							stroke-dashoffset="-286"
+						></circle>
+					</g></svg
+				><span class="splash-run splash-d3">s</span><span class="splash-run splash-d4">p</span
+				><span class="splash-run splash-d5">e</span><span class="splash-run splash-d6">r</span>
+			</div>
+		</div>
 	</body>
 </html>

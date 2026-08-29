@@ -1582,3 +1582,40 @@ left; this audit had to find the drift by diffing the table against
 `tokens.css`, and the next reader would not. §9 now points at the file as the
 single source and states only the roles; `docs/screens/` carries a note that
 the captures are stale.
+
+## Brand · 2026-08-29 — the P is the app icon, and the launch shows it
+
+**The installed icon changed from the ring to the P.** The favicon, the
+apple-touch icon and all three manifest PNGs are now the P mark — the stem and
+the 10/10/10/70 ring as its bowl — rasterised from the dark cut, because an
+icon lives on the true-black ground of the installed app. The maskable PNG
+scales the mark to 90 % about the centre: the full-size stem's foot passed a
+round mask's safe zone by a single pixel, which is not a margin. The ring-only
+mark, which had held the icon slot without ever being written down as its
+owner, moves to the job it is actually good at — being the **o**.
+
+**The launch got a splash.** Static markup in
+`app.html`, painted before any JavaScript: the P mark alone at centre, then
+the bowl yields to a set letter P as the word slides home, then
+r·o·s·p·e·r arrive letter by letter — the ring as the o — ending on the
+lockup.
+
+It first shipped losing on purpose — dismissed the moment the app rendered,
+usually mid-sequence, so a fast launch cut it off in favour of the keypad.
+**Petr reversed that the same day: the sequence plays out in full on every
+launch.** The layout now waits on the splash's own animations (their
+`finished` promises, so the timing lives in the CSS alone), holds the lockup
+for a beat, and only then fades. Stated plainly, because it trades against
+rule 5's spirit: this is a deliberate ritual — first cut ~2 s, then halved at
+Petr's ask to ~1 s — in front of a five-second app, chosen with that cost on
+the table. The app renders and seeds underneath
+the whole time — only the reveal waits, nothing is loading slower. Under
+reduced motion there are no animations to wait for, so the still lockup
+leaves as soon as the app is up and the ritual costs that user nothing.
+
+Two mechanics worth recording. The colours are **token roles, not literals** —
+the bundle's stylesheet is render-blocking in `<head>`, so `var(--ink)` and
+friends are resolved by first paint and the splash is correct in both themes
+with no hex written in `app.html` (the two `theme-color` metas remain the only
+exception). And `prefers-reduced-motion` gets the finished lockup as a still,
+not a blank — the same rule the toast fuse follows.

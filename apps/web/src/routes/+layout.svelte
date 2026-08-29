@@ -20,6 +20,37 @@
 		return watchTriggers();
 	});
 
+	/**
+	 * The launch splash lives in `app.html`, on screen from the first paint.
+	 * It plays out in full on every launch — Petr's ask, 2026-08-29 — so the
+	 * dismissal waits for its animations to finish rather than racing them.
+	 * The app is rendered and live underneath the whole time; only the reveal
+	 * waits. Under reduced motion there are no animations to wait for, so the
+	 * still lockup leaves as soon as the app has rendered.
+	 */
+	$effect(() => {
+		const splash = document.getElementById('splash');
+		if (!splash) return;
+		const animated = splash.getAnimations({ subtree: true });
+		let hold: ReturnType<typeof setTimeout> | undefined;
+		let gone: ReturnType<typeof setTimeout> | undefined;
+		void Promise.allSettled(animated.map((a) => a.finished)).then(() => {
+			/* The lockup stands for a beat before it fades — unless there was no
+			   sequence at all (reduced motion), where a hold is just delay. */
+			hold = setTimeout(
+				() => {
+					splash.classList.add('splash-out');
+					gone = setTimeout(() => splash.remove(), 350);
+				},
+				animated.length > 0 ? 200 : 0
+			);
+		});
+		return () => {
+			clearTimeout(hold);
+			clearTimeout(gone);
+		};
+	});
+
 	/* Only written when a route has measured its own floor; otherwise the
 	   cascade in `app.css` keeps the say. */
 	const lift = $derived(
