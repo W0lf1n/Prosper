@@ -408,7 +408,11 @@
 
 	.mode[data-mode='auto'] {
 		background: var(--signal-wash);
-		color: var(--in);
+		color: var(--signal);
+	}
+
+	.hint--foot {
+		padding-inline: var(--space-2);
 	}
 
 	.tile__figure--in {
@@ -440,9 +444,5 @@
 		font-size: var(--text-xs);
 		color: var(--ink-3);
 		line-height: var(--leading-base);
-	}
-
-	.hint--foot {
-		padding-inline: var(--space-2);
 	}
 </style>

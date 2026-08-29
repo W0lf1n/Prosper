@@ -104,6 +104,14 @@
 
 <Sheet {open} title="Srovnat s bankou" {onclose}>
 	<div class="form">
+		<!-- What this does, before it asks for anything — the sheet is opened a
+		     few times a year, and the shape alone does not say what happens on a
+		     mismatch. -->
+		<p class="lead prose">
+			Opíšeš zůstatek z banky a app ho porovná se svým. Když nesedí, nabídne vyrovnávací záznam, aby
+			sešit zase seděl — a zůstane vidět, kdy a o kolik se rozešel.
+		</p>
+
 		<!--
 		  The ledger's figure, first and without being asked for. This is not a
 		  memory test — the two numbers are supposed to agree, and hiding one of
@@ -204,6 +212,12 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
+	}
+
+	.lead {
+		font-size: var(--text-sm);
+		line-height: var(--leading-base);
+		color: var(--ink-3);
 	}
 
 	.known {

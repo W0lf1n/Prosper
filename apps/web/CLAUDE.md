@@ -63,13 +63,14 @@ The system is called _graphite instrument_: a graphite ground, surfaces raised
 by **luminance** rather than by boxes, hairlines only where an edge is
 load-bearing, and exactly one signal colour.
 
-| Rule                                                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------------- |
-| `--signal` (mint) is the primary action, the current selection, and money **in**. Nothing else — it is never decoration |
-| Money **out** has no hue: it is `--ink`. Most rows in a ledger are outflow, and forty red numbers is noise              |
-| `--flag` (amber) means look at this. `--danger` (coral) means destroy or refuse                                         |
-| Elevation inverts between themes. Use `--raised`, never a hard-coded `--surface-N`                                      |
-| Dark is the theme this was designed for. Light is its daylight counterpart, not the default                             |
+| Rule                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------- |
+| `--signal` (blue) is the chrome accent: primary action, current selection, links, focus. Never decoration, never data |
+| Mint (`--in`) is money **in**, and a money verdict that came out right — a passed check, a met month. Never chrome    |
+| Money **out** has no hue: it is `--ink`. Most rows in a ledger are outflow, and forty red numbers is noise            |
+| `--flag` (amber) means look at this. `--danger` (coral) means destroy or refuse                                       |
+| Elevation inverts between themes. Use `--raised`, never a hard-coded `--surface-N`                                    |
+| Dark is the theme this was designed for. Light is its daylight counterpart, not the default                           |
 
 Dark is **selected** twice — once under `prefers-color-scheme`, once under
 `[data-theme]` — so the Settings toggle wins in both directions. The values are

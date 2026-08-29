@@ -1463,3 +1463,122 @@ nobody pulls is a patch nobody has:
   Docker's default json-file driver keeps every line ever written, and a small
   VPS disk is where that ends badly. In the compose file rather than
   `daemon.json`, so the fence travels with the deployment.
+
+## Design audit · 2026-08-29 — eleven findings, two rulings, one mechanism
+
+An evidence-based audit (the `Prosper Audit` canvas in the design project) went
+over both themes, the responsive ladders, the Czech copy, reach, states and
+motion. The system largely held: the height ladders, the 44 px floor, the
+window-never-scrolls contract and the motion discipline all cleared. What was
+broken was narrow and concentrated in `tokens.css`. The colour and copy work
+shipped the same day. **Petr then drew a line: colours and hints only, no
+reworking of controls or navigation** — so three of the audit's structural
+proposals were reverted or declined the same day, and are recorded as such
+below. F10 (a low month-swipe on `/mesic`) was also declined — gesture/scroll
+disambiguation is easy to get subtly wrong and the chevrons are honest 44 px
+targets.
+
+**Debt is copper now, not amber.** `--split-debt` sat 1.03:1 from `--flag` in
+light (`#8f6508` vs `#8a6400`), 1.21:1 in dark — a want bucket's meter fill and
+a debt bucket's were literally one hue, on the screen whose whole law is that
+the classes read at a glance. Re-machined at the same oklch lightness and
+chroma with the hue at ≈ 45° (light `#a15733`, dark `#e29674`): a quarter turn
+from amber (≈ 82°) and clearly off coral danger (≈ 29°), which keeps all three
+warnings apart.
+
+**The denominator is visible now.** `--split-left` — the "Zbylo" ring segment
+and now every meter track — measured 1.29:1 against the light card and 1.07:1
+against the dark one: the goal meter had no visible end, and the ring's
+leftover was a gap you inferred. Retuned to ≥ 1.5:1 against `--surface` in both
+themes (light `#cdcdd3`, dark `#3e3e42`, both 1.58:1), and `app.css`'s `.meter`
+track now points at it instead of `--ground-2`, so "empty" is one colour
+whether it is a bar or a ring. `--ground-2` stays the pocket for genuinely
+recessed things — a track is not a pocket.
+
+**Light `--ink-3` went from 60 % to 66 %.** At 60 % it measured 4.29–4.47:1 on
+the light surfaces — under the 4.5:1 small-text line, and it is precisely the
+colour of the app's 11–12 px text. At 66 % it lands 5.20–5.40:1 and still ranks
+a clear step under `--ink-2` (6.67:1). Dark passed everywhere and is untouched.
+
+**Ruling: mint means "money in, and a money verdict that came out right".**
+The written charter said mint was money arriving, nothing else; the shipped app
+disagreed in eight deliberate places (the „Nic k vytknutí" tick, `.verdict--ok`,
+the legend's over-delta, save-bucket fills, pace-done text on `/cil` and
+`/mesic`, the met month in the record, the „bez výdaje" tick, the goal strip's
+done tone) — every one a verdict about money that came out right, none of them
+chrome. The charter widened to match instead of unwinding eight sites. The
+boundary that matters — mint is never chrome, signal is never data — stays.
+
+That ruling is what the blue-as-data fix hangs on: the quiet-days ring, the
+streak sentence and the streak badge on the entry slab all wore `--signal`,
+and the badge sat centimetres from four genuinely blue tap targets. All three
+now wear mint — days that cost nothing are money kept. Two smaller leaks went
+with them: the coin's income state wore a blue border on a mint control (now
+`--in`), and the auto pill on `/platby` was mint text on a blue wash (now
+signal on signal-wash — „automaticky" is the app acting on its own, which is
+chrome). The category sheet's selected row traded its solid `--signal` fill
+for the same wash-plus-edge the rail's chips use, for the same reason the
+chips traded theirs.
+
+**Ruling: the tab bar stays six.** The audit argued for demoting Jmění (seven
+cells at 320 px put „Nastavení" at the ellipsis line, and a stock figure read
+once a month is not "done repeatedly"). **Petr declined** — the bar is his
+navigation and it is not to be reworked. It was demoted for part of a day and
+restored; the 10 px label step-down under 400 px stays as the mechanism that
+keeps the long label whole.
+
+**One missing state got copy; the other was declined.** A ledger whose current
+direction has no categories was a dead end — the picker sheet now carries one
+escape line („Žádná kategorie. Založ první v Nastavení.") linking to Settings.
+The audit's other empty — a teaching slab on the empty tape — was built and
+**reverted on Petr's line**: the tape keeps its original behaviour, where even
+an empty book materialises today as a „bez výdaje" day.
+
+**The toast fuse survives reduced motion.** It was `display: none` under
+`prefers-reduced-motion`, which left the undo's expiry with no signal at all.
+It now holds static at half-burnt: says "this runs out", animates nothing.
+
+**The vysvětlivka.** The one explanation mechanism, chosen over tooltips
+(no hover on a phone), `?` icons (a second object competing for row space) and
+first-run coaching (friction on the five-second loop, rejected outright): the
+term itself becomes the control. A dashed hairline underline
+(`--hairline-2`), the standard borrowed 44 px hit area, and a tap opens the
+existing `Sheet` with the term as title and two to four sentences inside.
+`lib/ui/Explainer.svelte`, ~15 lines around the Sheet it reuses. Zero standing
+height, and the underline is self-limiting — a screen wearing five of them
+looks wrong.
+
+The rule, so the next term does not get one by default — all three must hold:
+
+1. the term names a rule whose consequences are invisible on this screen;
+2. the honest answer needs more than one line;
+3. the question arises at the moment the term is on the glass.
+
+Otherwise, down the ladder: one line → `.field__hint` or better label copy;
+needed before first use → the empty state teaches (the house pattern already).
+
+Placed at six terms, mostly additively — the existing field hints and the two
+standing `/platby` paragraphs stay alongside them: **Jak to zapsat /
+potvrdit·automaticky** and **Vrací se ti část?** (the ScheduleSheet legends),
+**Rozdělení příjmu** and **Kontrola** (the `/mesic` card labels),
+**mimořádný výdaj** (entry props — the row is term + switch; briefly reverted,
+then restored at Petr's ask the same day), and **vloženo / růst** (`/jmeni` —
+it absorbs the standing footnote, whose full content moved into its copy; also
+reverted and restored the same day). One rendering rule from Petr: **the term
+always prints as standard sentence-case text, never uppercase**, even inside a
+`.u-label` — the sentence case plus the dashed hairline is what marks a word
+that answers. The ReconcileSheet got the one new standing lead instead — it is
+opened a few times a year and its shape alone does not say what happens on a
+mismatch.
+**dluží mi** got no vysvětlivka: it was already explained at all three moments
+of use, which is the ladder working — the three copies just said the same
+thing in three voices and are now one sentence everywhere: „Zaplatil jsi celou
+částku, takže celá jde ze zůstatku. Tohle si jen pamatuje, kolik se má vrátit
+— až dorazí, odškrtneš to a zapíše se příjem."
+
+**The plan stopped restating the palette.** §9 printed the first edition
+(green signal, `#0A0C0D` ground, Instrument Sans) a full edition after it
+left; this audit had to find the drift by diffing the table against
+`tokens.css`, and the next reader would not. §9 now points at the file as the
+single source and states only the roles; `docs/screens/` carries a note that
+the captures are stale.

@@ -23,6 +23,7 @@
 	import type { Category, Goal, Holding, MonthTarget, Txn, Valuation } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Doughnut, { type Segment } from '$lib/ui/Doughnut.svelte';
+	import Explainer from '$lib/ui/Explainer.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
 	import RefileSheet from '$lib/ui/RefileSheet.svelte';
@@ -360,7 +361,7 @@
 		<div class="coverage__body">
 			<Doughnut
 				segments={[
-					{ value: coverage.quiet, colour: 'var(--signal)', label: 'bez výdaje' },
+					{ value: coverage.quiet, colour: 'var(--in)', label: 'bez výdaje' },
 					{ value: coverage.spending, colour: 'var(--split-left)', label: 's výdajem' }
 				]}
 				size={104}
@@ -397,9 +398,20 @@
 		</div>
 	</section>
 
+	<!-- One copy of the vysvětlivka, rendered under whichever verdict shows. -->
+	{#snippet kontrolaLabel()}
+		<Explainer term="Kontrola">
+			<p>
+				App ti kouká přes rameno — při zápisu i nad měsícem: duplicity, záznamy bez kategorie,
+				bucket, který přetéká, stará hodnota investice. Nic z toho nebrání uložení. Každý nález jen
+				radí, a co jde, má opravu na jedno ťuknutí.
+			</p>
+		</Explainer>
+	{/snippet}
+
 	{#if findings.length > 0}
 		<section class="card">
-			<h2 class="u-label">Kontrola</h2>
+			<h2 class="u-label">{@render kontrolaLabel()}</h2>
 			<ul class="findings">
 				{#each findings as finding (finding.id)}
 					<li class="finding">
@@ -431,7 +443,7 @@
 		</section>
 	{:else if summary.outflow !== ZERO}
 		<section class="card">
-			<h2 class="u-label">Kontrola</h2>
+			<h2 class="u-label">{@render kontrolaLabel()}</h2>
 			<p class="ok">
 				<span class="ok__tick"><Icon name="check" size={14} stroke={2.6} /></span>
 				Nic k vytknutí. Měsíc sedí.
@@ -466,8 +478,11 @@
 					</li>
 				{/each}
 			</ul>
+			<!-- The same sentence at all three moments dluží mi is on the glass:
+			     here, the entry sheet, and the tape's edit sheet. -->
 			<p class="hint prose">
-				Tyhle peníze nejsou v zůstatku — zaplatil jsi celou částku. Až dorazí, přibude příjem.
+				Zaplatil jsi celou částku, takže celá jde ze zůstatku. Tohle si jen pamatuje, kolik se má
+				vrátit — až dorazí, odškrtneš to a zapíše se příjem.
 			</p>
 		</section>
 	{/if}
@@ -479,7 +494,15 @@
 		made by the eye rather than by arithmetic.
 	-->
 	<section class="card">
-		<h2 class="u-label">Rozdělení příjmu</h2>
+		<h2 class="u-label">
+			<Explainer term="Rozdělení příjmu">
+				<p>
+					Z každé koruny příjmu: 10 % dávání, 10 % spoření, 10 % dluhy, 70 % život. Velký kruh je
+					tvůj měsíc, malý je předloha. Měří se proti příjmu, ne proti výdajům — proto může něco
+					zbýt. A zbytek je taky výsledek.
+				</p>
+			</Explainer>
+		</h2>
 
 		{#if split.hasIncome}
 			<div class="split">
@@ -848,13 +871,15 @@
 		color: var(--ink);
 	}
 
-	/* The signal is earned: a run of days that cost nothing. A broken one is not
-	   a failure and does not get the flag — spending money is what money is for,
-	   and an alarm every time somebody buys lunch is a line nobody reads. */
+	/* Mint, not signal: a run of days that cost nothing is a money verdict that
+	   came out right, and a statistic must not wear the tap-me colour. A broken
+	   run is not a failure and does not get the flag — spending money is what
+	   money is for, and an alarm every time somebody buys lunch is a line
+	   nobody reads. */
 	.coverage__streak {
 		font-size: var(--text-sm);
 		font-weight: 600;
-		color: var(--signal);
+		color: var(--in);
 	}
 
 	.coverage__streak--none {

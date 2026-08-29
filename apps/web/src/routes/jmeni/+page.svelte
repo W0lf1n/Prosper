@@ -34,6 +34,7 @@
 	import { ZERO, type Minor } from '$lib/domain/money';
 	import type { Account, Category, Holding, Txn, Valuation } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
+	import Explainer from '$lib/ui/Explainer.svelte';
 	import HoldingSheet, { type HoldingInput } from '$lib/ui/HoldingSheet.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
@@ -306,10 +307,18 @@
 			</p>
 		{/if}
 
-		<p class="footnote prose">
-			Hodnoty jsou to, co jsi opsal z výpisu — nic se nikam nenačítá. Růst se nepočítá jako příjem a
-			do rozdělení měsíce nevstupuje.
-		</p>
+		<!-- The standing footnote became a vysvětlivka (restored at Petr's ask,
+		     2026-08-29): the cards print the two terms, the term answers when
+		     asked, and its copy carries the footnote's whole content. -->
+		<div class="footnote prose">
+			<Explainer term="vloženo / růst" title="Vloženo a růst">
+				<p>
+					Vloženo je, co jsi tam z účtu poslal — sečteno z tvých vlastních záznamů. Růst je, o kolik
+					hodnota vklady přerostla. Růst není příjem a do měsíce nevstupuje: nikdo ti ho neposlal na
+					účet. Hodnoty jsou to, co jsi opsal z výpisu — nic se nikam nenačítá.
+				</p>
+			</Explainer>
+		</div>
 	{/if}
 </main>
 

@@ -288,13 +288,16 @@ a {
  * length means the same thing wherever it appears. Shared for the same reason
  * the card is: it was two copies that had already drifted apart.
  *
- * The track is the pocket — recessed inside a card is `--ground-2` in both
- * themes — and the fill carries the role.
+ * The track is `--split-left` — the same "empty" every ring uses, tuned to
+ * stay visible against the card in both themes — so the denominator of a bar
+ * and the denominator of a ring are one colour. `--ground-2` stays the pocket
+ * for genuinely recessed things (fields, the why-quote); a track is not a
+ * pocket, it is the unfilled part of a figure.
  */
 .meter {
 	height: 4px;
 	border-radius: var(--radius-full);
-	background: var(--ground-2);
+	background: var(--split-left);
 	overflow: hidden;
 }
 

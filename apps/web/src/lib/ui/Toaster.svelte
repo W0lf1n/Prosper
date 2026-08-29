@@ -307,10 +307,14 @@
 		}
 	}
 
-	/* A countdown that finishes instantly is a bar that was never there. */
+	/* A countdown that finishes instantly is a bar that was never there — but
+	   hiding it entirely left the undo's expiry with no signal at all. Held
+	   static at half-burnt, it still says "this offer runs out" without
+	   animating anything. */
 	@media (prefers-reduced-motion: reduce) {
 		.fuse {
-			display: none;
+			animation: none;
+			transform: scaleX(0.5);
 		}
 	}
 </style>

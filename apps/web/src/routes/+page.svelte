@@ -40,6 +40,7 @@
 	} from '$lib/domain/types';
 	import CategoryPicker from '$lib/ui/CategoryPicker.svelte';
 	import DueStrip from '$lib/ui/DueStrip.svelte';
+	import Explainer from '$lib/ui/Explainer.svelte';
 	import GoalStrip from '$lib/ui/GoalStrip.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Keypad from '$lib/ui/Keypad.svelte';
@@ -534,17 +535,32 @@
 			{#if direction === 'out'}
 				<!-- Rare switches. Properties of the row, not commands. -->
 				<div class="extras">
-					<button
-						type="button"
-						class="prop"
-						class:prop--on={isOneOff}
-						role="switch"
-						aria-checked={isOneOff}
-						onclick={() => (isOneOff = !isOneOff)}
-					>
-						<span class="prop__name">mimořádný výdaj</span>
-						<span class="prop__track" aria-hidden="true"><span class="prop__knob"></span></span>
-					</button>
+					<!--
+					  Two controls in one row (restored at Petr's ask, 2026-08-29): the
+					  term is a vysvětlivka and the switch is the switch. The dashed
+					  underline is what marks the difference before the first tap.
+					-->
+					<div class="prop" class:prop--on={isOneOff}>
+						<span class="prop__name">
+							<Explainer term="mimořádný výdaj" title="Mimořádný výdaj">
+								<p>
+									Výdaj mimo běžný chod měsíce — pračka, servis auta, letenka. Ze zůstatku odejde
+									jako každý jiný. Jen se nepočítá do toho, co měsíc obvykle stojí, takže ti jedna
+									pračka nezkazí srovnání s ostatními měsíci.
+								</p>
+							</Explainer>
+						</span>
+						<button
+							type="button"
+							class="prop__flip"
+							role="switch"
+							aria-checked={isOneOff}
+							aria-label="Mimořádný výdaj"
+							onclick={() => (isOneOff = !isOneOff)}
+						>
+							<span class="prop__track" aria-hidden="true"><span class="prop__knob"></span></span>
+						</button>
+					</div>
 
 					<button
 						type="button"
@@ -632,9 +648,11 @@
 
 <Sheet open={owedSheetOpen} title="Kolik ti vrátí" onclose={() => (owedSheetOpen = false)}>
 	<div class="owed-form">
+		<!-- The same sentence at all three moments dluží mi is on the glass:
+		     here, the /mesic card, and the tape's edit sheet. -->
 		<p class="note prose">
-			Do zůstatku jde celá částka — zaplatil jsi ji ty. Tohle si jen pamatuje, kolik se má vrátit.
-			Až peníze dorazí, odškrtneš to v přehledu měsíce.
+			Zaplatil jsi celou částku, takže celá jde ze zůstatku. Tohle si jen pamatuje, kolik se má
+			vrátit — až dorazí, odškrtneš to a zapíše se příjem.
 		</p>
 
 		<label class="field">
@@ -961,7 +979,7 @@
 	 */
 	.coin--in {
 		background: var(--in-wash);
-		border-color: var(--signal);
+		border-color: var(--in);
 		color: var(--in);
 		box-shadow: var(--edge-strong);
 	}
@@ -1207,21 +1225,41 @@
 			color var(--dur-fast) var(--ease-out);
 	}
 
-	/* Drawn at 37, hit at 45. */
-	.prop::after {
+	/* Drawn at 37, hit at 45 — on the row that is still one control. The
+	   mimořádný row is two (the term and the switch), and each of those
+	   carries its own borrowed hit area instead. */
+	.prop--field::after {
 		content: '';
 		position: absolute;
 		inset: -4px 0;
 	}
 
-	.prop:active {
+	.prop--field:active {
 		background: var(--surface-2);
 	}
 
 	@media (hover: hover) {
-		.prop:hover {
+		.prop--field:hover {
 			color: var(--ink-2);
 		}
+	}
+
+	.prop__flip {
+		position: relative;
+		flex: none;
+		display: grid;
+		place-items: center;
+		transition: transform var(--dur-press) var(--ease-out);
+	}
+
+	.prop__flip::after {
+		content: '';
+		position: absolute;
+		inset: -12px -8px;
+	}
+
+	.prop__flip:active {
+		transform: scale(0.95);
 	}
 
 	.prop__name {
@@ -1694,7 +1732,7 @@
 			min-height: var(--control);
 		}
 
-		.prop::after {
+		.prop--field::after {
 			inset: -10px 0;
 		}
 

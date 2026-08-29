@@ -38,6 +38,15 @@
         ],
         "createdAt": "2026-08-24T18:36:10.725Z",
         "reason": "user confirmed: pill-shaped meter must animate width, not scaleX (scaleX squashes the end-cap radius into an ellipse); animates once on data load. layout-transition exposes no extractable value, so only a file-scoped wildcard suppresses it."
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "apps/web/src/lib/styles/app.css"
+        ],
+        "createdAt": "2026-08-29T20:24:46.388Z",
+        "reason": "codebase comment at .meter__fill: width not scaleX because scaling a pill squashes its end radius; animates once on data change, no recurring layout cost"
       }
     ]
   }

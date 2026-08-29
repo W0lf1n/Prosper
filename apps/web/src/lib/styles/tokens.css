@@ -13,10 +13,15 @@
  *   · SIGNAL (blue, derived from the reference system's Action Blue) is the
  *     chrome accent: primary action, current selection, links, focus ring.
  *     Nothing else. It is never decoration and it is never a data colour.
- *   · Money coming IN is mint (--in). Money going out has no hue at all — it
- *     is the ink. Signal and in are now two roles, two hues.
+ *   · Mint (--in) is money coming in, and a money verdict that came out right —
+ *     a passed check, a met month, a day that cost nothing. Never chrome; the
+ *     boundary against --signal stays sharp. Money going out has no hue at all —
+ *     it is the ink. Signal and in are two roles, two hues.
  *   · FLAG (amber) means look at this. DANGER (coral) means destroy or refuse.
- *   · The four split classes stay apart at a glance; --split-left is a ghost.
+ *   · The four split classes stay apart at a glance. --split-left is a ghost,
+ *     but a *visible* one — it is the denominator of every meter and ring, and
+ *     "where does 100 % end" must be answerable, so it holds ≥ 1.5:1 against
+ *     --surface in both themes.
  *
  * Data hues are re-tuned, not re-assigned: all four sit near the same oklch
  * lightness and chroma per theme, so no class shouts over another.
@@ -46,7 +51,11 @@
 
 	--ink: #1d1d1f;
 	--ink-2: rgb(29 29 31 / 72%);
-	--ink-3: rgb(29 29 31 / 60%);
+	/* 66 %, not 60: the 11–12 px text this sets (hints, captions, tab labels)
+	   measured 4.29–4.47:1 at 60 % — under the 4.5:1 small-text line on every
+	   light surface. 66 % lands at 5.20–5.40:1 and still ranks clearly under
+	   --ink-2 (6.67:1). */
+	--ink-3: rgb(29 29 31 / 66%);
 
 	/* The one chrome accent — Action Blue. AA as text on every light surface. */
 	--signal: #0066cc;
@@ -65,12 +74,17 @@
 	--danger-wash: rgb(201 63 50 / 9%);
 	--danger-edge: rgb(201 63 50 / 20%);
 
-	/* ── the 10/10/10/70 split ─────────────────────────────────────────── */
+	/* ── the 10/10/10/70 split ─────────────────────────────────────────────
+	   Debt is copper (oklch hue ≈ 45°), not amber: at the old #8f6508 it sat
+	   1.03:1 from --flag and a debt bucket's meter was literally a want
+	   bucket's. Same oklch lightness and chroma as the rest of the bank, a
+	   quarter turn away from both flag (≈ 82°) and danger (≈ 29°).
+	   Left is the visible ghost — see the charter above. */
 	--split-give: #6353c4;
 	--split-save: #007850;
-	--split-debt: #8f6508;
+	--split-debt: #a15733;
 	--split-live: #6e7478;
-	--split-left: #e2e2e7;
+	--split-left: #cdcdd3;
 
 	/* ── elevation ─────────────────────────────────────────────────────────
 	   Withdrawn from resting surfaces: a card is raised by being lighter, not
@@ -243,9 +257,9 @@
 
 	--dark-split-give: #a294ec;
 	--dark-split-save: #4ccfa1;
-	--dark-split-debt: #d3a15e;
+	--dark-split-debt: #e29674;
 	--dark-split-live: #8b9299;
-	--dark-split-left: #232326;
+	--dark-split-left: #3e3e42;
 
 	--dark-elev-1: 0 0 0 0 rgb(0 0 0 / 0%);
 	--dark-elev-2: 0 6px 24px rgb(0 0 0 / 45%);

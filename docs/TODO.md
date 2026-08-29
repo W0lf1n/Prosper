@@ -51,6 +51,16 @@ the real reason for it; **which goal is `na očích` is chosen** rather than
 guessed from the nearest deadline (schema **v8**); and a **sheet is pulled
 down to close**, with the `✕` gone from every one of them.
 
+**The 2026-08-29 design audit landed as colours and hints only** (`DECISIONS.md`,
+the audit section): debt recoloured copper, the meter/ring denominator made
+visible, light `--ink-3` brought over the AA line, blue withdrawn from data,
+the mint charter widened to "money verdicts that came out right", the
+category-less picker given an escape line, and the **vysvětlivka** shipped —
+`Explainer.svelte` on six terms, always in sentence case, with the standing
+copy kept alongside. Petr drew the line at structural rework: the tab bar
+stays six, the empty-tape slab and the `/platby` copy deletions were
+reverted, and F10 (the low month-swipe) was declined.
+
 The app was renamed **Výdaje → Prosper** on 2026-08-27 (`DECISIONS.md`, Q0 —
 Name). The IndexedDB database is still called `finance` and stays that way:
 renaming it opens a second, empty database rather than migrating the first.
@@ -215,7 +225,11 @@ observation has happened.
   of them is the one that gets used.
 - **Does a six-cell tab bar read, or become a row of unlabelled glyphs?** The bar
   is at its ceiling. If a destination is never reached from it, the fix is
-  fewer tabs, not smaller ones.
+  fewer tabs, not smaller ones. (The audit already argued for demoting Jmění;
+  Petr declined — this observation is what would reopen that question.)
+- **Do the vysvětlivky get tapped, or does the dashed underline read as
+  decoration?** Six terms wear one. If a term keeps getting asked about out
+  loud anyway, the fix is better label copy, not a louder underline.
 - **Is the no-spend streak motivating or ignorable?** It replaced the recording
   streak, which was measuring the app rather than the money. If it is wallpaper
   by the end of the month, it should go rather than get louder.

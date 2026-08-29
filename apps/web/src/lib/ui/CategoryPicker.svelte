@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { normalize } from '$lib/domain/vocabulary';
 	import type { Category } from '$lib/domain/types';
 	import Icon from './Icon.svelte';
@@ -194,7 +195,16 @@
 				</li>
 			{/each}
 			{#if results.length === 0}
-				<li class="picker__empty">Nic takového tu není.</li>
+				{#if categories.length === 0}
+					<!-- Every category of this direction archived: without this line the
+					     sheet is a dead end — the rail holds only the search chip and the
+					     save button asks for a category nobody can pick. -->
+					<li class="picker__empty">
+						Žádná kategorie. <a href={resolve('/settings')}>Založ první v Nastavení.</a>
+					</li>
+				{:else}
+					<li class="picker__empty">Nic takového tu není.</li>
+				{/if}
 			{/if}
 		</ul>
 	</div>
@@ -487,6 +497,9 @@
 		width: 100%;
 		min-height: var(--touch-lg);
 		padding-inline: var(--space-3);
+		/* Transparent by default so the selected row's edge does not shift the
+		   layout when it arrives. */
+		border: 1px solid transparent;
 		border-radius: var(--radius-sm);
 		text-align: left;
 		transition: background var(--dur-fast) var(--ease-out);
@@ -502,16 +515,23 @@
 		}
 	}
 
+	/**
+	 * Selection is the same wash-and-edge the rail's chips wear, for the same
+	 * reason they traded their solid fill: a solid accent pill fights the one
+	 * command on screen, and it flattened the type suffix to 3.8:1 besides.
+	 * The dot and the suffix keep their own colours.
+	 */
 	.picker__item--on,
 	.picker__item--on:active {
-		background: var(--signal);
-		color: var(--signal-ink);
+		background: color-mix(in srgb, var(--signal) 10%, var(--surface));
+		border-color: var(--signal);
+		color: var(--ink);
 		font-weight: 600;
 	}
 
 	@media (hover: hover) {
 		.picker__item--on:hover {
-			background: var(--signal);
+			background: color-mix(in srgb, var(--signal) 10%, var(--surface));
 		}
 	}
 
@@ -530,14 +550,13 @@
 		color: var(--ink-3);
 	}
 
-	.picker__item--on .picker__type {
-		color: inherit;
-		opacity: 0.75;
-	}
-
 	.picker__empty {
 		padding: var(--space-4) var(--space-3);
 		font-size: var(--text-md);
 		color: var(--ink-3);
+	}
+
+	.picker__empty a {
+		color: var(--signal);
 	}
 </style>

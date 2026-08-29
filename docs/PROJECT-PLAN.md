@@ -518,7 +518,8 @@ live as glyphs in the header slab instead.
 
 Six is the bar's ceiling, reached on 2026-08-28 when `/platby` became a screen
 and `/jmeni` was asked for down there rather than only in the corner. Seven cells
-on a 320 px phone give each label 46 px; an eighth would give it nothing.
+on a 320 px phone give each label 46 px; an eighth would give it nothing. (The
+2026-08-29 audit proposed demoting `/jmeni`; Petr declined — the bar stays six.)
 
 ### `/` — Entry (the launch route)
 
@@ -721,30 +722,32 @@ browser keeps painting native controls from the system preference.
 
 ### The colour rules, and they are short
 
-```css
-/* light */                      /* dark */
---ground:   #EEEFEC;             #0A0C0D   /* the ground */
---surface:  #FBFCFA;             #15181A   /* a raised slab */
---ink:      #101413;             #E8ECEC
---hairline: #DCDFD9;             #232829
---signal:   #007850;             #3DE0A0   /* the one accent */
---out:      #101413;             #E8ECEC   /* outflow: no hue at all */
---in:       #007850;             #3DE0A0
---flag:     #7D5900;             #F3C563   /* amber: look at this */
---danger:   #B93225;             #FF6B5B   /* destroy or refuse */
-```
+The values are **not restated here**. This section used to print the
+first-edition palette and drifted the moment the second edition landed — the
+2026-08-29 audit had to detect that by diffing this table against the file.
+`apps/web/src/lib/styles/tokens.css` is the single source for every value and
+carries the charter in its header; what is binding here are the roles:
 
-- **`--signal` is the primary action, the current selection, and money coming
-  in. Nothing else.** It is never decoration.
+- **`--signal` (blue) is the chrome accent: the primary action, the current
+  selection, links, the focus ring. Nothing else.** It is never decoration and
+  never a data colour.
+- **Mint (`--in`) is money coming in, and a money verdict that came out right**
+  — a passed check, a met month, a day that cost nothing. Ruled 2026-08-29;
+  the boundary against `--signal` stays sharp because mint is never chrome.
 - **Money going out has no hue.** It is the ink. Most rows in a ledger are
   outflow, and forty red numbers is noise, not information. The one place this is
   deliberately suspended is the ambient pool behind the entry amount, where there
   is exactly one number on screen and the whole question is which way it points.
+- **`--flag` (amber) means look at this. `--danger` (coral) means destroy or
+  refuse.**
 - **Elevation is luminance.** Each step up is a step lighter; shadows only
   confirm what luminance already said. The scale **inverts** between themes, so a
   control uses `--raised` rather than hard-coding an end of it.
 - The 10/10/10/70 split has four colours of its own, chosen to stay apart at a
-  glance in a ring thirteen units thick.
+  glance in a ring thirteen units thick — debt is copper, a quarter turn of hue
+  from both amber and coral. `--split-left` is the shared "empty": every meter
+  track and ring remainder, visible against the card in both themes, because a
+  denominator you infer is not a denominator.
 
 ### Form
 
@@ -759,7 +762,9 @@ browser keeps painting native controls from the system preference.
 
 ### Type — the signature
 
-- UI / body: **Instrument Sans**
+- UI / body: the **system stack** — real SF Pro on Apple hardware, the platform
+  sans elsewhere, zero bytes either way. Instrument Sans left with the second
+  edition.
 - **All money is monospace, always** — IBM Plex Mono, `tabular-nums`,
   right-aligned. Columns of amounts align to the decimal. This is functional and
   it is the visual identity.
@@ -768,8 +773,8 @@ browser keeps painting native controls from the system preference.
   keypad amount, and that one is a hero rather than a heading.
 - Uppercase is allowed in exactly one place: `.u-label`, the micro-label. These
   are machine labels on an instrument, not headings in a document.
-- Both faces are **self-hosted** (97 kB, latin + latin-ext). A font CDN would
-  break the offline promise.
+- The one shipped face, IBM Plex Mono, is **self-hosted** (latin + latin-ext).
+  A font CDN would break the offline promise.
 
 ### Money toasts
 

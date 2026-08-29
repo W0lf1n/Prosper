@@ -26,6 +26,7 @@
 	import { monthKey, today } from '$lib/domain/datetime';
 	import type { Category, Schedule } from '$lib/domain/types';
 
+	import Explainer from './Explainer.svelte';
 	import Sheet from './Sheet.svelte';
 
 	export interface ScheduleInput {
@@ -239,9 +240,16 @@
 		-->
 		{#if !isIncome}
 			<fieldset class="group">
-				<legend class="field__label"
-					>Vrací se ti část? <span class="optional">nepovinné</span></legend
-				>
+				<legend class="field__label">
+					<Explainer term="Vrací se ti část?" title="Vrací se ti část">
+						<p>
+							Zaplatíš vždycky celou částku, takže celá jde ze zůstatku. Tohle si jen pamatuje,
+							kolik se má vrátit — každý zapsaný měsíc pak čeká v přehledu měsíce k odškrtnutí, a až
+							peníze dorazí, zapíše se příjem.
+						</p>
+					</Explainer>
+					<span class="optional">nepovinné</span>
+				</legend>
 
 				<div class="pair pair--owed">
 					<label class="field">
@@ -268,7 +276,22 @@
 		{/if}
 
 		<fieldset class="group">
-			<legend class="field__label">Jak to zapsat</legend>
+			<!--
+			  The switching hint below describes the selected mode; the vysvětlivka
+			  on the label holds both halves at once, for the moment of choosing.
+			-->
+			<legend class="field__label">
+				<Explainer term="Jak to zapsat" title="Potvrdit / automaticky">
+					<p>
+						Potvrdit — v den splatnosti ti app platbu nabídne tady a na úvodní obrazovce. Odklepneš
+						ji jedním ťuknutím a částku můžeš přepsat. Pro platby, které se mění.
+					</p>
+					<p>
+						Automaticky — zapíše se sama při otevření app, bez ptaní. Jen pro částky, které jsou
+						vždycky stejné.
+					</p>
+				</Explainer>
+			</legend>
 			<div class="modes">
 				{#each ['confirm', 'auto'] as const as option (option)}
 					<button

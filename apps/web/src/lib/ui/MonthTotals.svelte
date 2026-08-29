@@ -127,18 +127,21 @@
 		margin-inline-end: auto;
 	}
 
+	/* Mint, not signal: the badge is a statistic, and on the entry slab it sits
+	   centimetres from four blue icon links — a number wearing the tap-me
+	   colour there is an invitation to a mis-aimed tap. */
 	.totals__streak {
 		display: inline-flex;
 		align-items: center;
 		gap: 3px;
 		padding: 2px var(--space-2);
 		border-radius: var(--radius-full);
-		background: var(--signal-wash);
+		background: var(--in-wash);
 		font-family: var(--font-mono);
 		font-size: var(--text-2xs);
 		font-weight: 600;
 		font-variant-numeric: tabular-nums;
-		color: var(--signal);
+		color: var(--in);
 	}
 
 	.totals__month {

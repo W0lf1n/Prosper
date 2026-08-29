@@ -454,8 +454,8 @@
 							Přijato — {formatMoney(editing.owedAmount!)}
 						</button>
 						<p class="field__hint">
-							Zapíše příjem na dnešek. Do té doby tyhle peníze v zůstatku nejsou, protože jsi
-							zaplatil celou částku.
+							Zaplatil jsi celou částku, takže celá jde ze zůstatku. Tohle si jen pamatuje, kolik se
+							má vrátit — až dorazí, odškrtneš to a zapíše se příjem.
 						</p>
 					{:else}
 						<p class="field__hint">
@@ -846,8 +846,8 @@
 		min-width: 0;
 	}
 
-	/* The one green button in the app: money arriving is the only thing
-	   `--in` ever means. */
+	/* The one green button in the app: pressing it is money arriving, which is
+	   the heart of what `--in` means. */
 	.owed__ok {
 		border-color: color-mix(in srgb, var(--in) 50%, var(--hairline));
 		background: var(--in-wash);
