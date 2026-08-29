@@ -91,7 +91,7 @@ apps/web/src/
 └─ service-worker.ts
 ```
 
-`apps/api/` is the sync server (ASP.NET Core 9 + EF Core + Postgres 16) and
+`apps/api/` is the sync server (ASP.NET Core 10 + EF Core + Postgres 16) and
 `packages/contracts/` is the protocol both sides share. Each has its own README.
 `apps/web/src/lib/sync/` is the client half.
 

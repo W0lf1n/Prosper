@@ -154,7 +154,7 @@ is untouched for the 95 % of entries that are nobody else's business.
 | Q2  | Currency          | CZK only; `currency` column present and unused on every account                                                                  | Before P2    |
 | Q3  | Budgeting method  | (a) pure ledger in P1; `Category.monthlyCap` exists and is null                                                                  | Before P3    |
 | Q8  | Receipt photos    | No                                                                                                                               | Not in v1    |
-| Q10 | Backend           | ASP.NET Core 9 Minimal API — **written**, `apps/api`                                                                             | done         |
+| Q10 | Backend           | ASP.NET Core 10 Minimal API — **written**, `apps/api`                                                                             | done         |
 | Q11 | Server database   | PostgreSQL 16 — **written**; SQLite supported so it runs without Docker                                                          | done         |
 | Q13 | Sync approach     | Hand-rolled outbox + LWW — **built**, see Q41                                                                                    | done         |
 | Q14 | Auth              | Device-bound bearer token with a pairing code. **Not a JWT** — nothing needs to be stateless, and a hash in a table is revocable | done         |
@@ -1430,3 +1430,36 @@ Four ways out now, and only one of them is a thing to aim at. Pull it down, tap
 the blurred app behind it, press Esc — and a `visually-hidden` button at the end
 of every sheet, because a drag gesture is not something every assistive
 technology can produce and Esc is not something a touch screen reader has.
+
+---
+
+## Maintenance · 2026-08-29 — base images have support windows
+
+An assumption in `deploy/` turned out wrong: that picking the current version
+of a base image was a decision that stayed made. Two of them had quietly left
+support while the compose file sat unproven.
+
+**`aspnet:9.0` was already end-of-life.** .NET 9 is an STS release; its
+support ended May 2026, which means the runtime image had stopped receiving
+security patches before the first real deployment ever ran. The API now
+targets **.NET 10 (LTS, supported to November 2028)** — EF Core and the Npgsql
+provider moved to their 10.x lines with it, and all 50 API tests passed
+without a single code change. The lesson is recorded here so the next bump is
+a calendar decision, not a discovery: **an STS release is a subscription to
+doing this again in eighteen months, so the API tracks LTS releases only.**
+
+**`nginx:1.27-alpine` was a dead branch.** Mainline branches stop receiving
+fixes the moment the next one opens. The web image now tracks the **stable**
+branch (`nginx:1.28-alpine`), which is the one maintained for people who do
+not chase mainline.
+
+Two fences went in beside the version bumps, because a patched base image
+nobody pulls is a patch nobody has:
+
+- **The runbook's update command is now `docker compose build --pull`.**
+  Without `--pull`, `build` reuses the base images from the first build,
+  forever — the flag is the only thing that ever fetches a patched one.
+- **Container logs are capped in the compose file** (10 MB × 3 per service).
+  Docker's default json-file driver keeps every line ever written, and a small
+  VPS disk is where that ends badly. In the compose file rather than
+  `daemon.json`, so the fence travels with the deployment.

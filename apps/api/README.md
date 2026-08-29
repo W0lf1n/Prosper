@@ -1,6 +1,6 @@
 # Prosper API — the sync server
 
-ASP.NET Core 9 Minimal API + EF Core + Postgres 16. It implements
+ASP.NET Core 10 Minimal API + EF Core + Postgres 16. It implements
 `docs/PROJECT-PLAN.md` §10 and nothing else.
 
 **The app does not need it.** Prosper is offline-first: the ledger lives in

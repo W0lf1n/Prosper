@@ -53,7 +53,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       - run: dotnet restore
         working-directory: apps/api
@@ -92,7 +92,7 @@ jobs:
         run: docker build -f apps/web/Dockerfile -t prosper-web:ci .
 
       # `real_ip` is a module, not a core directive, and the pairing limiters
-      # are only per-client because of it. If `nginx:1.27-alpine` ever ships
+      # are only per-client because of it. If `nginx:1.28-alpine` ever ships
       # without `ngx_http_realip_module`, this says "unknown directive" here
       # rather than arriving as a thirty-second curl timeout below.
       - name: The web image's nginx config parses

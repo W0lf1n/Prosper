@@ -44,7 +44,7 @@ about what a transaction _means_ lives on the client, where it is tested.
 │   │    │     location /api/ ──────────┐           published port,    │   │
 │   │    │                              │           bound to loopback  │   │
 │   │    ▼                              ▼                              │   │
-│   │   /usr/share/nginx/html      api  ASP.NET Core 9  :8080          │   │
+│   │   /usr/share/nginx/html      api  ASP.NET Core 10  :8080          │   │
 │   │   (200.html, _app/…)          │   not published                  │   │
 │   │                               ▼                                  │   │
 │   │                              db   Postgres 16                    │   │
@@ -434,8 +434,13 @@ copy does not exist yet.
 ## Updating
 
 ```bash
-cd /srv/prosper && sudo git pull && cd deploy && docker compose up -d --build
+cd /srv/prosper && sudo git pull && cd deploy && docker compose build --pull && docker compose up -d
 ```
+
+`--pull` is not decoration. Without it, `build` reuses whatever `node:22-alpine`,
+`nginx:1.28-alpine` and the .NET images it pulled the first time — forever. The
+base images are where security patches arrive, and this flag is the only thing
+that fetches them.
 
 Postgres is untouched by a rebuild — the data is in the `pgdata` volume, not in
 the image.

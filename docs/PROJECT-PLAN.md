@@ -185,7 +185,7 @@ Full reasoning, including every rejected alternative, is in `DECISIONS.md`.
 | Phone          | Android primary; iOS kept working as a degraded case                             |
 | History import | **None.** Clean start — the 2026 workbook has no dates to import                 |
 | Repository     | `github.com/W0lf1n/Prosper`, public, **MIT**                                     |
-| Backend / sync | ASP.NET Core 9 + Postgres 16, hand-rolled outbox + LWW — **written**, `apps/api` |
+| Backend / sync | ASP.NET Core 10 + Postgres 16, hand-rolled outbox + LWW — **written**, `apps/api` |
 
 ### The workbook
 
@@ -225,7 +225,7 @@ full analysis, including the eight distinct failure modes it exhibited, is in
 │      ▼                                                        │
 │  web   nginx + static PWA, location /api/ ──┐                │
 │                                             ▼                 │
-│                     api  ASP.NET Core 9  →  db  Postgres 16  │
+│                     api  ASP.NET Core 10  →  db  Postgres 16  │
 │                                        nightly pg_dump → disk │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -898,7 +898,7 @@ Prosper/
 │  │  │                             #   · /jmeni · /settings
 │  │  ├─ src/service-worker.ts      # app shell cache, hand-rolled
 │  │  └─ vite.config.ts             # SvelteKit + adapter + Vitest, all inline
-│  └─ api/                          # ASP.NET Core 9 + EF Core + Postgres 16
+│  └─ api/                          # ASP.NET Core 10 + EF Core + Postgres 16
 │     ├─ src/Prosper.Api/           #   pairing, push, pull, health
 │     └─ tests/Prosper.Api.Tests/   #   50 tests, SQLite in memory
 ├─ deploy/                          # compose, both nginx configs, backup.sh

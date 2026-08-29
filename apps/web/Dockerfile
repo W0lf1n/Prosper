@@ -27,7 +27,10 @@ RUN pnpm build
 # nginx rather than a Node process. There is no server-side anything to run:
 # the ledger lives in IndexedDB, `adapter-static` emits files, and this image is
 # a file server with one `location /api/`.
-FROM nginx:1.27-alpine
+# The stable branch, not mainline: mainline tags stop receiving fixes the
+# moment the next branch opens, and nobody rebuilds this image often enough
+# to chase that.
+FROM nginx:1.28-alpine
 
 COPY deploy/nginx/headers.conf /etc/nginx/snippets/headers.conf
 COPY deploy/nginx/app.conf /etc/nginx/conf.d/default.conf

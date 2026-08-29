@@ -13,10 +13,21 @@
 # `docs/DEPLOYMENT.md`.
 name: prosper
 
+# Docker's default log driver keeps every line ever written, unbounded, on a
+# VPS with a small disk. Capped here, per container, rather than in
+# `daemon.json` — so the fence travels with the deployment instead of being
+# host configuration somebody has to remember.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: prosper
       POSTGRES_USER: prosper
@@ -34,6 +45,7 @@ services:
     build:
       context: ../apps/api
     restart: unless-stopped
+    logging: *logging
     depends_on:
       db:
         condition: service_healthy
@@ -52,6 +64,7 @@ services:
       context: ..
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
+    logging: *logging
     depends_on:
       - api
     ports:
