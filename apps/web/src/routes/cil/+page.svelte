@@ -32,6 +32,7 @@
 	} from '$lib/domain/datetime';
 	import { ZERO, formatMoney, parseAmount, type Minor } from '$lib/domain/money';
 	import { DAYS, plural } from '$lib/domain/czech';
+	import { homeCurrency, inCurrency } from '$lib/domain/accounts';
 	import {
 		contributions,
 		defaultGoalCategory,
@@ -45,7 +46,7 @@
 		WHY_MIN_LENGTH,
 		type GoalStatus
 	} from '$lib/domain/goals';
-	import type { Category, Goal, MonthTarget, Txn } from '$lib/domain/types';
+	import type { Account, Category, Goal, MonthTarget, Txn } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
@@ -63,13 +64,33 @@
 		(await db().monthTargets.toArray()).filter((t: MonthTarget) => !t.isDeleted)
 	);
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
-	const txns = liveQuery(async () =>
-		data.accountId
-			? (await db().txns.where('accountId').equals(data.accountId).toArray()).filter(
-					(t: Txn) => !t.isDeleted
-				)
-			: []
+	const allTxns = liveQuery(async () =>
+		(await db().txns.toArray()).filter((t: Txn) => !t.isDeleted)
 	);
+	const accounts = liveQuery(() => db().accounts.toArray());
+
+	/**
+	 * Goals are denominated in the home currency, so they are measured over the
+	 * home-currency rows of *every* account — not the active one (Q49). A euro
+	 * account can neither feed a koruna goal nor hide the contributions made
+	 * while it happened to be active.
+	 */
+	const home = $derived(homeCurrency(($accounts ?? []) as Account[]));
+	const goalTxns = $derived(
+		inCurrency(($allTxns ?? []) as Txn[], ($accounts ?? []) as Account[], home)
+	);
+
+	/**
+	 * Where a one-tap contribution lands: the active account when it is held in
+	 * the home currency, otherwise the first account that is — money put toward
+	 * a koruna goal has to be koruna.
+	 */
+	const contributionAccountId = $derived.by(() => {
+		const rows = ($accounts ?? []) as Account[];
+		const active = rows.find((a) => a.id === data.accountId);
+		if (active && active.currency === home) return active.id;
+		return rows.find((a) => !a.isDeleted && !a.isArchived && a.currency === home)?.id ?? null;
+	});
 
 	const month = monthKey(today());
 
@@ -93,7 +114,7 @@
 		(($goals ?? []) as Goal[]).map((goal) =>
 			goalStatus({
 				goal,
-				txns: $txns ?? [],
+				txns: goalTxns,
 				categories: liveCategories,
 				target: writtenTarget(goal.id),
 				month,
@@ -116,7 +137,7 @@
 		current
 			? monthHistory(
 					current.goal,
-					$txns ?? [],
+					goalTxns,
 					liveCategories,
 					(($monthTargets ?? []) as MonthTarget[]).filter((t) => t.goalId === current.goal.id),
 					today()
@@ -230,7 +251,7 @@
 							startAmount: (fParsedSaved -
 								contributions(
 									{ ...goal, categoryId: fCategoryId },
-									$txns ?? [],
+									goalTxns,
 									liveCategories
 								)) as Minor
 						}
@@ -325,10 +346,10 @@
 	);
 
 	async function putAside() {
-		if (!current || !data.accountId || !parsedPut || !putCategoryId) return;
+		if (!current || !contributionAccountId || !parsedPut || !putCategoryId) return;
 		const saved = await contributeToGoal({
 			goal: current.goal,
-			accountId: data.accountId,
+			accountId: contributionAccountId,
 			amount: parsedPut,
 			categoryId: putCategoryId
 		});
@@ -718,7 +739,7 @@
 				<button
 					type="button"
 					class="btn btn--primary btn--block"
-					disabled={parsedPut === null || !data.accountId}
+					disabled={parsedPut === null || !contributionAccountId}
 					onclick={putAside}
 				>
 					Odložit {parsedPut ? formatMoney(parsedPut) : ''}

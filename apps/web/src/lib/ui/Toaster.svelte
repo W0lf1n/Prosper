@@ -34,7 +34,7 @@
 					</span>
 
 					<span class="body">
-						<span class="amount">{formatMoney(t.amount, { sign: 'never' })}</span>
+						<span class="amount">{formatMoney(t.amount, { sign: 'never', code: t.code })}</span>
 						{#if t.message}
 							<span class="note">{t.message}</span>
 						{/if}

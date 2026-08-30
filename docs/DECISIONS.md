@@ -1705,3 +1705,82 @@ re-litigated:
   account's* minor unit; amounts in different currencies are never summed; no
   exchange rate is ever fetched — where currencies meet (a transfer's two
   legs), the rate is implied by two typed amounts and never stored.
+
+### Q49 — Accounts became plural, each in its own currency · built 2026-08-30
+
+Asked for: a second account — KB in koruny, Revolut in euros — so a beer on
+holiday has somewhere true to go. Planned earlier the same day (the section
+above); Petr answered the three open questions and the build followed. Schema
+**v11**.
+
+**The two principles everything hangs on.** An amount is an integer in *its
+account's* minor unit — `Minor` did not change, only whose hundredths a row
+means, and the answer is always its account's. And amounts in different
+currencies are **never summed**: `domain/accounts.ts` (`homeCurrency`,
+`inCurrency`, `groupByCurrency`) is the only door to adding rows together, and
+no combined cross-currency figure exists anywhere in the app, because it would
+need an exchange rate and **no rate is ever fetched or stored**.
+
+**Formatting** (`money.ts`): one glyph cache per ISO code, Czech locale for
+all of them — "1 234,50 €" reads as the same app as "1 234,50 Kč". Four
+currencies offered (CZK, EUR, USD, GBP), all with two minor-unit digits so
+`Minor` keeps meaning hundredths; JPY stays out until it is real. `code`
+defaults to CZK everywhere, so a screen that never opts in never changed.
+
+**The switcher lives in Settings**, on the account card, which became the
+account list: the active account's fold on top, the others below with one-tap
+**Přepnout**, plus **Přidat účet** (name, kind, currency, opening balance) and
+**Převod**. The layout hands `accountId` to every route, so a switch is one
+meta write and an `invalidateAll()`. Currency is chosen at creation and never
+editable — an account with history cannot be redenominated. Archiving the
+active account hands "active" to the next one first; the last account cannot
+be archived at all.
+
+**Transfers** (`createTransfer`): two rows, mutually referencing
+`transferPairId` (§6.1), committed together or not at all. Between currencies
+both sides are typed — 2 470 Kč out, 100 € in; the pair *is* the rate — and
+inside one currency the amount is asked once. Deleting either leg tombstones
+both; the undo restores both. Transfers are excluded from every measurement —
+`summariseMonth` (and so trends and the split), the uncategorised nag,
+`findMissingRecurring`, coverage and the streak, the payee autocomplete —
+because moving your own money is not spending it; only the balances see the
+legs, because the balances are what moved. The flow lives on **/tape** (the
+balance slab) and in **Settings** — never the entry screen, whose contract is
+the five-second expense (decided by the project, per Petr's "decide for me").
+
+**Schedules got an owner**: `Schedule.accountId` (v11), backfilled to the
+active account — what every schedule meant while there was only one. The
+poster uses the schedule's own account wherever confirmation happens; a
+legacy row without one falls back to the active account. `/platby` and the
+entry screen's confirm strip are per-account, like every recording screen.
+
+**`/mesic` got Petr's switcher** — chips under the header: each account, and
+**vše**. Per-account is the full screen in that account's currency. "Vše" is
+one card per currency — net, in, out, buckets, summed only within the
+currency — while Kontrola, the split and trends step aside with a sentence
+saying where they went: euros and koruny do not average.
+
+**Goals are home-currency facts.** The home currency is the first live
+account's (CZK in practice). `/cil`, `/mesic`'s goal card and the launch
+catch-up measure contributions over home-currency rows of *every* account —
+a euro lunch can neither feed nor dilute a koruna goal — and the entry
+screen's goal strip renders nothing at all on a foreign-currency account
+(`null` would draw the "napsat cíl" invite, which is worse than silence).
+One-tap contributions land on a home-currency account even when the euro one
+is active.
+
+**`/jmeni` stays per-currency, per Petr:** the home currency's cash joins
+`celkem` beside the holdings (stated in it), and each other currency is its
+own "Na účtu · EUR" line that joins no total.
+
+**A trap found on the way** (recorded in `CLAUDE.md`): a `liveQuery` whose
+closure reads `data.accountId` re-runs on Dexie writes, not on `data`
+changes. Every screen mounts fresh after navigation so it never showed — but
+Settings is where the switch happens, and its active-account card kept
+showing the old account. That card now derives from the live accounts list
+instead of owning a query.
+
+**Deliberately not built:** any exchange rate, fetched or stated; a combined
+cross-currency figure; editing an account's currency; a transfer on the entry
+screen; multi-currency holdings (`Holding.currency` still waits, as
+`Account.currency` did).

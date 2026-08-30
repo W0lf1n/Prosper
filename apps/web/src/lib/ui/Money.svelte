@@ -13,6 +13,7 @@
 		value,
 		currency = true,
 		sign = 'auto',
+		code = 'CZK',
 		colour = true,
 		size = 'base',
 		bold = false
@@ -21,7 +22,9 @@
 	const tone = $derived(colour && value !== 0 ? (value < 0 ? 'money--out' : 'money--in') : '');
 </script>
 
-<span class="money {tone} size-{size}" class:bold>{formatMoney(value, { currency, sign })}</span>
+<span class="money {tone} size-{size}" class:bold
+	>{formatMoney(value, { currency, sign, code })}</span
+>
 
 <style>
 	/**

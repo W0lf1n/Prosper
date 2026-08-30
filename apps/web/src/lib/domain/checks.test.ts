@@ -190,6 +190,30 @@ describe('duplicates', () => {
 	});
 });
 
+describe('transfers stay out of the measurements (Q49)', () => {
+	it('a transfer leg is neither outflow, income, a bucket, nor an uncategorised row', () => {
+		const out = txn('2026-08-10', -2470_00, {
+			transferPairId: 'leg-in',
+			payee: 'Převod → Revolut'
+		});
+		const inc = txn('2026-08-10', 2470_00, { transferPairId: out.id, payee: 'Převod ← KB' });
+		const lunch = txn('2026-08-11', -249_00, { categoryId: 'cat-jídlo' });
+
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [out, inc, lunch],
+			categories: CATEGORIES,
+			today: '2026-08-30'
+		});
+
+		expect(summary.outflow).toBe(-249_00);
+		expect(summary.income).toBe(0);
+		expect(summary.buckets).toHaveLength(1);
+		// The uncategorised nag must not fire on rows that cannot have a bucket.
+		expect(summary.findings.find((f) => f.rule === 'uncategorised')).toBeUndefined();
+	});
+});
+
 describe('summariseMonth()', () => {
 	const base = {
 		categories: CATEGORIES,

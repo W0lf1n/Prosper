@@ -2,6 +2,7 @@
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
 	import {
+		createTransfer,
 		deleteTxn,
 		getCollapsedMonths,
 		reconcileAccount,
@@ -9,8 +10,10 @@
 		setCollapsedMonths,
 		settleReceivable,
 		unsettleReceivable,
-		updateTxn
+		updateTxn,
+		type Transfer
 	} from '$lib/db/repo';
+	import { liveAccounts } from '$lib/domain/accounts';
 	import { formatDayHeading, formatMonthHeading, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
 	import { buildTape } from '$lib/domain/ledger';
@@ -18,13 +21,14 @@
 	import { daysSinceReconciled } from '$lib/domain/reconcile';
 	import { uuidv7 } from '$lib/domain/ids';
 	import { DAYS, counted } from '$lib/domain/czech';
-	import type { Category, Reconciliation, Txn, TxnShare } from '$lib/domain/types';
+	import type { Account, Category, Reconciliation, Txn, TxnShare } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
 	import ReconcileSheet from '$lib/ui/ReconcileSheet.svelte';
 	import Sheet from '$lib/ui/Sheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
+	import TransferSheet, { type TransferInput } from '$lib/ui/TransferSheet.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
 
@@ -33,6 +37,11 @@
 	const account = liveQuery(async () =>
 		data.accountId ? ((await db().accounts.get(data.accountId)) ?? null) : null
 	);
+	const allAccounts = liveQuery(() => db().accounts.toArray());
+
+	/** Everything on this screen is one account's, in its own currency (Q49). */
+	const currency = $derived($account?.currency ?? 'CZK');
+	const accountRows = $derived(liveAccounts(($allAccounts ?? []) as Account[]));
 
 	const txns = liveQuery(async () =>
 		data.accountId
@@ -92,6 +101,19 @@
 
 	let reconciling = $state(false);
 
+	// ── transfer ────────────────────────────────────────────────────────────
+	let transferring = $state(false);
+
+	async function saveTransfer(input: TransferInput) {
+		const transfer: Transfer = await createTransfer(input);
+		transferring = false;
+		toast.money(transfer.out.amount, {
+			message: transfer.out.payee,
+			code: currency,
+			undo: () => deleteTxn(transfer.out.id)
+		});
+	}
+
 	const sinceReconciled = $derived(
 		data.accountId
 			? daysSinceReconciled(($reconciliations ?? []) as Reconciliation[], data.accountId, today())
@@ -133,7 +155,7 @@
 		reconciling = false;
 		toast.show(
 			result.adjustment
-				? `Vyrovnáno o ${formatMoney(result.adjustment.amount, { sign: 'never' })}`
+				? `Vyrovnáno o ${formatMoney(result.adjustment.amount, { sign: 'never', code: currency })}`
 				: 'Srovnáno s bankou'
 		);
 	}
@@ -217,6 +239,7 @@
 		if (!repayment) return;
 		toast.money(repayment.amount, {
 			message: repayment.payee,
+			code: currency,
 			undo: () => unsettleReceivable(txnId, shareId)
 		});
 	}
@@ -323,8 +346,17 @@
 -->
 <section class="balance slab">
 	<h2 class="balance__name u-label">{$account?.name ?? '—'}</h2>
-	<Money value={balance} colour={false} size="2xl" bold />
+	<Money value={balance} colour={false} size="2xl" bold code={currency} />
 	<span class="balance__caption">aktuální zůstatek</span>
+
+	{#if accountRows.length > 1}
+		<!-- Only once there is somewhere to move money to. Same recipe as the
+		     reconcile row: this slab is where the balances live, so it is where
+		     they are moved (Q49). -->
+		<button type="button" class="balance__check" onclick={() => (transferring = true)}>
+			<span class="balance__check-label">Převod mezi účty</span>
+		</button>
+	{/if}
 
 	<button type="button" class="balance__check" onclick={() => (reconciling = true)}>
 		<span class="balance__check-label">Srovnat s bankou</span>
@@ -340,9 +372,18 @@
 	</button>
 </section>
 
+<TransferSheet
+	open={transferring}
+	accounts={($allAccounts ?? []) as Account[]}
+	defaultFromId={data.accountId}
+	onsave={saveTransfer}
+	onclose={() => (transferring = false)}
+/>
+
 <ReconcileSheet
 	open={reconciling}
 	computed={computedBalance}
+	code={currency}
 	accountName={$account?.name ?? 'Účet'}
 	categories={reconcileCategories}
 	onsave={saveReconciliation}
@@ -382,7 +423,7 @@
 					<div class="day__head">
 						<span class="day__date">{formatDayHeading(day.date)}</span>
 						{#if day.rows.length > 0}
-							<Money value={day.net} size="sm" colour={false} />
+							<Money value={day.net} size="sm" colour={false} code={currency} />
 						{/if}
 					</div>
 
@@ -405,8 +446,13 @@
 								<li>
 									<button type="button" class="row" onclick={() => openEdit(row.txn)}>
 										<span class="row__label">
-											<span class="row__category" class:row__category--none={!row.txn.categoryId}>
-												{categoryById.get(row.txn.categoryId ?? '')?.name ?? 'bez kategorie'}
+											<span
+												class="row__category"
+												class:row__category--none={!row.txn.categoryId && !row.txn.transferPairId}
+											>
+												{row.txn.transferPairId
+													? 'převod'
+													: (categoryById.get(row.txn.categoryId ?? '')?.name ?? 'bez kategorie')}
 											</span>
 											{#if row.txn.payee || isOpenReceivable(row.txn)}
 												<span class="row__payee">
@@ -418,7 +464,7 @@
 											{/if}
 										</span>
 										<span class="row__amounts">
-											<Money value={row.txn.amount} size="base" bold />
+											<Money value={row.txn.amount} size="base" bold code={currency} />
 											<Money value={row.balance} size="sm" colour={false} currency={false} />
 										</span>
 									</button>
@@ -447,18 +493,27 @@
 			<input class="field__input field__input--mono" type="date" bind:value={editDate} />
 		</label>
 
-		<label class="field">
-			<span class="field__label">Kategorie</span>
-			<select class="field__input" bind:value={editCategory}>
-				<!-- Only offered when the row already is one, so it can be fixed. -->
-				{#if editing?.categoryId === null}
-					<option value="">bez kategorie</option>
-				{/if}
-				{#each ($categories ?? []).filter((c: Category) => !c.isArchived && !c.isDeleted) as category (category.id)}
-					<option value={category.id}>{category.name}</option>
-				{/each}
-			</select>
-		</label>
+		{#if editing?.transferPairId === null}
+			<label class="field">
+				<span class="field__label">Kategorie</span>
+				<select class="field__input" bind:value={editCategory}>
+					<!-- Only offered when the row already is one, so it can be fixed. -->
+					{#if editing?.categoryId === null}
+						<option value="">bez kategorie</option>
+					{/if}
+					{#each ($categories ?? []).filter((c: Category) => !c.isArchived && !c.isDeleted) as category (category.id)}
+						<option value={category.id}>{category.name}</option>
+					{/each}
+				</select>
+			</label>
+		{:else}
+			<!-- A transfer has no bucket and owes nobody anything — it is the same
+			     money on the move. Deleting either leg removes both. -->
+			<p class="field__hint">
+				Tohle je převod mezi účty. Nepočítá se do výdajů ani příjmů a smazáním zmizí obě jeho
+				strany.
+			</p>
+		{/if}
 
 		<label class="field">
 			<span class="field__label">Komu / za co</span>
@@ -477,7 +532,7 @@
 		  received, fix a figure, fix a name, add a second person, or take one
 		  off the row entirely by clearing their amount.
 		-->
-		{#if editing && editing.amount < 0}
+		{#if editing && editing.amount < 0 && editing.transferPairId === null}
 			<fieldset class="owed">
 				<legend class="field__label">Dluží mi</legend>
 

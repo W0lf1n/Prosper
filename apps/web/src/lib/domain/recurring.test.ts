@@ -21,6 +21,7 @@ const SYNCED = { updatedAt: '2026-08-01T00:00:00.000Z', deviceId: 'dev', isDelet
 function schedule(id: string, patch: Partial<Schedule> = {}): Schedule {
 	return {
 		id,
+		accountId: 'acc-1',
 		payee: id,
 		categoryId: 'cat',
 		amount: minor(-379_00),

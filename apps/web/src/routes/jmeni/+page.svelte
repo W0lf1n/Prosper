@@ -21,7 +21,7 @@
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
 	import { archiveHolding, createHolding, recordValuation, updateHolding } from '$lib/db/repo';
-	import { balanceOf } from '$lib/domain/ledger';
+	import { groupByCurrency, homeCurrency } from '$lib/domain/accounts';
 	import {
 		contributionOf,
 		readHoldings,
@@ -31,7 +31,7 @@
 	} from '$lib/domain/holdings';
 	import { formatShortDate, today } from '$lib/domain/datetime';
 	import { DAYS, plural } from '$lib/domain/czech';
-	import { ZERO, type Minor } from '$lib/domain/money';
+	import { ZERO, add, sum, type Minor } from '$lib/domain/money';
 	import type { Account, Category, Holding, Txn, Valuation } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Explainer from '$lib/ui/Explainer.svelte';
@@ -41,20 +41,12 @@
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import ValuationSheet from '$lib/ui/ValuationSheet.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
-	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
-
-	const account = liveQuery(async () =>
-		data.accountId ? ((await db().accounts.get(data.accountId)) ?? null) : null
-	);
-
+	// Every account and every row: the cash leg is per currency now (Q49), and
+	// which account happens to be active has no bearing on what is owned.
+	const allAccounts = liveQuery(() => db().accounts.toArray());
 	const allTxns = liveQuery(async () =>
-		data.accountId
-			? (await db().txns.where('accountId').equals(data.accountId).toArray()).filter(
-					(t: Txn) => !t.isDeleted
-				)
-			: []
+		(await db().txns.toArray()).filter((t: Txn) => !t.isDeleted)
 	);
 
 	const allHoldings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
@@ -67,10 +59,28 @@
 		)
 	);
 
-	/** Derived, and exact: the opening figure plus every row since. */
-	const cash = $derived(
-		balanceOf(($account as Account | null)?.openingBalance ?? ZERO, ($allTxns ?? []) as Txn[])
-	);
+	/**
+	 * Derived, and exact: opening figures plus every row since — per currency,
+	 * because balances in different currencies are never summed (Q49). The home
+	 * currency's cash goes into `celkem` beside the holdings, which are stated
+	 * in it; each other currency is its own line and joins no total.
+	 */
+	const home = $derived(homeCurrency(($allAccounts ?? []) as Account[]));
+	const cashByCurrency = $derived.by(() => {
+		const rows = ($allTxns ?? []) as Txn[];
+		const totals: { code: string; total: Minor }[] = [];
+		for (const [code, group] of groupByCurrency(($allAccounts ?? []) as Account[])) {
+			const opening = sum(group.map((a) => a.openingBalance));
+			const ids = new Set(group.map((a) => a.id));
+			totals.push({
+				code,
+				total: add(opening, sum(rows.filter((t) => ids.has(t.accountId)).map((t) => t.amount)))
+			});
+		}
+		return totals;
+	});
+	const cash = $derived(cashByCurrency.find((c) => c.code === home)?.total ?? ZERO);
+	const foreignCash = $derived(cashByCurrency.filter((c) => c.code !== home));
 
 	const readings = $derived(
 		readHoldings({
@@ -208,6 +218,16 @@
 				<dt class="leg__name">V investicích</dt>
 				<dd class="leg__value"><Money value={wealth.invested} size="base" colour={false} /></dd>
 			</div>
+			<!-- Foreign-currency balances stand beside the total, never inside it:
+			     adding them would need an exchange rate, and none exists here (Q49). -->
+			{#each foreignCash as line (line.code)}
+				<div class="leg">
+					<dt class="leg__name">Na účtu · {line.code}</dt>
+					<dd class="leg__value">
+						<Money value={line.total} size="base" colour={false} code={line.code} />
+					</dd>
+				</div>
+			{/each}
 		</dl>
 
 		<!--

@@ -181,7 +181,7 @@ Full reasoning, including every rejected alternative, is in `DECISIONS.md`.
 | Ids            | Client-generated **UUIDv7**, hand-rolled, no dependency                          |
 | Hosting        | Static output (`adapter-static`), served by its own nginx container from the API's origin — `deploy/`, runbook in `DEPLOYMENT.md` |
 | UI language    | **Czech.** Code, identifiers, comments and docs stay English                     |
-| Currency       | CZK only; `currency` column present and unused on every account                  |
+| Currency       | Per account since Q49 (CZK, EUR, USD, GBP); never summed across, no rates        |
 | Phone          | Android primary; iOS kept working as a degraded case                             |
 | History import | **None.** Clean start — the 2026 workbook has no dates to import                 |
 | Repository     | `github.com/W0lf1n/Prosper`, public, **MIT**                                     |
@@ -272,7 +272,7 @@ interface Account extends Synced {
 	kind: AccountKind;
 	openingBalance: Minor;
 	openingDate: string;
-	currency: string; // 'CZK'
+	currency: string; // per account since Q49 — immutable once the account has rows
 	isArchived: boolean;
 	sortOrder: number;
 }
@@ -320,6 +320,7 @@ interface TxnShare {
 /** A payment that repeats: a declaration, not a detection. Q40. */
 interface Schedule extends Synced {
 	id: string;
+	accountId: string; // which account it posts from — Q49
 	payee: string;
 	categoryId: string;
 	amount: Minor; // signed

@@ -22,6 +22,8 @@
 	import Sheet from './Sheet.svelte';
 
 	interface Props {
+		/** Currency of the account being reconciled (Q49). */
+		code?: string;
 		open: boolean;
 		/** What the ledger says right now. Captured by the caller before opening. */
 		computed: Minor;
@@ -38,7 +40,7 @@
 		onclose: () => void;
 	}
 
-	let { open, computed, accountName, categories, onsave, onclose }: Props = $props();
+	let { open, computed, accountName, categories, code = 'CZK', onsave, onclose }: Props = $props();
 
 	let statementText = $state('');
 	let date = $state(today());
@@ -119,7 +121,7 @@
 		-->
 		<div class="known">
 			<span class="known__label u-label">{accountName} podle zápisů</span>
-			<Money value={computed} size="xl" bold colour={false} />
+			<Money value={computed} size="xl" bold colour={false} {code} />
 		</div>
 
 		<label class="field">
@@ -147,7 +149,7 @@
 					</p>
 				{:else}
 					<p class="delta__lead">
-						Rozdíl <Money value={delta.amount} size="lg" bold />
+						Rozdíl <Money value={delta.amount} size="lg" bold {code} />
 					</p>
 					<p class="delta__note">{describeDelta(delta)}</p>
 				{/if}
@@ -179,7 +181,7 @@
 				disabled={busy}
 				onclick={() => commit(true)}
 			>
-				Zapsat vyrovnání {formatMoney(delta.amount)}
+				Zapsat vyrovnání {formatMoney(delta.amount, { code })}
 			</button>
 			<!--
 			  The honest second option. A difference is often a card payment that

@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-08-30 · schema v10 · 402 web tests · 50 API tests
+**Last revised:** 2026-08-30 · schema v11 · 425 web tests · 50 API tests
 
 ---
 
@@ -110,6 +110,7 @@ The runbook is `docs/DEPLOYMENT.md`.
 | `czech.ts`        | Czech plurals — "3 záznamy", not "3 záznamů"                    |
 | `ids.ts`          | UUIDv7, hand-rolled, no dependency                              |
 | `types.ts`        | The data model. Mirrors the server, when there is one           |
+| `accounts.ts`     | Accounts plural: home currency, never-sum-across, transfers     |
 | `vocabulary.ts`   | A hand-written dictionary of Petr's own words. Not ML, ever     |
 | `checks.ts`       | The four laws, enforced. Every rule cites its workbook figure   |
 | `ledger.ts`       | Tape building, every day of it, bucket rankings, recent payees  |
@@ -224,6 +225,14 @@ ledger.
 
 **Dexie must not be constructed during SSR/prerender.** `db()` is lazy for
 exactly that reason. `ssr = false`, `prerender = true` in `routes/+layout.ts`.
+
+**A `liveQuery` closure re-runs on Dexie writes, not on `data` changes.** Every
+per-account query closes over `data.accountId`, and that is fine on every
+screen a navigation re-mounts — but Settings is where the account *switch*
+happens, and its active-account card kept showing the old account after
+`invalidateAll()`, because switching writes only `meta`. A screen that must
+react to the active account changing derives from a table-wide live list
+instead of owning a keyed query.
 
 ---
 

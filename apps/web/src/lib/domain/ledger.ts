@@ -163,6 +163,9 @@ export function recentPayees(txns: readonly Txn[], limit = 20): string[] {
 	const seen = new Map<string, string>(); // lowercase → original casing
 	const ordered = [...txns].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 	for (const txn of ordered) {
+		// A transfer's payee is machine-written; offering it back as an
+		// autocomplete for expenses would only pollute the list (Q49).
+		if (txn.transferPairId !== null) continue;
 		const name = txn.payee.trim();
 		if (!name) continue;
 		const key = name.toLocaleLowerCase('cs');

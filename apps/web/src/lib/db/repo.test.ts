@@ -17,9 +17,11 @@ import {
 	BACKUP_VERSION,
 	catchUpGoalTargets,
 	confirmScheduled,
+	createAccount,
 	createGoal,
 	createHolding,
 	createSchedule,
+	createTransfer,
 	createTxn,
 	deleteTxn,
 	ensureSeeded,
@@ -29,6 +31,7 @@ import {
 	pinGoal,
 	recordValuation,
 	resetLedger,
+	restoreTxn,
 	setCollapsedMonths,
 	settleReceivable,
 	unsettleReceivable,
@@ -323,6 +326,7 @@ describe('shares — one expense, several payers (Q47)', () => {
 		expect(txn.shares[9]?.who).toBe('osoba 10');
 
 		const schedule = await createSchedule({
+			accountId,
 			payee: 'Netflix',
 			categoryId: 'cat',
 			amount: -39900 as Minor,
@@ -370,6 +374,7 @@ describe('shares — one expense, several payers (Q47)', () => {
 
 	it('confirmScheduled copies the declared shares onto the posted row, with fresh ids', async () => {
 		const schedule = await createSchedule({
+			accountId,
 			payee: 'Netflix',
 			categoryId: 'cat',
 			amount: -39900 as Minor,
@@ -427,6 +432,87 @@ describe('shares — one expense, several payers (Q47)', () => {
 		expect(after?.shares).toEqual([
 			{ id: 'legacy', who: 'Zůza', amount: 125000, settledByTxnId: repayment!.id }
 		]);
+	});
+});
+
+/**
+ * Transfers write to two accounts at once, which is exactly the kind of fact
+ * only persistence can prove — like the settle flow above.
+ */
+describe('transfers — two accounts, one movement (Q49)', () => {
+	async function secondAccount() {
+		return createAccount({ name: 'Revolut', kind: 'checking', currency: 'EUR' });
+	}
+
+	it('writes two mutually-referencing legs, each in its own account', async () => {
+		const revolut = await secondAccount();
+
+		const transfer = await createTransfer({
+			fromAccountId: accountId,
+			toAccountId: revolut.id,
+			amountOut: 2470_00 as Minor,
+			amountIn: 100_00 as Minor,
+			date: '2026-08-30'
+		});
+
+		expect(transfer.out.accountId).toBe(accountId);
+		expect(transfer.out.amount).toBe(-2470_00);
+		expect(transfer.in.accountId).toBe(revolut.id);
+		expect(transfer.in.amount).toBe(100_00);
+		// Mutually referencing (§6.1): each leg names the other.
+		expect(transfer.out.transferPairId).toBe(transfer.in.id);
+		expect(transfer.in.transferPairId).toBe(transfer.out.id);
+		// No bucket, ever — a transfer is not spending.
+		expect(transfer.out.categoryId).toBeNull();
+		expect(transfer.in.categoryId).toBeNull();
+	});
+
+	it('refuses a transfer onto the same account', async () => {
+		await expect(
+			createTransfer({
+				fromAccountId: accountId,
+				toAccountId: accountId,
+				amountOut: 100_00 as Minor,
+				amountIn: 100_00 as Minor
+			})
+		).rejects.toThrow(/dva různé účty/);
+	});
+
+	it('deleting one leg takes the pair, and the undo brings back both', async () => {
+		const revolut = await secondAccount();
+		const transfer = await createTransfer({
+			fromAccountId: accountId,
+			toAccountId: revolut.id,
+			amountOut: 500_00 as Minor,
+			amountIn: 500_00 as Minor
+		});
+
+		await deleteTxn(transfer.out.id);
+		expect((await db.txns.get(transfer.out.id))?.isDeleted).toBe(true);
+		expect((await db.txns.get(transfer.in.id))?.isDeleted).toBe(true);
+
+		await restoreTxn(transfer.out.id);
+		expect((await db.txns.get(transfer.out.id))?.isDeleted).toBe(false);
+		expect((await db.txns.get(transfer.in.id))?.isDeleted).toBe(false);
+	});
+
+	it('a schedule posts to its own account, wherever the active one points', async () => {
+		const revolut = await secondAccount();
+		const schedule = await createSchedule({
+			accountId: revolut.id,
+			payee: 'Spotify',
+			categoryId: 'cat',
+			amount: -299_00 as Minor,
+			dayOfMonth: 5,
+			startMonth: '2026-08'
+		});
+
+		// Confirmed while the *other* account is active — the schedule wins.
+		const posted = await confirmScheduled(
+			{ schedule, month: '2026-08', date: '2026-08-05' },
+			{ accountId }
+		);
+		expect(posted.accountId).toBe(revolut.id);
 	});
 });
 

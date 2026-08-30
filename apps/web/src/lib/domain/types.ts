@@ -44,7 +44,15 @@ export interface Account extends Synced {
 	kind: AccountKind;
 	openingBalance: Minor;
 	openingDate: IsoDate;
-	currency: string; // 'CZK' — unused in v1, present so multi-currency is not a migration
+	/**
+	 * ISO code from `money.CURRENCIES` — live since 2026-08-30, having sat
+	 * unused since v1 exactly so this day would not be a migration. Every
+	 * amount on this account's rows is an integer of *this* currency's minor
+	 * units, and amounts in different currencies are never summed (Q49).
+	 * Immutable once the account has rows: changing it would silently
+	 * redenominate history.
+	 */
+	currency: string;
 	isArchived: boolean;
 	sortOrder: number;
 }
@@ -165,6 +173,13 @@ export type ScheduleMode = 'confirm' | 'auto';
  */
 export interface Schedule extends Synced {
 	id: string;
+	/**
+	 * The account this schedule posts from — new at v11, when accounts became
+	 * plural. The mortgage does not leave the vacation account. Rows written by
+	 * older builds may lack it; the poster falls back to the active account,
+	 * which is what every schedule meant while there was only one.
+	 */
+	accountId: string;
 	/** Goes into the payee field of every row it makes, and names it on screen. */
 	payee: string;
 	categoryId: string;

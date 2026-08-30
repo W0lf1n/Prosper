@@ -334,6 +334,98 @@ describe('v9 → v10 — Goal.startAmount', () => {
 	});
 });
 
+describe('v10 → v11 — Schedule.accountId', () => {
+	it('backfills the active account from meta', async () => {
+		const name = `mig-schedacct-${Date.now()}`;
+		const old = await openAtVersion(name, 10);
+		await old.table('accounts').put({
+			id: 'acc-kb',
+			name: 'Běžný účet',
+			kind: 'checking',
+			openingBalance: 0,
+			openingDate: '2026-01-01',
+			currency: 'CZK',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		await old.table('meta').put({ key: 'activeAccountId', value: 'acc-kb' });
+		await old.table('schedules').put({
+			id: 's-net',
+			payee: 'Netflix',
+			categoryId: 'cat',
+			amount: -39900,
+			dayOfMonth: 5,
+			startMonth: '2026-01',
+			endMonth: null,
+			mode: 'confirm',
+			shares: [],
+			lastPostedMonth: '2026-07',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const schedule = await upgraded.schedules.get('s-net');
+
+		// Every schedule meant the active account while there was only one.
+		expect(schedule?.accountId).toBe('acc-kb');
+		upgraded.close();
+	});
+
+	it('falls back to the first live account when meta never said', async () => {
+		const name = `mig-schedacct-fb-${Date.now()}`;
+		const old = await openAtVersion(name, 10);
+		await old.table('accounts').bulkPut([
+			{
+				id: 'acc-dead',
+				name: 'Smazaný',
+				kind: 'checking',
+				openingBalance: 0,
+				openingDate: '2026-01-01',
+				currency: 'CZK',
+				isArchived: false,
+				sortOrder: 0,
+				...SYNCED,
+				isDeleted: true
+			},
+			{
+				id: 'acc-live',
+				name: 'Běžný účet',
+				kind: 'checking',
+				openingBalance: 0,
+				openingDate: '2026-01-01',
+				currency: 'CZK',
+				isArchived: false,
+				sortOrder: 1,
+				...SYNCED
+			}
+		]);
+		await old.table('schedules').put({
+			id: 's-hypo',
+			payee: 'Hypotéka',
+			categoryId: 'cat',
+			amount: -32_000_00,
+			dayOfMonth: 15,
+			startMonth: '2026-01',
+			endMonth: null,
+			mode: 'auto',
+			shares: [],
+			lastPostedMonth: null,
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		expect((await upgraded.schedules.get('s-hypo'))?.accountId).toBe('acc-live');
+		upgraded.close();
+	});
+});
+
 describe('v7 → v8 — which goal is na očích', () => {
 	it('backfills false on a goal written before the field existed', async () => {
 		const name = `mig-pin-${Date.now()}`;

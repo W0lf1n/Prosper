@@ -25,11 +25,13 @@
 
 	interface Props {
 		groups: DueGroup[];
+		/** Currency of the account these schedules post to. */
+		code?: string;
 		onconfirm: (group: DueGroup, amount: Minor | null) => Promise<void>;
 		onskip: (group: DueGroup) => Promise<void>;
 	}
 
-	let { groups, onconfirm, onskip }: Props = $props();
+	let { groups, code = 'CZK', onconfirm, onskip }: Props = $props();
 
 	let open = $state(false);
 
@@ -83,7 +85,8 @@
 		<span class="due-strip__text">
 			{counted(groups.length, PAYMENTS)} k potvrzení
 		</span>
-		<span class="due-strip__sum"><Money value={total} size="sm" sign="never" colour={false} /></span
+		<span class="due-strip__sum"
+			><Money value={total} size="sm" sign="never" colour={false} {code} /></span
 		>
 		<span class="due-strip__go" aria-hidden="true"><Icon name="chevron-right" size={15} /></span>
 	</button>

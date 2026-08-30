@@ -61,11 +61,24 @@
 
 	let { data }: PageProps = $props();
 
+	const account = liveQuery(async () =>
+		data.accountId ? ((await db().accounts.get(data.accountId)) ?? null) : null
+	);
 	const schedules = liveQuery(() => db().schedules.orderBy('sortOrder').toArray());
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
 
+	/** Everything on this screen is one account's, in that account's currency (Q49). */
+	const currency = $derived($account?.currency ?? 'CZK');
+
 	const live = $derived(
-		(($schedules ?? []) as Schedule[]).filter((s) => !s.isDeleted && !s.isArchived)
+		(($schedules ?? []) as Schedule[]).filter(
+			(s) =>
+				!s.isDeleted &&
+				!s.isArchived &&
+				// A schedule from an older build carries no account and means the
+				// active one — same fallback the poster applies.
+				(!s.accountId || s.accountId === data.accountId)
+		)
 	);
 
 	const cost = $derived(recurringCost(live));
@@ -115,9 +128,10 @@
 	}
 
 	async function saveSchedule(input: ScheduleInput) {
+		if (!data.accountId) return;
 		const patch = { ...input, amount: input.amount as Minor };
 		if (editing) await updateSchedule(editing.id, patch);
-		else await createSchedule(patch);
+		else await createSchedule({ ...patch, accountId: data.accountId });
 		sheetOpen = false;
 		toast.show(editing ? 'Uloženo' : sheetIncoming ? 'Pravidelný příjem přidán' : 'Platba přidána');
 	}
@@ -158,7 +172,7 @@
 <AppBar title="Pravidelné platby" />
 
 <main class="page">
-	<DueStrip groups={due} onconfirm={confirmDue} onskip={skipDue} />
+	<DueStrip groups={due} code={currency} onconfirm={confirmDue} onskip={skipDue} />
 
 	<!--
 	  The figure the whole screen exists for, and it is the year rather than the
@@ -168,32 +182,36 @@
 	-->
 	<section class="card summary">
 		<h2 class="u-label">Za rok</h2>
-		<Money value={cost.yearly} size="2xl" bold colour={false} sign="never" />
+		<Money value={cost.yearly} size="2xl" bold colour={false} sign="never" code={currency} />
 
 		<dl class="facts">
 			<div>
 				<dt>Odejde za měsíc</dt>
-				<dd class="mono">{formatMoney(cost.monthly, { sign: 'never' })}</dd>
+				<dd class="mono">{formatMoney(cost.monthly, { sign: 'never', code: currency })}</dd>
 			</div>
 			{#if cost.reimbursed > 0}
 				<div>
 					<dt>Z toho se vrací</dt>
-					<dd class="mono facts__back">{formatMoney(cost.reimbursed, { sign: 'never' })}</dd>
+					<dd class="mono facts__back">
+						{formatMoney(cost.reimbursed, { sign: 'never', code: currency })}
+					</dd>
 				</div>
 				<div>
 					<dt>Stojí tě to za měsíc</dt>
-					<dd class="mono">{formatMoney(cost.net, { sign: 'never' })}</dd>
+					<dd class="mono">{formatMoney(cost.net, { sign: 'never', code: currency })}</dd>
 				</div>
 			{/if}
 			{#if income.rows.length > 0}
 				<div>
 					<dt>Přijde za měsíc</dt>
-					<dd class="mono facts__in">{formatMoney(income.monthly, { sign: 'never' })}</dd>
+					<dd class="mono facts__in">
+						{formatMoney(income.monthly, { sign: 'never', code: currency })}
+					</dd>
 				</div>
 			{/if}
 			<div>
 				<dt>Ještě odejde tenhle měsíc</dt>
-				<dd class="mono">{formatMoney(stillComing, { sign: 'never' })}</dd>
+				<dd class="mono">{formatMoney(stillComing, { sign: 'never', code: currency })}</dd>
 			</div>
 		</dl>
 	</section>
@@ -215,7 +233,9 @@
 						<button type="button" class="tile" onclick={() => openSchedule(row.schedule)}>
 							<span class="tile__head">
 								<span class="tile__name">{row.schedule.payee}</span>
-								<span class="tile__figure">{formatMoney(row.monthly, { sign: 'never' })}</span>
+								<span class="tile__figure"
+									>{formatMoney(row.monthly, { sign: 'never', code: currency })}</span
+								>
 							</span>
 
 							<span class="tile__foot">
@@ -230,7 +250,7 @@
 									{#if left}
 										zbývá {counted(left.payments, PAYMENTS)}
 									{:else}
-										{formatMoney(row.yearly, { sign: 'never' })} / rok
+										{formatMoney(row.yearly, { sign: 'never', code: currency })} / rok
 									{/if}
 								</span>
 							</span>
@@ -244,10 +264,10 @@
 								<span class="tile__foot back">
 									<span class="tile__where">
 										vrací {payerNames(row.schedule)}
-										{formatMoney(row.reimbursed, { sign: 'never' })}
+										{formatMoney(row.reimbursed, { sign: 'never', code: currency })}
 									</span>
 									<span class="tile__note">
-										stojí {formatMoney(row.net, { sign: 'never' })}
+										stojí {formatMoney(row.net, { sign: 'never', code: currency })}
 									</span>
 								</span>
 							{/if}
@@ -286,7 +306,7 @@
 							<span class="tile__head">
 								<span class="tile__name">{row.schedule.payee}</span>
 								<span class="tile__figure tile__figure--in">
-									{formatMoney(row.monthly, { sign: 'never' })}
+									{formatMoney(row.monthly, { sign: 'never', code: currency })}
 								</span>
 							</span>
 
@@ -297,7 +317,9 @@
 										{MODE_LABEL[row.schedule.mode]}
 									</span>
 								</span>
-								<span class="tile__note">{formatMoney(row.yearly, { sign: 'never' })} / rok</span>
+								<span class="tile__note"
+									>{formatMoney(row.yearly, { sign: 'never', code: currency })} / rok</span
+								>
 							</span>
 						</button>
 					</li>
@@ -332,6 +354,7 @@
 
 <ScheduleSheet
 	open={sheetOpen}
+	code={currency}
 	schedule={editing}
 	categories={sheetCategories}
 	onsave={saveSchedule}

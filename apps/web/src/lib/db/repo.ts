@@ -7,6 +7,7 @@
  *   3. Mutations pass through `enqueue()`, the seam the P2 outbox plugs into.
  */
 
+import { homeCurrency, inCurrency } from '$lib/domain/accounts';
 import { monthKey, nowIso, startOfMonth, today } from '$lib/domain/datetime';
 import { goalStatus, validateGoal, validateGoalShape } from '$lib/domain/goals';
 import { DEFAULT_REMINDER_DAYS } from '$lib/domain/holdings';
@@ -322,7 +323,13 @@ export async function updateTxn(id: string, patch: TxnPatch): Promise<Txn | unde
 	return next;
 }
 
-/** Soft delete. The row stays, flagged, forever. */
+/**
+ * Soft delete. The row stays, flagged, forever.
+ *
+ * A transfer leg takes its pair with it (Q49): a transfer is one fact told as
+ * two rows, and deleting half of it would leave a phantom expense on one
+ * account and free money on the other.
+ */
 export async function deleteTxn(id: string): Promise<void> {
 	const database = db();
 	const existing = await database.txns.get(id);
@@ -331,6 +338,15 @@ export async function deleteTxn(id: string): Promise<void> {
 	const next: Txn = { ...existing, isDeleted: true, ...(await stamp()) };
 	await database.txns.put(next);
 	await enqueue('txn', next.id, next);
+
+	if (existing.transferPairId) {
+		const pair = await database.txns.get(existing.transferPairId);
+		if (pair && !pair.isDeleted) {
+			const gone: Txn = { ...pair, isDeleted: true, ...(await stamp()) };
+			await database.txns.put(gone);
+			await enqueue('txn', gone.id, gone);
+		}
+	}
 }
 
 /**
@@ -348,6 +364,17 @@ export async function restoreTxn(id: string): Promise<void> {
 	const next: Txn = { ...existing, isDeleted: false, ...(await stamp()) };
 	await database.txns.put(next);
 	await enqueue('txn', next.id, next);
+
+	// The undo of a transfer delete brings back both legs, same as the delete
+	// took both — the toast's undo is the only caller, moments later.
+	if (existing.transferPairId) {
+		const pair = await database.txns.get(existing.transferPairId);
+		if (pair?.isDeleted) {
+			const back: Txn = { ...pair, isDeleted: false, ...(await stamp()) };
+			await database.txns.put(back);
+			await enqueue('txn', back.id, back);
+		}
+	}
 }
 
 // ── receivables ─────────────────────────────────────────────────────────────
@@ -431,7 +458,8 @@ export async function updateAccount(
 }
 
 export async function createAccount(
-	input: Pick<Account, 'name' | 'kind'> & Partial<Pick<Account, 'openingBalance' | 'openingDate'>>
+	input: Pick<Account, 'name' | 'kind'> &
+		Partial<Pick<Account, 'currency' | 'openingBalance' | 'openingDate'>>
 ): Promise<Account> {
 	const database = db();
 	const { updatedAt, deviceId } = await stamp();
@@ -441,7 +469,10 @@ export async function createAccount(
 		kind: input.kind,
 		openingBalance: input.openingBalance ?? ZERO,
 		openingDate: input.openingDate ?? today(),
-		currency: 'CZK',
+		// Chosen once, at the counter. There is deliberately no way to change it
+		// later — an account with rows in it cannot switch currency without
+		// silently redenominating its whole history (Q49).
+		currency: input.currency ?? 'CZK',
 		isArchived: false,
 		sortOrder: await database.accounts.count(),
 		updatedAt,
@@ -451,6 +482,95 @@ export async function createAccount(
 	await database.accounts.put(account);
 	await enqueue('account', account.id, account);
 	return account;
+}
+
+// ── transfers ───────────────────────────────────────────────────────────────
+
+export interface NewTransfer {
+	fromAccountId: string;
+	toAccountId: string;
+	/** What leaves, positive magnitude, in the source account's currency. */
+	amountOut: Minor;
+	/** What lands, positive magnitude, in the target account's currency. The
+	    pair of amounts *is* the exchange rate; nothing else records one (Q49). */
+	amountIn: Minor;
+	date?: string;
+	note?: string | null;
+}
+
+export interface Transfer {
+	out: Txn;
+	in: Txn;
+}
+
+/**
+ * Move money between two accounts — §6.1: two rows, mutually referencing
+ * `transferPairId`, never one row and never a magic category.
+ *
+ * Both legs commit together or not at all: one leg alone would be a phantom
+ * expense on one account and a phantom windfall on the other. Every summary
+ * excludes transfer legs (`domain/accounts.ts` → `isTransfer`); only the
+ * balances see them, because the balances are what actually moved.
+ */
+export async function createTransfer(input: NewTransfer): Promise<Transfer> {
+	const database = db();
+	if (input.fromAccountId === input.toAccountId) {
+		throw new Error('Převod potřebuje dva různé účty.');
+	}
+	const [from, to] = await Promise.all([
+		database.accounts.get(input.fromAccountId),
+		database.accounts.get(input.toAccountId)
+	]);
+	if (!from || !to) throw new Error('Účet převodu neexistuje.');
+
+	// Resolved before the transaction — `enqueue` reads `meta` on its first
+	// call and `meta` is not one of the tables below (the importBackup trap).
+	await refreshSyncEnabled();
+
+	const { updatedAt, deviceId } = await stamp();
+	const date = input.date ?? today();
+	const note = input.note?.trim() || null;
+
+	const base = {
+		date,
+		categoryId: null,
+		note,
+		source: 'manual' as const,
+		isCleared: false,
+		isOneOff: false,
+		shares: [],
+		scheduleId: null,
+		createdAt: updatedAt,
+		updatedAt,
+		deviceId,
+		isDeleted: false
+	};
+
+	const outLeg: Txn = {
+		...base,
+		id: uuidv7(),
+		accountId: from.id,
+		amount: neg(abs(input.amountOut)),
+		payee: `Převod → ${to.name}`,
+		transferPairId: '' // filled below, once the other id exists
+	};
+	const inLeg: Txn = {
+		...base,
+		id: uuidv7(),
+		accountId: to.id,
+		amount: abs(input.amountIn),
+		payee: `Převod ← ${from.name}`,
+		transferPairId: outLeg.id
+	};
+	outLeg.transferPairId = inLeg.id;
+
+	await database.transaction('rw', [database.txns, database.outbox], async () => {
+		await database.txns.bulkPut([outLeg, inLeg]);
+		await enqueue('txn', outLeg.id, outLeg);
+		await enqueue('txn', inLeg.id, inLeg);
+	});
+
+	return { out: outLeg, in: inLeg };
 }
 
 // ── categories ──────────────────────────────────────────────────────────────
@@ -513,13 +633,14 @@ function normalizeScheduleShares(shares: readonly NewShare[] | undefined): Sched
 }
 
 export async function createSchedule(
-	input: Pick<Schedule, 'payee' | 'categoryId' | 'amount' | 'dayOfMonth'> &
+	input: Pick<Schedule, 'accountId' | 'payee' | 'categoryId' | 'amount' | 'dayOfMonth'> &
 		Partial<Pick<Schedule, 'startMonth' | 'endMonth' | 'mode'>> & { shares?: NewShare[] }
 ): Promise<Schedule> {
 	const database = db();
 	const { updatedAt, deviceId } = await stamp();
 	const schedule: Schedule = {
 		id: uuidv7(),
+		accountId: input.accountId,
 		payee: input.payee.trim(),
 		categoryId: input.categoryId,
 		amount: input.amount,
@@ -554,6 +675,7 @@ export async function updateSchedule(
 	patch: Partial<
 		Pick<
 			Schedule,
+			| 'accountId'
 			| 'payee'
 			| 'categoryId'
 			| 'amount'
@@ -609,7 +731,11 @@ export async function confirmScheduled(
 ): Promise<Txn> {
 	const amount = options.amount ?? item.schedule.amount;
 	const txn = await createTxn({
-		accountId: options.accountId,
+		/* The schedule's own account since v11 (Q49); `options.accountId` — the
+		   active account — is the fallback for a row an older build wrote
+		   without one, which is what every schedule meant while there was only
+		   one account. */
+		accountId: item.schedule.accountId || options.accountId,
 		amount,
 		date: item.date,
 		categoryId: item.schedule.categoryId,
@@ -1040,12 +1166,16 @@ export async function catchUpGoalTargets(): Promise<number> {
 	const goals = (await database.goals.toArray()).filter((g) => !g.isDeleted);
 	if (goals.length === 0) return 0;
 
-	const [txns, categories, targets] = await Promise.all([
+	const [txns, categories, targets, accounts] = await Promise.all([
 		database.txns.toArray(),
 		database.categories.toArray(),
-		database.monthTargets.toArray()
+		database.monthTargets.toArray(),
+		database.accounts.toArray()
 	]);
-	const live = txns.filter((t) => !t.isDeleted);
+	// Goals are denominated in the home currency, so only home-currency
+	// accounts' rows may count toward them — euro cents summed into a koruna
+	// target would be a number meaning nothing (Q49).
+	const live = inCurrency(txns, accounts, homeCurrency(accounts)).filter((t) => !t.isDeleted);
 
 	let written = 0;
 	for (const goal of goals) {

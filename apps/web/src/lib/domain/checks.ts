@@ -254,9 +254,21 @@ export interface MonthSummary {
 	findings: Finding[];
 }
 
+/**
+ * The rows a month is measured over: live, in the month, and **not a transfer
+ * leg** (Q49). Moving money to the EUR account is not spending and the money
+ * arriving there is not income — the balance sees both legs, the summary sees
+ * neither, or every transfer would inflate both sides of the same koruna.
+ */
+function measuredRows(context: MonthContext): Txn[] {
+	return context.txns.filter(
+		(t) => !t.isDeleted && t.transferPairId === null && monthKey(t.date) === context.month
+	);
+}
+
 export function summariseMonth(context: MonthContext): MonthSummary {
-	const { month, txns, categories } = context;
-	const rows = txns.filter((t) => !t.isDeleted && monthKey(t.date) === month);
+	const { month, categories } = context;
+	const rows = measuredRows(context);
 
 	// An inflow filed under a spending bucket is a refund, not income: it nets
 	// against what that bucket cost. Counting it as income is the mistake the
@@ -317,8 +329,8 @@ function checkMonth(
 	totals: { income: Minor; outflow: Minor; buckets: BucketTotal[] }
 ): Finding[] {
 	const findings: Finding[] = [];
-	const { month, txns } = context;
-	const rows = txns.filter((t) => !t.isDeleted && monthKey(t.date) === month);
+	const { month } = context;
+	const rows = measuredRows(context);
 
 	// OSTATNÍ carried 100 895 Kč across eight months — the second largest bucket
 	// after housing, and it explains nothing about where the money went.
@@ -390,7 +402,9 @@ function checkMonth(
  */
 export function findMissingRecurring(context: MonthContext): Finding[] {
 	const { month, txns } = context;
-	const live = txns.filter((t) => !t.isDeleted && t.amount < 0 && t.payee.trim());
+	const live = txns.filter(
+		(t) => !t.isDeleted && t.transferPairId === null && t.amount < 0 && t.payee.trim()
+	);
 
 	const previous = [1, 2, 3].map((back) => shiftMonth(month, -back));
 	const seenIn = new Map<string, Set<string>>();

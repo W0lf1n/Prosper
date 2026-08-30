@@ -3,15 +3,28 @@
 	import { db, SCHEMA_VERSION } from '$lib/db/schema';
 	import {
 		archiveCategory,
+		createAccount,
 		createCategory,
+		createTransfer,
 		exportBackup,
 		importBackup,
 		resetLedger,
+		setActiveAccountId,
 		updateAccount,
 		updateCategory,
-		type Backup
+		type Backup,
+		type Transfer
 	} from '$lib/db/repo';
-	import { ZERO, formatMoney, parseAmount, type Minor } from '$lib/domain/money';
+	import { invalidateAll } from '$app/navigation';
+	import { ACCOUNT_KIND_LABEL, liveAccounts } from '$lib/domain/accounts';
+	import {
+		CURRENCIES,
+		ZERO,
+		currencySymbol,
+		formatMoney,
+		parseAmount,
+		type Minor
+	} from '$lib/domain/money';
 	import { formatDateTime, formatShortDate, today } from '$lib/domain/datetime';
 	import { summariseMonth } from '$lib/domain/checks';
 	import { RECORDS, counted } from '$lib/domain/czech';
@@ -19,22 +32,35 @@
 	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
 	import { sharesOf } from '$lib/domain/receivables';
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
-	import type { Category, SpendType } from '$lib/domain/types';
+	import type { Account, AccountKind, Category, SpendType } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
 	import { defaultBaseUrl, pair, unpair } from '$lib/sync/pair';
 	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import ResetSheet from '$lib/ui/ResetSheet.svelte';
+	import BottomSheet from '$lib/ui/Sheet.svelte';
+	import TransferSheet, { type TransferInput } from '$lib/ui/TransferSheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	const account = liveQuery(async () =>
-		data.accountId ? ((await db().accounts.get(data.accountId)) ?? null) : null
+	const allAccounts = liveQuery(() => db().accounts.toArray());
+	const accountRows = $derived(liveAccounts(($allAccounts ?? []) as Account[]));
+	/**
+	 * Derived from the live list rather than its own `liveQuery`: a query
+	 * closing over `data.accountId` only re-runs on Dexie writes, and switching
+	 * accounts writes `meta` — the fold would keep showing the old account
+	 * until something else touched the table. This is the one screen a switch
+	 * happens on, so it is the one screen that must re-derive.
+	 */
+	const account = $derived(
+		(($allAccounts ?? []) as Account[]).find((a) => a.id === data.accountId) ?? null
 	);
+	const otherAccounts = $derived(accountRows.filter((a) => a.id !== data.accountId));
+	const activeCurrency = $derived(account?.currency ?? 'CZK');
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
 	/**
 	 * Live rows, not every row ever written.
@@ -61,11 +87,11 @@
 	// ── account ─────────────────────────────────────────────────────────────
 	// Writable deriveds: they seed themselves from the stored account and accept
 	// typing on top, then re-seed once a save lands.
-	let accountName = $derived($account?.name ?? '');
+	let accountName = $derived(account?.name ?? '');
 	let openingBalance = $derived(
-		$account ? formatMoney($account.openingBalance, { currency: false }) : ''
+		account ? formatMoney(account.openingBalance, { currency: false }) : ''
 	);
-	let openingDate = $derived($account?.openingDate ?? today());
+	let openingDate = $derived(account?.openingDate ?? today());
 	let accountError = $state('');
 
 	/**
@@ -100,6 +126,89 @@
 		// Back to automatic: folds if there is a ledger, stays put if there is not.
 		accountOpen = null;
 		toast.show('Účet uložen');
+	}
+
+	/**
+	 * Which account the keypad writes to — the one everything else reads (Q49).
+	 * The layout hands `accountId` to every route, so a switch re-runs its load
+	 * and the whole app follows.
+	 */
+	async function switchTo(next: Account) {
+		await setActiveAccountId(next.id);
+		await invalidateAll();
+		toast.show(`Zapisuje se na „${next.name}“`);
+	}
+
+	// ── adding an account ───────────────────────────────────────────────────
+	let addOpen = $state(false);
+	let newAccountName = $state('');
+	let newAccountKind = $state<AccountKind>('checking');
+	let newAccountCurrency = $state('CZK');
+	let newAccountBalance = $state('');
+	let newAccountDate = $state(today());
+	let newAccountError = $state('');
+
+	const ACCOUNT_KINDS = Object.entries(ACCOUNT_KIND_LABEL) as [AccountKind, string][];
+
+	async function addAccount() {
+		const name = newAccountName.trim();
+		if (!name) {
+			newAccountError = 'Pojmenuj účet.';
+			return;
+		}
+		const parsed = newAccountBalance.trim()
+			? parseAmount(newAccountBalance)
+			: ({ ok: true, value: ZERO } as const);
+		if (!parsed.ok) {
+			newAccountError = 'Počáteční zůstatek není částka.';
+			return;
+		}
+		newAccountError = '';
+		await createAccount({
+			name,
+			kind: newAccountKind,
+			currency: newAccountCurrency,
+			openingBalance: parsed.value,
+			openingDate: newAccountDate
+		});
+		addOpen = false;
+		newAccountName = '';
+		newAccountBalance = '';
+		newAccountCurrency = 'CZK';
+		newAccountKind = 'checking';
+		newAccountDate = today();
+		toast.show(`Účet „${name}“ přidán`);
+	}
+
+	/**
+	 * Archiving the active account hands "active" to the next one first — the
+	 * app always writes somewhere, so the last account cannot be archived at
+	 * all (the button never renders without a successor).
+	 */
+	let confirmingArchive = $state(false);
+
+	async function archiveActive() {
+		const successor = otherAccounts[0];
+		const doomed = account;
+		if (!successor || !doomed || !data.accountId) return;
+		await setActiveAccountId(successor.id);
+		await updateAccount(doomed.id, { isArchived: true });
+		confirmingArchive = false;
+		accountOpen = null;
+		await invalidateAll();
+		toast.show(`„${doomed.name}“ archivován — zapisuje se na „${successor.name}“`);
+	}
+
+	// ── transfer ────────────────────────────────────────────────────────────
+	let transferOpen = $state(false);
+
+	async function saveTransfer(input: TransferInput) {
+		const transfer: Transfer = await createTransfer(input);
+		transferOpen = false;
+		toast.money(transfer.out.amount, {
+			message: transfer.out.payee,
+			code: accountRows.find((a) => a.id === input.fromAccountId)?.currency
+		});
 	}
 
 	// ── categories ──────────────────────────────────────────────────────────
@@ -402,7 +511,7 @@
 
 <main class="page">
 	<section class="card card--account">
-		<h2 class="u-label">Účet</h2>
+		<h2 class="u-label">Účty</h2>
 
 		{#if accountExpanded}
 			<label class="field">
@@ -434,8 +543,36 @@
 
 			<p class="hint prose">
 				Zůstatek se počítá z počátečního stavu a všech záznamů. Zadej ho přesně tak, jak ho
-				ukazovala banka k uvedenému dni — jinak nebude sedět nikdy.
+				ukazovala banka k uvedenému dni — jinak nebude sedět nikdy. Měna je daná při založení ({activeCurrency})
+				— účet s historií ji změnit nemůže.
 			</p>
+
+			{#if otherAccounts.length > 0}
+				{#if confirmingArchive}
+					<div class="archive-ask">
+						<p class="archive-ask__text">
+							Archivovat „{account?.name}“? Záznamy zůstanou, zapisovat se bude na „{otherAccounts[0]
+								?.name}“.
+						</p>
+						<div class="archive-ask__actions">
+							<button type="button" class="btn" onclick={() => (confirmingArchive = false)}>
+								Zpět
+							</button>
+							<button type="button" class="btn btn--danger" onclick={archiveActive}>
+								Archivovat
+							</button>
+						</div>
+					</div>
+				{:else}
+					<button
+						type="button"
+						class="btn btn--quiet btn--block"
+						onclick={() => (confirmingArchive = true)}
+					>
+						Archivovat účet
+					</button>
+				{/if}
+			{/if}
 		{:else}
 			<!--
 			  Folded, but it still says everything the fields would: the whole
@@ -444,15 +581,51 @@
 			-->
 			<button type="button" class="summary" onclick={() => (accountOpen = true)}>
 				<span class="summary__lines">
-					<span class="summary__name">{$account?.name ?? 'Účet'}</span>
+					<span class="summary__name">{account?.name ?? 'Účet'}</span>
 					<span class="summary__detail">
-						začal na <span class="mono">{formatMoney($account?.openingBalance ?? ZERO)}</span>
+						začal na
+						<span class="mono">
+							{formatMoney(account?.openingBalance ?? ZERO, { code: activeCurrency })}
+						</span>
 						{formatShortDate(openingDate)}
 					</span>
 				</span>
 				<span class="summary__go">Upravit</span>
 			</button>
 		{/if}
+
+		{#if otherAccounts.length > 0}
+			<!-- The rest of the accounts. Tapping one makes it the account the
+			     keypad writes to — the switcher lives here, next to what it
+			     switches (Q49). -->
+			<ul class="accounts">
+				{#each otherAccounts as row (row.id)}
+					<li>
+						<button type="button" class="account-row" onclick={() => switchTo(row)}>
+							<span class="account-row__lines">
+								<span class="account-row__name">{row.name}</span>
+								<span class="account-row__meta">
+									{ACCOUNT_KIND_LABEL[row.kind]} · {currencySymbol(row.currency)}
+								</span>
+							</span>
+							<span class="account-row__go">Přepnout</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
+		<div class="row-actions">
+			<button type="button" class="btn" onclick={() => (addOpen = true)}>Přidat účet</button>
+			{#if accountRows.length > 1}
+				<button type="button" class="btn" onclick={() => (transferOpen = true)}>Převod</button>
+			{/if}
+		</div>
+
+		<p class="hint prose">
+			Klávesnice zapisuje na účet nahoře; ostatní obrazovky ukazují ten samý. Druhý účet se hodí na
+			dovolenou v eurech — každý účet počítá ve své měně a dohromady se nesčítají.
+		</p>
 	</section>
 
 	<section class="card">
@@ -703,6 +876,70 @@
 		</div>
 	</section>
 </main>
+
+<!-- ── nový účet ─────────────────────────────────────────────────────── -->
+<BottomSheet open={addOpen} title="Nový účet" onclose={() => (addOpen = false)}>
+	<div class="form">
+		<label class="field">
+			<span class="field__label">Název</span>
+			<input class="field__input" bind:value={newAccountName} placeholder="Revolut" />
+		</label>
+
+		<div class="form-pair">
+			<label class="field">
+				<span class="field__label">Druh</span>
+				<select class="field__input" bind:value={newAccountKind}>
+					{#each ACCOUNT_KINDS as [kind, label] (kind)}
+						<option value={kind}>{label}</option>
+					{/each}
+				</select>
+			</label>
+
+			<label class="field">
+				<span class="field__label">Měna</span>
+				<select class="field__input" bind:value={newAccountCurrency}>
+					{#each CURRENCIES as code (code)}
+						<option value={code}>{code} — {currencySymbol(code)}</option>
+					{/each}
+				</select>
+				<span class="field__hint">Napořád — účet s historií měnu změnit nemůže.</span>
+			</label>
+		</div>
+
+		<div class="form-pair">
+			<label class="field">
+				<span class="field__label">Počáteční zůstatek</span>
+				<input
+					class="field__input field__input--mono"
+					bind:value={newAccountBalance}
+					inputmode="decimal"
+					placeholder="0"
+				/>
+			</label>
+
+			<label class="field">
+				<span class="field__label">Ke dni</span>
+				<input class="field__input field__input--mono" type="date" bind:value={newAccountDate} />
+			</label>
+		</div>
+
+		{#if newAccountError}
+			<p class="error-text">{newAccountError}</p>
+		{/if}
+
+		<button type="button" class="btn btn--primary btn--block" onclick={addAccount}>
+			Založit účet
+		</button>
+	</div>
+</BottomSheet>
+
+<TransferSheet
+	open={transferOpen}
+	accounts={($allAccounts ?? []) as Account[]}
+	defaultFromId={data.accountId}
+	onsave={saveTransfer}
+	onclose={() => (transferOpen = false)}
+/>
 
 <ResetSheet
 	open={resetOpen}
@@ -991,6 +1228,107 @@
 		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--signal);
+	}
+
+	/* ── the other accounts, and the sheet that adds one ─────────────────── */
+
+	.accounts {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* Same full-bleed row recipe as the fold above: presses by luminance. */
+	.account-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		min-height: var(--touch);
+		padding: var(--space-2) var(--space-3);
+		margin-inline: calc(var(--space-3) * -1);
+		width: calc(100% + var(--space-3) * 2);
+		border-radius: var(--radius-md);
+		text-align: left;
+		transition: background var(--dur-fast) var(--ease-out);
+	}
+
+	.account-row:active {
+		background: var(--surface-2);
+	}
+
+	@media (hover: hover) {
+		.account-row:hover {
+			background: var(--surface-2);
+		}
+	}
+
+	.account-row__lines {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.account-row__name {
+		font-size: var(--text-md);
+		color: var(--ink);
+	}
+
+	.account-row__meta {
+		font-size: var(--text-xs);
+		color: var(--ink-3);
+	}
+
+	.account-row__go {
+		flex: none;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--signal);
+	}
+
+	.form {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+
+	.form-pair {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-3);
+	}
+
+	@media (max-width: 360px) {
+		.form-pair {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.archive-ask {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		padding: var(--space-3);
+		border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--hairline));
+		border-radius: var(--radius-sm);
+		background: var(--danger-wash);
+	}
+
+	.archive-ask__text {
+		font-size: var(--text-sm);
+		color: var(--ink);
+	}
+
+	.archive-ask__actions {
+		display: flex;
+		gap: var(--space-2);
+	}
+
+	.archive-ask__actions .btn {
+		flex: 1;
 	}
 
 	/* ── data ────────────────────────────────────────────────────────────── */

@@ -10,6 +10,8 @@
 		income: Minor;
 		outflow: Minor; // negative
 		net: Minor;
+		/** Currency of the account these figures belong to (Q49). */
+		code?: string;
 		/** Wraps the numbers in a link when given. */
 		href?: string;
 		/** Buttons for the top-right corner. */
@@ -30,7 +32,17 @@
 		streak?: { days: number } | null;
 	}
 
-	let { month, income, outflow, net, href, actions, footer, streak = null }: Props = $props();
+	let {
+		month,
+		income,
+		outflow,
+		net,
+		code = 'CZK',
+		href,
+		actions,
+		footer,
+		streak = null
+	}: Props = $props();
 
 	/**
 	 * The two legs, drawn against each other.
@@ -68,7 +80,7 @@
 		class:totals__body--link={Boolean(href)}
 	>
 		<div class="totals__net">
-			<Money value={net} size="2xl" bold />
+			<Money value={net} size="2xl" bold {code} />
 			<span class="totals__caption">zůstatek měsíce</span>
 		</div>
 

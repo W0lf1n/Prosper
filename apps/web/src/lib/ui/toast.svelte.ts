@@ -16,6 +16,8 @@ export interface Toast {
 	tone: 'neutral' | 'out' | 'in' | 'flag';
 	/** Present for money events. Rendered large, in the direction's colour. */
 	amount?: Minor;
+	/** Currency of the account the money moved on. CZK when absent. */
+	code?: string;
 	undo?: () => void | Promise<void>;
 	/**
 	 * How long it stays. The card draws it as a hairline running out along its
@@ -60,12 +62,16 @@ export const toast = {
 	 * Money left, or money arrived. The amount is the message; `message` is only
 	 * the small line under it saying what it was.
 	 */
-	money(amount: Minor, options: { message?: string; undo?: Toast['undo']; ms?: number } = {}) {
+	money(
+		amount: Minor,
+		options: { message?: string; code?: string; undo?: Toast['undo']; ms?: number } = {}
+	) {
 		present(
 			{
 				message: options.message ?? '',
 				tone: amount < 0 ? 'out' : 'in',
 				amount,
+				code: options.code,
 				undo: options.undo
 			},
 			options.ms ?? (options.undo ? 6000 : 3200)

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+	CURRENCIES,
 	ZERO,
 	abs,
+	currencySymbol,
 	add,
 	cmp,
 	formatAmount,
@@ -220,5 +222,30 @@ describe('formatMoney()', () => {
 		expect(formatAmount(m(123450))).toBe(`1${NBSP}234,50`);
 		expect(formatMoney(m(123450), { sign: 'always' })).toBe(`+1${NBSP}234,50${NBSP}Kč`);
 		expect(formatMoney(m(-123450), { sign: 'never', currency: false })).toBe(`1${NBSP}234,50`);
+	});
+});
+
+describe('other currencies (Q49)', () => {
+	it('formats euros the Czech way — the number stays Czech, only the symbol moves', () => {
+		expect(formatMoney(m(123450), { code: 'EUR' })).toBe(`1${NBSP}234,50${NBSP}€`);
+	});
+
+	it('defaults to koruny everywhere nothing says otherwise', () => {
+		expect(formatMoney(m(123450))).toBe(`1${NBSP}234,50${NBSP}Kč`);
+		expect(formatMoney(m(123450), { code: 'CZK' })).toBe(formatMoney(m(123450)));
+	});
+
+	it('hands out the bare symbol for the keypad label', () => {
+		expect(currencySymbol()).toBe('Kč');
+		expect(currencySymbol('EUR')).toBe('€');
+	});
+
+	it('offers only two-decimal currencies, so Minor keeps meaning hundredths', () => {
+		for (const code of CURRENCIES) {
+			expect(
+				new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: code }).resolvedOptions()
+					.maximumFractionDigits
+			).toBe(2);
+		}
 	});
 });

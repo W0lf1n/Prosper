@@ -26,7 +26,7 @@
 		type AmountInput
 	} from '$lib/domain/amount-input';
 	import { addDays, formatDayHeading, today } from '$lib/domain/datetime';
-	import { CURRENCY_SYMBOL, formatMoney, sub } from '$lib/domain/money';
+	import { currencySymbol, formatMoney, sub } from '$lib/domain/money';
 	import { valuationWarning, type HoldingReading } from '$lib/domain/holdings';
 	import Icon from './Icon.svelte';
 	import Keypad from './Keypad.svelte';
@@ -72,7 +72,7 @@
 	{#if reading}
 		<div class="valuation">
 			<output class="amount">
-				{display(amount)}<span class="amount__unit">{CURRENCY_SYMBOL}</span>
+				{display(amount)}<span class="amount__unit">{currencySymbol()}</span>
 			</output>
 
 			<!--

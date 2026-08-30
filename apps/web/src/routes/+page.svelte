@@ -15,7 +15,7 @@
 	import { resolve } from '$app/paths';
 	import { addDays, formatDayHeading, monthKey, today } from '$lib/domain/datetime';
 	import {
-		CURRENCY_SYMBOL,
+		currencySymbol,
 		ZERO,
 		formatMoney,
 		neg,
@@ -23,6 +23,7 @@
 		sub,
 		type Minor
 	} from '$lib/domain/money';
+	import { homeCurrency } from '$lib/domain/accounts';
 	import { categoryRanking, recentPayees } from '$lib/domain/ledger';
 	import { checkDraft, summariseMonth, type Finding } from '$lib/domain/checks';
 	import { dueGroups, type DueGroup } from '$lib/domain/recurring';
@@ -30,6 +31,7 @@
 	import { quietStreak } from '$lib/domain/coverage';
 	import { goalCategoryIds, goalStatus, pickPrimary } from '$lib/domain/goals';
 	import type {
+		Account,
 		Category,
 		Goal,
 		Holding,
@@ -54,6 +56,14 @@
 	let { data }: PageProps = $props();
 
 	const accountId = $derived(data.accountId);
+
+	const allAccounts = liveQuery(() => db().accounts.toArray());
+	const activeAccount = $derived(
+		(($allAccounts ?? []) as Account[]).find((a) => a.id === data.accountId) ?? null
+	);
+	/** The currency being typed — the active account's (Q49). */
+	const currency = $derived(activeAccount?.currency ?? 'CZK');
+	const home = $derived(homeCurrency(($allAccounts ?? []) as Account[]));
 
 	const allCategories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
 
@@ -119,7 +129,13 @@
 	 */
 	const due = $derived(
 		dueGroups({ schedules: ($allSchedules ?? []) as Schedule[], today: today() }).filter(
-			(group) => group.item.schedule.mode === 'confirm'
+			(group) =>
+				group.item.schedule.mode === 'confirm' &&
+				// One account's strip, like /platby — a sum across currencies would
+				// be a lie, and the vacation account has no business nagging about
+				// the mortgage (Q49). A legacy schedule with no account means this
+				// one, whichever it is.
+				(!group.item.schedule.accountId || group.item.schedule.accountId === data.accountId)
 		)
 	);
 
@@ -210,7 +226,13 @@
 		);
 	});
 
-	const primaryGoal = $derived(pickPrimary(goalStatuses));
+	/**
+	 * Goals are measured in the home currency, so the strip only speaks when
+	 * the account being typed into is held in it (Q49) — a euro lunch cannot
+	 * move a koruna goal, and pretending otherwise would put a wrong number on
+	 * the most-read line of the app.
+	 */
+	const primaryGoal = $derived(currency === home ? pickPrimary(goalStatuses) : null);
 
 	const payees = $derived(recentPayees($allTxns ?? [], 12));
 
@@ -280,6 +302,7 @@
 		const what = payee.trim();
 		toast.money(signed, {
 			message: goalBefore ? goalLine(goalBefore, magnitude) : what ? `${bucket} · ${what}` : bucket,
+			code: currency,
 			undo: () => deleteTxn(saved.id)
 		});
 		reset();
@@ -313,6 +336,7 @@
 		scene.flash(txn.amount < 0 ? 'out' : 'in');
 		toast.money(txn.amount, {
 			message: group.item.schedule.payee,
+			code: currency,
 			undo: () => deleteTxn(txn.id)
 		});
 	}
@@ -396,6 +420,7 @@
 		<div class="totals-slot">
 			<MonthTotals
 				month={summary.month}
+				code={currency}
 				income={summary.income}
 				outflow={summary.outflow}
 				net={summary.net}
@@ -443,7 +468,12 @@
 				{/snippet}
 
 				{#snippet footer()}
-					<GoalStrip status={primaryGoal} />
+					<!-- Not on a foreign-currency account: `null` would render the
+					     "napsat cíl" invite, which is worse than silence when a goal
+					     exists and simply is not this account's business (Q49). -->
+					{#if currency === home}
+						<GoalStrip status={primaryGoal} />
+					{/if}
 				{/snippet}
 			</MonthTotals>
 		</div>
@@ -453,7 +483,7 @@
 		  nothing is due, so the screen the five-second budget belongs to keeps
 		  exactly the height it always had.
 		-->
-		<DueStrip groups={due} onconfirm={confirmDue} onskip={skipDue} />
+		<DueStrip groups={due} code={currency} onconfirm={confirmDue} onskip={skipDue} />
 
 		<!--
 		  ── the amount, and the sign that turned into a switch ────────────
@@ -487,7 +517,7 @@
 				<span class="visually-hidden">{direction === 'out' ? 'Výdaj' : 'Příjem'}</span
 				>{#key display(amount)}<span class="display__digits">{display(amount)}</span>{/key}
 			</output>
-			<span class="display__currency">{CURRENCY_SYMBOL}</span>
+			<span class="display__currency">{currencySymbol(currency)}</span>
 		</div>
 
 		<!--
@@ -575,7 +605,7 @@
 								><Icon name="chevron-right" size={15} /></span
 							>
 						{:else}
-							<span class="prop__value">{formatMoney(owedAmount)}</span>
+							<span class="prop__value">{formatMoney(owedAmount, { code: currency })}</span>
 						{/if}
 					</button>
 				</div>

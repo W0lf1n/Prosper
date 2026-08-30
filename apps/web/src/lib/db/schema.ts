@@ -291,6 +291,45 @@ export const migrations: Migration[] = [
 					if (row.startAmount === undefined) row.startAmount = 0;
 				});
 		}
+	},
+	{
+		/**
+		 * `Schedule.accountId` — which account a schedule posts from (DECISIONS
+		 * Q49, accounts made plural).
+		 *
+		 * Backfilled to the account every schedule has meant all along: the
+		 * active one, read from `meta`, falling back to the first live account
+		 * when the meta key has never been written. A database with schedules
+		 * and no account cannot exist — `ensureSeeded` runs before anything can
+		 * declare a payment — so the remaining fallback of an empty string is
+		 * theoretical, and `confirmScheduled` tolerates it by posting to the
+		 * active account of the day.
+		 *
+		 * No index changes, so `schedules` is not restated.
+		 */
+		version: 11,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			const active = (await tx.table('meta').get('activeAccountId')) as
+				{ value?: unknown } | undefined;
+			let fallback = typeof active?.value === 'string' ? active.value : '';
+			if (!fallback) {
+				const accounts = (await tx.table('accounts').toArray()) as {
+					id: string;
+					sortOrder: number;
+					isDeleted: boolean;
+				}[];
+				fallback =
+					accounts.filter((a) => !a.isDeleted).sort((a, b) => a.sortOrder - b.sortOrder)[0]?.id ??
+					'';
+			}
+			await tx
+				.table('schedules')
+				.toCollection()
+				.modify((row: { accountId?: string }) => {
+					if (row.accountId === undefined) row.accountId = fallback;
+				});
+		}
 	}
 ];
 

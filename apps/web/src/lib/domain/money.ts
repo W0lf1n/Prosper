@@ -157,24 +157,52 @@ export function parseAmount(input: string): ParseResult {
 // ── formatting ──────────────────────────────────────────────────────────────
 
 const LOCALE = 'cs-CZ';
-const CURRENCY = 'CZK';
+
+/** The currency everything defaults to, and the one goals are measured in. */
+export const HOME_CURRENCY = 'CZK';
+
+/**
+ * The currencies an account may be opened in.
+ *
+ * A short list on purpose, and every entry has **two minor-unit digits**, so a
+ * `Minor` means the same thing whatever the account: hundredths. A currency
+ * with zero decimals (JPY) would quietly redefine the unit, and stays out
+ * until it is actually needed.
+ */
+export const CURRENCIES = ['CZK', 'EUR', 'USD', 'GBP'] as const;
 
 const groupFormat = new Intl.NumberFormat(LOCALE, {
 	useGrouping: true,
 	maximumFractionDigits: 0
 });
 
-/** Locale glyphs pulled out of Intl once — never hand-rolled (§11.9). */
-const GLYPHS = (() => {
+interface Glyphs {
+	decimal: string;
+	minus: string;
+	currency: string;
+	beforeCurrency: string;
+}
+
+/**
+ * Locale glyphs pulled out of Intl, once per currency — never hand-rolled
+ * (§11.9). The Czech locale for every code, so "1 234,50 €" and "1 234,50 Kč"
+ * read as the same app with a different symbol, not as two apps.
+ */
+const glyphCache = new Map<string, Glyphs>();
+
+function glyphsFor(code: string): Glyphs {
+	const cached = glyphCache.get(code);
+	if (cached) return cached;
+
 	const parts = new Intl.NumberFormat(LOCALE, {
 		style: 'currency',
-		currency: CURRENCY
+		currency: code
 	}).formatToParts(-1);
 
 	let decimal = ',';
 	let minus = '-';
-	let currency = 'Kč';
-	let beforeCurrency = ' ';
+	let currency = code;
+	let beforeCurrency = ' ';
 
 	for (let i = 0; i < parts.length; i++) {
 		const p = parts[i]!;
@@ -186,36 +214,43 @@ const GLYPHS = (() => {
 			beforeCurrency = prev?.type === 'literal' ? prev.value : '';
 		}
 	}
-	return { decimal, minus, currency, beforeCurrency };
-})();
+
+	const glyphs = { decimal, minus, currency, beforeCurrency };
+	glyphCache.set(code, glyphs);
+	return glyphs;
+}
 
 export interface FormatOptions {
 	/** Append the currency symbol. Default true. */
 	currency?: boolean;
 	/** 'auto' shows a minus for outflows, 'always' forces a sign, 'never' formats the magnitude. */
 	sign?: 'auto' | 'always' | 'never';
+	/** ISO currency code. Defaults to the home currency, CZK. */
+	code?: string;
 }
 
 /**
- * Format an amount the Czech way: "1 234,50 Kč".
+ * Format an amount the Czech way: "1 234,50 Kč" — or "1 234,50 €" for an
+ * account held in euros. The *number* is always Czech; only the symbol moves.
  *
  * The integer part goes through Intl for grouping; the fraction is the exact
  * integer remainder, so no division ever touches the value being displayed.
  */
 export function formatMoney(value: Minor, options: FormatOptions = {}): string {
-	const { currency = true, sign = 'auto' } = options;
+	const { currency = true, sign = 'auto', code = HOME_CURRENCY } = options;
+	const glyphs = glyphsFor(code);
 
 	const negative = value < 0;
 	const magnitude = Math.abs(value);
 	const whole = Math.floor(magnitude / 100); // exact: magnitude is a safe integer
 	const frac = magnitude - whole * 100;
 
-	let out = groupFormat.format(whole) + GLYPHS.decimal + String(frac).padStart(2, '0');
+	let out = groupFormat.format(whole) + glyphs.decimal + String(frac).padStart(2, '0');
 
-	if (sign === 'auto' && negative) out = GLYPHS.minus + out;
-	else if (sign === 'always') out = (negative ? GLYPHS.minus : '+') + out;
+	if (sign === 'auto' && negative) out = glyphs.minus + out;
+	else if (sign === 'always') out = (negative ? glyphs.minus : '+') + out;
 
-	if (currency) out += GLYPHS.beforeCurrency + GLYPHS.currency;
+	if (currency) out += (glyphs.beforeCurrency || ' ') + glyphs.currency;
 	return out;
 }
 
@@ -224,5 +259,7 @@ export function formatAmount(value: Minor): string {
 	return formatMoney(value, { currency: false });
 }
 
-/** The currency symbol on its own, for labelling the keypad. */
-export const CURRENCY_SYMBOL = GLYPHS.currency;
+/** The currency symbol on its own, for labelling the keypad and the switcher. */
+export function currencySymbol(code: string = HOME_CURRENCY): string {
+	return glyphsFor(code).currency;
+}

@@ -4,6 +4,7 @@
 	import { db } from '$lib/db/schema';
 	import { settleReceivable, unsettleReceivable, updateTxn } from '$lib/db/repo';
 	import { summariseMonth } from '$lib/domain/checks';
+	import { groupByCurrency, homeCurrency, inCurrency, liveAccounts } from '$lib/domain/accounts';
 	import { formatMonthHeading, monthKey, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, type Minor } from '$lib/domain/money';
 	import { openReceivables, totalOwed } from '$lib/domain/receivables';
@@ -20,7 +21,15 @@
 		verdict,
 		type ProsperityClass
 	} from '$lib/domain/prosperity';
-	import type { Category, Goal, Holding, MonthTarget, Txn, Valuation } from '$lib/domain/types';
+	import type {
+		Account,
+		Category,
+		Goal,
+		Holding,
+		MonthTarget,
+		Txn,
+		Valuation
+	} from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Doughnut, { type Segment } from '$lib/ui/Doughnut.svelte';
 	import Explainer from '$lib/ui/Explainer.svelte';
@@ -34,13 +43,10 @@
 
 	let { data }: PageProps = $props();
 
-	const txns = liveQuery(async () =>
-		data.accountId
-			? (await db().txns.where('accountId').equals(data.accountId).toArray()).filter(
-					(t: Txn) => !t.isDeleted
-				)
-			: []
-	);
+	// The whole ledger, every account: this screen owns its own account switcher
+	// (Q49), so it cannot lean on the layout's single active account.
+	const txns = liveQuery(async () => (await db().txns.toArray()).filter((t: Txn) => !t.isDeleted));
+	const accounts = liveQuery(() => db().accounts.toArray());
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
 	const goals = liveQuery(async () =>
 		(await db().goals.toArray()).filter((g: Goal) => !g.isDeleted)
@@ -72,10 +78,49 @@
 
 	let month = $state(monthKey(today()));
 
+	// ── which account the month is about (Q49) ──────────────────────────────
+	//
+	// Petr's call: per-account views *and* an all-accounts one, chosen here.
+	// Per-account is a month in that account's own currency, with everything
+	// this screen knows how to say. "Vše" shows every currency side by side —
+	// summed within a currency, never across one — and the per-account
+	// verdicts (Kontrola, the split, trends) step aside rather than pretend
+	// euros and koruny average.
+	let viewChoice = $state<string | null>(null);
+	const view = $derived(viewChoice ?? data.accountId ?? 'all');
+
+	const accountRows = $derived(liveAccounts(($accounts ?? []) as Account[]));
+	const viewAccount = $derived(
+		view === 'all' ? null : (accountRows.find((a) => a.id === view) ?? null)
+	);
+	/** The per-account sections' currency. Meaningless — and unread — in "vše". */
+	const currency = $derived(viewAccount?.currency ?? 'CZK');
+	const home = $derived(homeCurrency(($accounts ?? []) as Account[]));
+
+	/** The rows the per-account cards read. Empty in "vše" — those cards hide. */
+	const viewRows = $derived(view === 'all' ? [] : rows.filter((t) => t.accountId === view));
+	/** Day-based figures survive "vše": a day is quiet when nothing was spent
+	    anywhere, and no summing across currencies is involved. */
+	const dayRows = $derived(view === 'all' ? rows : viewRows);
+
+	/** One summary per currency, for "vše" — each over its own accounts only. */
+	const currencyGroups = $derived.by(() => {
+		if (view !== 'all') return [];
+		return [...groupByCurrency(accountRows).keys()].map((code) => ({
+			code,
+			summary: summariseMonth({
+				month,
+				txns: inCurrency(rows, ($accounts ?? []) as Account[], code),
+				categories: ($categories ?? []) as Category[],
+				today: today()
+			})
+		}));
+	});
+
 	const summary = $derived(
 		summariseMonth({
 			month,
-			txns: rows,
+			txns: viewRows,
 			categories: ($categories ?? []) as Category[],
 			today: today()
 		})
@@ -90,11 +135,11 @@
 	 * itself; that question died with the day mark on 2026-08-28, and this is
 	 * the one that survived it.
 	 */
-	const coverage = $derived(monthCoverage({ month, txns: rows, today: today() }));
+	const coverage = $derived(monthCoverage({ month, txns: dayRows, today: today() }));
 
 	/** Only meaningful for the month you are actually in. */
 	const streak = $derived(
-		month === monthKey(today()) ? quietStreak({ txns: rows, today: today() }) : null
+		month === monthKey(today()) ? quietStreak({ txns: dayRows, today: today() }) : null
 	);
 
 	// ── draining a bucket (T4) ──────────────────────────────────────────────
@@ -114,7 +159,7 @@
 	const drainCandidates = $derived(
 		draining
 			? refileCandidates({
-					txns: rows,
+					txns: viewRows,
 					categories: ($categories ?? []) as Category[],
 					month,
 					categoryId: draining
@@ -171,7 +216,7 @@
 		new Map<string | null, CategoryTrend>(
 			categoryTrends({
 				month,
-				txns: rows,
+				txns: viewRows,
 				categories: ($categories ?? []) as Category[],
 				today: today(),
 				window: TREND_WINDOW
@@ -210,7 +255,9 @@
 			(($goals ?? []) as Goal[]).map((g) =>
 				goalStatus({
 					goal: g,
-					txns: rows,
+					// Home-currency rows from every account: the goal is measured in
+					// the home currency wherever the contribution was typed (Q49).
+					txns: inCurrency(rows, ($accounts ?? []) as Account[], home),
 					categories: ($categories ?? []) as Category[],
 					target: written.find((t) => t.goalId === g.id && t.month === month) ?? null,
 					month,
@@ -221,14 +268,15 @@
 	});
 
 	/** Outstanding across the whole book, not just this month — a debt has no month. */
-	const receivables = $derived(openReceivables(rows));
-	const owed = $derived(totalOwed(rows));
+	const receivables = $derived(openReceivables(viewRows));
+	const owed = $derived(totalOwed(viewRows));
 
 	async function markReceived(txnId: string, shareId: string) {
 		const repayment = await settleReceivable(txnId, shareId);
 		if (!repayment) return;
 		toast.money(repayment.amount, {
 			message: repayment.payee,
+			code: currency,
 			undo: () => unsettleReceivable(txnId, shareId)
 		});
 	}
@@ -304,23 +352,104 @@
 	{/snippet}
 </AppBar>
 
-<MonthTotals
-	month={summary.month}
-	income={summary.income}
-	outflow={summary.outflow}
-	net={summary.net}
-/>
+{#if accountRows.length > 1}
+	<!-- Which account the month is about — Petr's switcher (Q49). "Vše" lays
+	     the currencies side by side; it never adds them up. -->
+	<nav class="accounts" aria-label="Účet">
+		{#each accountRows as row (row.id)}
+			<button
+				type="button"
+				class="accounts__chip"
+				class:accounts__chip--on={view === row.id}
+				aria-pressed={view === row.id}
+				onclick={() => (viewChoice = row.id)}
+			>
+				{row.name}
+			</button>
+		{/each}
+		<button
+			type="button"
+			class="accounts__chip"
+			class:accounts__chip--on={view === 'all'}
+			aria-pressed={view === 'all'}
+			onclick={() => (viewChoice = 'all')}
+		>
+			vše
+		</button>
+	</nav>
+{/if}
+
+{#if view !== 'all'}
+	<MonthTotals
+		month={summary.month}
+		income={summary.income}
+		outflow={summary.outflow}
+		net={summary.net}
+		code={currency}
+	/>
+{/if}
 
 <main class="page">
-	{#if summary.oneOffOutflow !== 0}
-		<p class="aside prose">
-			Z toho jednorázově <strong>{formatMoney(summary.oneOffOutflow, { sign: 'never' })}</strong>.
-			Běžný chod měsíce vyšel na
-			<strong>{formatMoney(summary.recurringOutflow, { sign: 'never' })}</strong>.
+	{#if view === 'all'}
+		<!-- One card per currency, each summed only over its own accounts.
+		     There is deliberately no combined figure: it would need an exchange
+		     rate, and no rate is ever fetched or stored (Q49). -->
+		{#each currencyGroups as group (group.code)}
+			<section class="card currency-group">
+				<h2 class="u-label">{group.code}</h2>
+				<div class="currency-group__net">
+					<Money value={group.summary.net} size="xl" bold code={group.code} />
+				</div>
+				<dl class="currency-group__rows">
+					<div>
+						<dt>Přišlo</dt>
+						<dd>
+							<Money value={group.summary.income} size="sm" colour={false} code={group.code} />
+						</dd>
+					</div>
+					<div>
+						<dt>Odešlo</dt>
+						<dd>
+							<Money
+								value={group.summary.outflow}
+								size="sm"
+								colour={false}
+								sign="never"
+								code={group.code}
+							/>
+						</dd>
+					</div>
+				</dl>
+				{#if group.summary.buckets.length > 0}
+					<ul class="currency-group__buckets">
+						{#each group.summary.buckets as bucket (bucket.category?.id ?? 'none')}
+							<li>
+								<span class="currency-group__bucket-name">
+									{bucket.category?.name ?? 'bez kategorie'}
+								</span>
+								<Money value={bucket.total} size="sm" bold colour={false} code={group.code} />
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
+		{/each}
+		<p class="hint prose">
+			Každá měna zvlášť. Kontrola, rozdělení příjmu a trendy běží nad jedním účtem — přepni si ho
+			nahoře.
 		</p>
 	{/if}
 
-	{#if goal}
+	{#if summary.oneOffOutflow !== 0}
+		<p class="aside prose">
+			Z toho jednorázově <strong
+				>{formatMoney(summary.oneOffOutflow, { sign: 'never', code: currency })}</strong
+			>. Běžný chod měsíce vyšel na
+			<strong>{formatMoney(summary.recurringOutflow, { sign: 'never', code: currency })}</strong>.
+		</p>
+	{/if}
+
+	{#if goal && viewAccount && viewAccount.currency === home}
 		<a class="card card--goal" href={resolve('/cil')}>
 			<div class="card__head">
 				<h2 class="u-label">Cíl · {goal.goal.name}</h2>
@@ -456,7 +585,7 @@
 			<h2 class="u-label">Dluží mi</h2>
 			<div class="owed-total">
 				<span>Celkem venku</span>
-				<Money value={owed} size="lg" bold colour={false} />
+				<Money value={owed} size="lg" bold colour={false} code={currency} />
 			</div>
 			<ul class="owed-list">
 				<!-- One entry per share, not per row — a Netflix split with two
@@ -466,10 +595,12 @@
 						<div class="owed-row__what">
 							<span class="owed-row__who">{receivable.who}</span>
 							<span class="owed-row__for">
-								{receivable.txn.payee || 'bez popisu'} · z {formatMoney(receivable.spent)}
+								{receivable.txn.payee || 'bez popisu'} · z {formatMoney(receivable.spent, {
+									code: currency
+								})}
 							</span>
 						</div>
-						<Money value={receivable.amount} size="base" bold colour={false} />
+						<Money value={receivable.amount} size="base" bold colour={false} code={currency} />
 						<button
 							type="button"
 							class="owed-row__ok"
@@ -489,143 +620,145 @@
 		</section>
 	{/if}
 
-	<!--
-		The 10/10/10/70 split. Actual on top, because the question is "how am I
-		doing"; the book's shape underneath it, because that is what the answer is
-		measured against. Same four colours in both rings, so the comparison is
-		made by the eye rather than by arithmetic.
-	-->
-	<section class="card">
-		<h2 class="u-label">
-			<Explainer term="Rozdělení příjmu">
-				<p>
-					Z každé koruny příjmu: 10 % dávání, 10 % spoření, 10 % dluhy, 70 % život. Velký kruh je
-					tvůj měsíc, malý je předloha. Měří se proti příjmu, ne proti výdajům — proto může něco
-					zbýt. A zbytek je taky výsledek.
-				</p>
-			</Explainer>
-		</h2>
+	{#if view !== 'all'}
+		<!--
+			The 10/10/10/70 split. Actual on top, because the question is "how am I
+			doing"; the book's shape underneath it, because that is what the answer is
+			measured against. Same four colours in both rings, so the comparison is
+			made by the eye rather than by arithmetic.
+		-->
+		<section class="card">
+			<h2 class="u-label">
+				<Explainer term="Rozdělení příjmu">
+					<p>
+						Z každé koruny příjmu: 10 % dávání, 10 % spoření, 10 % dluhy, 70 % život. Velký kruh je
+						tvůj měsíc, malý je předloha. Měří se proti příjmu, ne proti výdajům — proto může něco
+						zbýt. A zbytek je taky výsledek.
+					</p>
+				</Explainer>
+			</h2>
 
-		{#if split.hasIncome}
-			<div class="split">
-				<Doughnut segments={actualSegments} size={148} title="Jak jsi rozdělil příjem">
-					{#snippet centre()}
-						{#if split.left < 0}
-							<span class="split__big split__big--over">{split.leftPercent} %</span>
-							<span class="split__small">přečerpáno</span>
-						{:else}
-							<span class="split__big">{split.leftPercent} %</span>
-							<span class="split__small">zbylo</span>
-						{/if}
-					{/snippet}
-				</Doughnut>
-
-				<ul class="legend">
-					{#each split.slices as slice (slice.cls)}
-						<li class="legend__row">
-							<span class="legend__dot" style="background: {CLASS_COLOUR[slice.cls]}"></span>
-							<span class="legend__name">
-								{slice.label}
-								<span class="legend__note">{CLASS_NOTE[slice.cls]}</span>
-							</span>
-							<span class="legend__pct">{slice.percent} %</span>
-							<span
-								class="legend__delta"
-								data-state={slice.cls === 'live' ? 'flat' : slice.delta < 0 ? 'under' : 'over'}
-							>
-								{slice.delta > 0 ? '+' : ''}{slice.delta}
-							</span>
-						</li>
-					{/each}
-				</ul>
-			</div>
-
-			<p class="verdict" class:verdict--ok={!split.weakest && split.left >= 0}>
-				{verdict(split)}
-			</p>
-		{:else}
-			<p class="hint prose">{verdict(split)}</p>
-		{/if}
-
-		<hr class="perforation" />
-
-		<div class="target">
-			<Doughnut
-				segments={targetSegments}
-				size={84}
-				thickness={16}
-				track="transparent"
-				title="Jak to má být: 10 / 10 / 10 / 70"
-			/>
-			<div class="target__text">
-				<h3 class="u-label">Jak to má být</h3>
-				<ul class="target__list">
-					{#each targetSlices() as slice (slice.cls)}
-						<li>
-							<span class="legend__dot" style="background: {CLASS_COLOUR[slice.cls]}"></span>
-							<strong>{slice.percent} %</strong>
-							{slice.label.toLocaleLowerCase('cs')}
-						</li>
-					{/each}
-				</ul>
-			</div>
-		</div>
-	</section>
-
-	<section class="card">
-		<h2 class="u-label">Kam to šlo</h2>
-		{#if summary.buckets.length === 0}
-			<p class="empty">Zatím žádné výdaje.</p>
-		{:else}
-			<ul class="buckets">
-				{#each summary.buckets as bucket (bucket.category?.id ?? 'none')}
-					{@const trend = trends.get(bucket.category?.id ?? null)}
-					<li class="bucket">
-						<div class="bucket__head">
-							<span class="bucket__name" class:bucket__name--none={!bucket.category}>
-								{bucket.category?.name ?? 'bez kategorie'}
-							</span>
-							<span class="bucket__numbers">
-								<span class="bucket__share">{bucket.share} %</span>
-								<Money value={bucket.total} size="base" bold />
-							</span>
-						</div>
-						<div class="meter">
-							<span
-								class="meter__fill"
-								data-type={bucket.category?.spendType ?? 'none'}
-								style="width: {barWidth(bucket.total)}%"
-							></span>
-						</div>
-						<div class="bucket__foot">
-							<span class="bucket__count">{bucket.count}×</span>
-
-							<!--
-							  Against its own normal, not against the other buckets. The
-							  biggest bucket is the rent every month, and saying so is worth
-							  nothing; what is worth something is that this month's JÍDLO is
-							  a third dearer than JÍDLO usually is.
-
-							  Silent when the move is small, and silent when there is no
-							  history — a percentage off one month is not a trend.
-							-->
-							{#if trend && trend.direction !== 'flat' && trend.changePercent !== null}
-								<span class="bucket__trend" data-direction={trend.direction}>
-									{trend.direction === 'up' ? '↑' : '↓'}
-									{Math.abs(trend.changePercent)} % oproti obvyklým
-									{formatMoney(trend.typical!, { sign: 'never' })}
-								</span>
-							{:else if bucket.oneOffTotal !== 0}
-								<span class="bucket__oneoff">
-									z toho 1× {formatMoney(bucket.oneOffTotal, { sign: 'never' })}
-								</span>
+			{#if split.hasIncome}
+				<div class="split">
+					<Doughnut segments={actualSegments} size={148} title="Jak jsi rozdělil příjem">
+						{#snippet centre()}
+							{#if split.left < 0}
+								<span class="split__big split__big--over">{split.leftPercent} %</span>
+								<span class="split__small">přečerpáno</span>
+							{:else}
+								<span class="split__big">{split.leftPercent} %</span>
+								<span class="split__small">zbylo</span>
 							{/if}
-						</div>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-	</section>
+						{/snippet}
+					</Doughnut>
+
+					<ul class="legend">
+						{#each split.slices as slice (slice.cls)}
+							<li class="legend__row">
+								<span class="legend__dot" style="background: {CLASS_COLOUR[slice.cls]}"></span>
+								<span class="legend__name">
+									{slice.label}
+									<span class="legend__note">{CLASS_NOTE[slice.cls]}</span>
+								</span>
+								<span class="legend__pct">{slice.percent} %</span>
+								<span
+									class="legend__delta"
+									data-state={slice.cls === 'live' ? 'flat' : slice.delta < 0 ? 'under' : 'over'}
+								>
+									{slice.delta > 0 ? '+' : ''}{slice.delta}
+								</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
+
+				<p class="verdict" class:verdict--ok={!split.weakest && split.left >= 0}>
+					{verdict(split)}
+				</p>
+			{:else}
+				<p class="hint prose">{verdict(split)}</p>
+			{/if}
+
+			<hr class="perforation" />
+
+			<div class="target">
+				<Doughnut
+					segments={targetSegments}
+					size={84}
+					thickness={16}
+					track="transparent"
+					title="Jak to má být: 10 / 10 / 10 / 70"
+				/>
+				<div class="target__text">
+					<h3 class="u-label">Jak to má být</h3>
+					<ul class="target__list">
+						{#each targetSlices() as slice (slice.cls)}
+							<li>
+								<span class="legend__dot" style="background: {CLASS_COLOUR[slice.cls]}"></span>
+								<strong>{slice.percent} %</strong>
+								{slice.label.toLocaleLowerCase('cs')}
+							</li>
+						{/each}
+					</ul>
+				</div>
+			</div>
+		</section>
+
+		<section class="card">
+			<h2 class="u-label">Kam to šlo</h2>
+			{#if summary.buckets.length === 0}
+				<p class="empty">Zatím žádné výdaje.</p>
+			{:else}
+				<ul class="buckets">
+					{#each summary.buckets as bucket (bucket.category?.id ?? 'none')}
+						{@const trend = trends.get(bucket.category?.id ?? null)}
+						<li class="bucket">
+							<div class="bucket__head">
+								<span class="bucket__name" class:bucket__name--none={!bucket.category}>
+									{bucket.category?.name ?? 'bez kategorie'}
+								</span>
+								<span class="bucket__numbers">
+									<span class="bucket__share">{bucket.share} %</span>
+									<Money value={bucket.total} size="base" bold code={currency} />
+								</span>
+							</div>
+							<div class="meter">
+								<span
+									class="meter__fill"
+									data-type={bucket.category?.spendType ?? 'none'}
+									style="width: {barWidth(bucket.total)}%"
+								></span>
+							</div>
+							<div class="bucket__foot">
+								<span class="bucket__count">{bucket.count}×</span>
+
+								<!--
+								  Against its own normal, not against the other buckets. The
+								  biggest bucket is the rent every month, and saying so is worth
+								  nothing; what is worth something is that this month's JÍDLO is
+								  a third dearer than JÍDLO usually is.
+
+								  Silent when the move is small, and silent when there is no
+								  history — a percentage off one month is not a trend.
+								-->
+								{#if trend && trend.direction !== 'flat' && trend.changePercent !== null}
+									<span class="bucket__trend" data-direction={trend.direction}>
+										{trend.direction === 'up' ? '↑' : '↓'}
+										{Math.abs(trend.changePercent)} % oproti obvyklým
+										{formatMoney(trend.typical!, { sign: 'never', code: currency })}
+									</span>
+								{:else if bucket.oneOffTotal !== 0}
+									<span class="bucket__oneoff">
+										z toho 1× {formatMoney(bucket.oneOffTotal, { sign: 'never', code: currency })}
+									</span>
+								{/if}
+							</div>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+	{/if}
 </main>
 
 <RefileSheet
@@ -640,6 +773,103 @@
 <TabBar />
 
 <style>
+	/* ── the account switcher (Q49) ──────────────────────────────────────── */
+
+	.accounts {
+		display: flex;
+		gap: var(--space-2);
+		padding: 0 var(--space-3) var(--space-2);
+		overflow-x: auto;
+	}
+
+	/* Same recipe as the sheet's mode buttons: selection is `--signal`, the
+	   chrome accent — this is navigation state, never data. */
+	.accounts__chip {
+		flex: none;
+		min-height: var(--control);
+		padding: var(--space-1) var(--space-3);
+		border: 1px solid var(--hairline);
+		border-radius: var(--radius-full);
+		background: var(--surface-2);
+		font-size: var(--text-sm);
+		font-weight: 400;
+		color: var(--ink-2);
+		white-space: nowrap;
+		position: relative;
+		transition:
+			background var(--dur-fast) var(--ease-out),
+			border-color var(--dur-fast) var(--ease-out),
+			color var(--dur-fast) var(--ease-out);
+	}
+
+	/* The row's gap is where the borrowed hit areas live (--touch ≥ --control). */
+	.accounts__chip::after {
+		content: '';
+		position: absolute;
+		inset: calc((var(--touch) - 100%) / -2) calc(var(--control-gap) / -2);
+	}
+
+	.accounts__chip--on {
+		background: color-mix(in srgb, var(--signal) 10%, var(--surface));
+		border-color: var(--signal);
+		color: var(--ink);
+		font-weight: 600;
+	}
+
+	/* ── the all-accounts view: one card per currency ────────────────────── */
+
+	.currency-group__net {
+		display: flex;
+		justify-content: flex-end;
+	}
+
+	.currency-group__rows {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.currency-group__rows div {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+	}
+
+	.currency-group__rows dt {
+		font-size: var(--text-sm);
+		color: var(--ink-3);
+	}
+
+	.currency-group__rows dd {
+		margin: 0;
+	}
+
+	.currency-group__buckets {
+		list-style: none;
+		margin: 0;
+		padding: var(--space-2) 0 0;
+		border-top: 1px solid var(--hairline);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.currency-group__buckets li {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: var(--space-3);
+	}
+
+	.currency-group__bucket-name {
+		font-size: var(--text-sm);
+		color: var(--ink-2);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
 	/* ── the month switcher ──────────────────────────────────────────────── */
 
 	.switcher {

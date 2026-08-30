@@ -47,12 +47,14 @@
 		/** The schedule being edited, or null to declare a new one. */
 		schedule: Schedule | null;
 		categories: Category[];
+		/** Currency of the account this schedule posts to (Q49). */
+		code?: string;
 		onsave: (input: ScheduleInput) => Promise<void>;
 		onarchive: (() => Promise<void>) | null;
 		onclose: () => void;
 	}
 
-	let { open, schedule, categories, onsave, onarchive, onclose }: Props = $props();
+	let { open, schedule, categories, code = 'CZK', onsave, onarchive, onclose }: Props = $props();
 
 	let payee = $state('');
 	let categoryId = $state('');
@@ -243,13 +245,13 @@
 		{#if yearly !== null}
 			<p class="yearly">
 				{#if netYearly !== null}
-					Odejde <strong>{formatMoney(yearly)}</strong> za rok, ale stojí tě to
-					<strong>{formatMoney(netYearly)}</strong>. 31. se v kratším měsíci posune na jeho poslední
-					den.
+					Odejde <strong>{formatMoney(yearly, { code })}</strong> za rok, ale stojí tě to
+					<strong>{formatMoney(netYearly, { code })}</strong>. 31. se v kratším měsíci posune na
+					jeho poslední den.
 				{:else}
 					{isIncome ? 'Přijde' : 'Stojí'}
-					<strong>{formatMoney(yearly)}</strong> za rok. 31. se v kratším měsíci posune na jeho poslední
-					den.
+					<strong>{formatMoney(yearly, { code })}</strong> za rok. 31. se v kratším měsíci posune na jeho
+					poslední den.
 				{/if}
 			</p>
 		{/if}

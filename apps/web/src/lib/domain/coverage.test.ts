@@ -44,6 +44,17 @@ describe('monthCoverage', () => {
 		expect(result.percent).toBe(33);
 	});
 
+	it('a transfer day is still a quiet day — moving money is not spending it (Q49)', () => {
+		const result = monthCoverage({
+			month: '2026-08',
+			txns: [txn('2026-08-01', { transferPairId: 'pair' })],
+			today: '2026-08-02'
+		});
+
+		expect(result.spending).toBe(0);
+		expect(result.quiet).toBe(2);
+	});
+
 	it('counts a day nobody recorded as a day without an expense', () => {
 		// The whole reversal: no mark, no tap, no hole. Nothing was spent.
 		const result = monthCoverage({
