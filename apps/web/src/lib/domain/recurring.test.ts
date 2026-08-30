@@ -9,10 +9,12 @@ import {
 	recurringCost,
 	recurringIncome,
 	remainingPayments,
-	remainingThisMonth
+	remainingThisMonth,
+	scheduleSharesOf,
+	sharesForPosting
 } from './recurring';
 import { minor } from './money';
-import type { Schedule } from './types';
+import type { Schedule, ScheduleShare } from './types';
 
 const SYNCED = { updatedAt: '2026-08-01T00:00:00.000Z', deviceId: 'dev', isDeleted: false };
 
@@ -26,14 +28,20 @@ function schedule(id: string, patch: Partial<Schedule> = {}): Schedule {
 		startMonth: '2026-01',
 		endMonth: null,
 		mode: 'confirm',
-		owedAmount: null,
-		owedBy: null,
+		shares: [],
 		lastPostedMonth: null,
 		isArchived: false,
 		sortOrder: 0,
 		...SYNCED,
 		...patch
 	};
+}
+
+let shareSeq = 0;
+
+function share(amount: number, who = ''): ScheduleShare {
+	shareSeq += 1;
+	return { id: `share-${shareSeq}`, who, amount: minor(amount) };
 }
 
 const TODAY = '2026-08-25';
@@ -230,7 +238,7 @@ describe('recurringCost', () => {
 		// The mortgage paid whole, halved by the person it is halved with. The
 		// balance sees 32 000 on the 15th; the decision is made against 16 000.
 		const total = recurringCost([
-			schedule('hypo', { amount: minor(-32_000_00), owedAmount: minor(16_000_00), owedBy: 'Jana' })
+			schedule('hypo', { amount: minor(-32_000_00), shares: [share(16_000_00, 'Jana')] })
 		]);
 
 		const row = total.rows[0]!;
@@ -246,9 +254,9 @@ describe('recurringCost', () => {
 		expect(total.yearly).toBe(192_000_00);
 	});
 
-	it('never lets a share turn a payment into income', () => {
+	it('never lets shares turn a payment into income', () => {
 		const total = recurringCost([
-			schedule('odd', { amount: minor(-1_000_00), owedAmount: minor(4_000_00) })
+			schedule('odd', { amount: minor(-1_000_00), shares: [share(4_000_00)] })
 		]);
 
 		expect(total.rows[0]!.net).toBe(0);
@@ -263,8 +271,73 @@ describe('netOfSchedule', () => {
 
 	it('subtracts the declared share', () => {
 		expect(
-			netOfSchedule(schedule('hypo', { amount: minor(-32_000_00), owedAmount: minor(12_500_00) }))
+			netOfSchedule(schedule('hypo', { amount: minor(-32_000_00), shares: [share(12_500_00)] }))
 		).toBe(19_500_00);
+	});
+
+	it('subtracts every payer of a split subscription — Q47', () => {
+		expect(
+			netOfSchedule(
+				schedule('netflix', {
+					amount: minor(-399_00),
+					shares: [share(133_00, 'Kerhy'), share(133_00, 'Zůza')]
+				})
+			)
+		).toBe(133_00);
+	});
+});
+
+describe('scheduleSharesOf — the legacy fallback', () => {
+	it('synthesises the single share of a pre-v9 schedule', () => {
+		const old: Record<string, unknown> = { ...schedule('hypo', { amount: minor(-32_000_00) }) };
+		delete old.shares;
+		old.owedAmount = 16_000_00;
+		old.owedBy = 'Jana';
+
+		expect(scheduleSharesOf(old as unknown as Schedule)).toEqual([
+			{ id: 'legacy', who: 'Jana', amount: 16_000_00 }
+		]);
+		expect(netOfSchedule(old as unknown as Schedule)).toBe(16_000_00);
+	});
+
+	it('reads an unshared legacy schedule as an empty list', () => {
+		const old: Record<string, unknown> = { ...schedule('netflix') };
+		delete old.shares;
+		old.owedAmount = null;
+		old.owedBy = null;
+		expect(scheduleSharesOf(old as unknown as Schedule)).toEqual([]);
+	});
+});
+
+describe('sharesForPosting', () => {
+	it('copies the declared shares onto an ordinary posting', () => {
+		const netflix = schedule('netflix', {
+			amount: minor(-399_00),
+			shares: [share(133_00, 'Kerhy'), share(133_00, 'Zůza')]
+		});
+		expect(sharesForPosting(netflix, minor(-399_00))).toEqual([
+			{ who: 'Kerhy', amount: 133_00 },
+			{ who: 'Zůza', amount: 133_00 }
+		]);
+	});
+
+	it('never books back more than went out on an overridden amount', () => {
+		const netflix = schedule('netflix', {
+			amount: minor(-399_00),
+			shares: [share(133_00, 'Kerhy'), share(133_00, 'Zůza')]
+		});
+		// Confirmed at 200: the first share fits, the second is clamped to the rest.
+		expect(sharesForPosting(netflix, minor(-200_00))).toEqual([
+			{ who: 'Kerhy', amount: 133_00 },
+			{ who: 'Zůza', amount: 67_00 }
+		]);
+		// Confirmed at 100: only the first share, clamped, survives.
+		expect(sharesForPosting(netflix, minor(-100_00))).toEqual([{ who: 'Kerhy', amount: 100_00 }]);
+	});
+
+	it('gives an incoming amount no shares at all', () => {
+		const odd = schedule('odd', { shares: [share(133_00, 'Kerhy')] });
+		expect(sharesForPosting(odd, minor(399_00))).toEqual([]);
 	});
 });
 

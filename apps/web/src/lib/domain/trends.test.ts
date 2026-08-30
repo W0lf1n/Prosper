@@ -36,9 +36,7 @@ function txn(date: string, amount: number, categoryId: string, patch: Partial<Tx
 		isCleared: false,
 		createdAt: `${date}T10:00:00.000Z`,
 		isOneOff: false,
-		owedAmount: null,
-		owedBy: null,
-		settledByTxnId: null,
+		shares: [],
 		scheduleId: null,
 		...SYNCED,
 		...patch

@@ -46,6 +46,7 @@
 		recurringIncome,
 		remainingPayments,
 		remainingThisMonth,
+		scheduleSharesOf,
 		type DueGroup
 	} from '$lib/domain/recurring';
 	import type { Category, Schedule } from '$lib/domain/types';
@@ -86,6 +87,13 @@
 
 	function categoryName(id: string): string {
 		return (($categories ?? []) as Category[]).find((c) => c.id === id)?.name ?? '—';
+	}
+
+	/** "Zůza", "Zůza a Kerhy", "Zůza, Kerhy a Pepa" — however many pay back. */
+	function payerNames(schedule: Schedule): string {
+		const names = scheduleSharesOf(schedule).map((s) => s.who.trim() || 'někdo');
+		if (names.length <= 1) return names[0] ?? 'někdo';
+		return `${names.slice(0, -1).join(', ')} a ${names[names.length - 1]}`;
 	}
 
 	// ── the sheet ───────────────────────────────────────────────────────────
@@ -235,7 +243,7 @@
 							{#if row.reimbursed > 0}
 								<span class="tile__foot back">
 									<span class="tile__where">
-										vrací {row.schedule.owedBy || 'někdo'}
+										vrací {payerNames(row.schedule)}
 										{formatMoney(row.reimbursed, { sign: 'never' })}
 									</span>
 									<span class="tile__note">

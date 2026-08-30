@@ -213,6 +213,84 @@ export const migrations: Migration[] = [
 					if (row.isPinned === undefined) row.isPinned = false;
 				});
 		}
+	},
+	{
+		/**
+		 * `Txn.shares` / `Schedule.shares` — several people paying back one
+		 * expense (DECISIONS Q47).
+		 *
+		 * The single `owedAmount` / `owedBy` (/ `settledByTxnId`) trio becomes an
+		 * array of shares, each with its own settlement. No index changes — the
+		 * old fields were never indexed and the new one is an array of objects,
+		 * which IndexedDB could not index anyway — so neither table is restated.
+		 *
+		 * The backfill wraps an existing share into a one-element array and gives
+		 * an empty row an empty one, explicitly, for the reason v5 backfilled
+		 * `scheduleId`: an absent field is not an empty list, and every reader
+		 * would need a guard forever. The legacy fields are left in place on old
+		 * rows — they are the audit trail of what this migration read, and
+		 * `sharesOf()` prefers the array whenever both exist.
+		 *
+		 * The synthesised share's id is the same constant `sharesOf()` uses for a
+		 * legacy row it meets at read time (an old backup merged in later), so
+		 * one share never changes identity depending on which path it took.
+		 */
+		version: 9,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			interface LegacyOwedRow {
+				shares?: unknown;
+				owedAmount?: number | null;
+				owedBy?: string | null;
+				settledByTxnId?: string | null;
+			}
+			await tx
+				.table('txns')
+				.toCollection()
+				.modify((row: LegacyOwedRow) => {
+					if (Array.isArray(row.shares)) return;
+					row.shares = row.owedAmount
+						? [
+								{
+									id: 'legacy',
+									who: row.owedBy ?? '',
+									amount: Math.abs(row.owedAmount),
+									settledByTxnId: row.settledByTxnId ?? null
+								}
+							]
+						: [];
+				});
+			await tx
+				.table('schedules')
+				.toCollection()
+				.modify((row: LegacyOwedRow) => {
+					if (Array.isArray(row.shares)) return;
+					row.shares = row.owedAmount
+						? [{ id: 'legacy', who: row.owedBy ?? '', amount: Math.abs(row.owedAmount) }]
+						: [];
+				});
+		}
+	},
+	{
+		/**
+		 * `Goal.startAmount` — the stated head start of a goal (DECISIONS Q48).
+		 *
+		 * No index changes, so `goals` is not restated. Backfilled to zero rather
+		 * than left absent, for the standing reason (v5, v7, v8): arithmetic over
+		 * an absent field is NaN, and every reader would need a guard for ever.
+		 * Zero is also the honest value — a goal written before the field existed
+		 * never claimed a head start.
+		 */
+		version: 10,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			await tx
+				.table('goals')
+				.toCollection()
+				.modify((row: { startAmount?: number }) => {
+					if (row.startAmount === undefined) row.startAmount = 0;
+				});
+		}
 	}
 ];
 

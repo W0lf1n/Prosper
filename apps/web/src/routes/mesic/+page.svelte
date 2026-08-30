@@ -224,12 +224,12 @@
 	const receivables = $derived(openReceivables(rows));
 	const owed = $derived(totalOwed(rows));
 
-	async function markReceived(txnId: string) {
-		const repayment = await settleReceivable(txnId);
+	async function markReceived(txnId: string, shareId: string) {
+		const repayment = await settleReceivable(txnId, shareId);
 		if (!repayment) return;
 		toast.money(repayment.amount, {
 			message: repayment.payee,
-			undo: () => unsettleReceivable(txnId)
+			undo: () => unsettleReceivable(txnId, shareId)
 		});
 	}
 
@@ -459,7 +459,9 @@
 				<Money value={owed} size="lg" bold colour={false} />
 			</div>
 			<ul class="owed-list">
-				{#each receivables as receivable (receivable.txn.id)}
+				<!-- One entry per share, not per row — a Netflix split with two
+				     friends is two debts, each ticked off when its own money lands. -->
+				{#each receivables as receivable (`${receivable.txn.id}:${receivable.share.id}`)}
 					<li class="owed-row">
 						<div class="owed-row__what">
 							<span class="owed-row__who">{receivable.who}</span>
@@ -471,7 +473,7 @@
 						<button
 							type="button"
 							class="owed-row__ok"
-							onclick={() => markReceived(receivable.txn.id)}
+							onclick={() => markReceived(receivable.txn.id, receivable.share.id)}
 						>
 							Přijato
 						</button>

@@ -265,8 +265,9 @@
 			categoryId,
 			payee,
 			isOneOff,
-			owedAmount: direction === 'out' ? owedAmount : null,
-			owedBy: direction === 'out' ? owedBy : null
+			/* The fast path stays one payer — a second one is added later, on the
+			   row's edit sheet, where there is room for a list (Q47). */
+			shares: direction === 'out' && owedAmount ? [{ who: owedBy, amount: owedAmount }] : []
 		});
 
 		navigator.vibrate?.(direction === 'out' ? 14 : [10, 40, 14]);

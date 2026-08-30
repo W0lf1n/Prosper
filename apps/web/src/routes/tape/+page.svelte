@@ -14,10 +14,11 @@
 	import { formatDayHeading, formatMonthHeading, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
 	import { buildTape } from '$lib/domain/ledger';
-	import { isOpenReceivable } from '$lib/domain/receivables';
+	import { MAX_SHARES, isOpenReceivable, isOpenShare, sharesOf } from '$lib/domain/receivables';
 	import { daysSinceReconciled } from '$lib/domain/reconcile';
+	import { uuidv7 } from '$lib/domain/ids';
 	import { DAYS, counted } from '$lib/domain/czech';
-	import type { Category, Reconciliation, Txn } from '$lib/domain/types';
+	import type { Category, Reconciliation, Txn, TxnShare } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import Money from '$lib/ui/Money.svelte';
@@ -156,12 +157,33 @@
 	 * finding no way to say so — and no way to fix a share typed wrong, which
 	 * could until now only ever be set once, at entry — is the screen refusing
 	 * to talk about the thing it just brought up.
+	 *
+	 * Since Q47 the row carries a *list* of shares, one per person, each with
+	 * its own Přijato — Friend1 paying up says nothing about Friend2. This is
+	 * also the only place a second person is added to an already-saved row.
 	 */
-	let editOwed = $state('');
-	let editOwedBy = $state('');
+	interface EditShare {
+		/** Null until saved — a person added in this sheet. */
+		id: string | null;
+		amount: string;
+		who: string;
+		/** The saved settlement. A settled share renders read-only. */
+		settledByTxnId: string | null;
+	}
+	let editShares = $state<EditShare[]>([]);
 
-	const editingOpenOwed = $derived(editing !== null && isOpenReceivable(editing));
-	const editingSettled = $derived(editing !== null && editing.settledByTxnId !== null);
+	/** The shares as the row holds them — Přijato settles these, not the drafts. */
+	const storedShares = $derived(
+		new Map<string, TxnShare>(editing ? sharesOf(editing).map((s) => [s.id, s]) : [])
+	);
+
+	const canAddShare = $derived.by(() => {
+		// Settled shares count against the ceiling too — they are still people
+		// on this payment, not free slots.
+		if (editShares.length >= MAX_SHARES) return false;
+		const editable = editShares.filter((row) => row.settledByTxnId === null);
+		return editable.length === 0 || editable[editable.length - 1]!.amount.trim() !== '';
+	});
 
 	function openEdit(txn: Txn) {
 		editing = txn;
@@ -170,26 +192,32 @@
 		editCategory = txn.categoryId ?? '';
 		editPayee = txn.payee;
 		editNote = txn.note ?? '';
-		editOwed = txn.owedAmount
-			? formatMoney(txn.owedAmount, { currency: false, sign: 'never' })
-			: '';
-		editOwedBy = txn.owedBy ?? '';
+		editShares = sharesOf(txn).map((share) => ({
+			id: share.id,
+			amount: formatMoney(share.amount, { currency: false, sign: 'never' }),
+			who: share.who,
+			settledByTxnId: share.settledByTxnId
+		}));
+		// Nothing open to type into — offer one empty pair, like the entry sheet.
+		if (txn.amount < 0 && editShares.every((row) => row.settledByTxnId !== null)) {
+			editShares = [...editShares, { id: null, amount: '', who: '', settledByTxnId: null }];
+		}
 		editError = '';
 	}
 
 	/**
-	 * The money arrived. Captured before the write, because the toast reads a
-	 * figure the live query is about to change underneath it.
+	 * The money arrived — one share of it. Captured before the write, because
+	 * the toast reads a figure the live query is about to change underneath it.
 	 */
-	async function receive() {
+	async function receive(shareId: string) {
 		if (!editing) return;
 		const txnId = editing.id;
 		editing = null;
-		const repayment = await settleReceivable(txnId);
+		const repayment = await settleReceivable(txnId, shareId);
 		if (!repayment) return;
 		toast.money(repayment.amount, {
 			message: repayment.payee,
-			undo: () => unsettleReceivable(txnId)
+			undo: () => unsettleReceivable(txnId, shareId)
 		});
 	}
 
@@ -212,19 +240,39 @@
 		const amount = editing.amount < 0 ? neg(magnitude) : magnitude;
 
 		// An outflow only. A share of money that came *in* is not a receivable,
-		// and the entry screen does not offer it either.
-		let owed: Minor | null = null;
-		if (amount < 0 && editOwed.trim()) {
-			const share = parseAmount(editOwed);
-			if (!share.ok || share.value <= 0) {
-				editError = 'Dlužná částka není částka.';
-				return;
+		// and the entry screen does not offer it either. Settled shares pass
+		// through untouched — their money already arrived; the open drafts are
+		// parsed, and an emptied row is a person taken off.
+		const shares: TxnShare[] = [];
+		if (amount < 0) {
+			let total = 0;
+			for (const row of editShares) {
+				if (row.settledByTxnId !== null && row.id !== null) {
+					const saved = storedShares.get(row.id);
+					if (saved) {
+						shares.push(saved);
+						total += saved.amount;
+					}
+					continue;
+				}
+				if (!row.amount.trim()) continue;
+				const share = parseAmount(row.amount);
+				if (!share.ok || share.value <= 0) {
+					editError = 'Dlužná částka není částka.';
+					return;
+				}
+				total += share.value;
+				shares.push({
+					id: row.id ?? uuidv7(),
+					who: row.who,
+					amount: share.value,
+					settledByTxnId: null
+				});
 			}
-			if (share.value > magnitude) {
+			if (total > magnitude) {
 				editError = 'Vrátit ti nemůže víc, než kolik to stálo.';
 				return;
 			}
-			owed = share.value;
 		}
 
 		await updateTxn(editing.id, {
@@ -233,8 +281,7 @@
 			categoryId: editCategory || null,
 			payee: editPayee,
 			note: editNote,
-			owedAmount: owed,
-			owedBy: owed === null ? null : editOwedBy.trim() || null
+			shares
 		});
 		editing = null;
 	}
@@ -245,6 +292,18 @@
 		editing = null;
 		await deleteTxn(doomed.id);
 		toast.show('Záznam smazán', { undo: () => restoreTxn(doomed.id) });
+	}
+
+	/** "Zůza dluží 125,00" / "Zůza a Kerhy dluží 250,00" — the open shares, on the row. */
+	function owedLine(txn: Txn): string {
+		const open = sharesOf(txn).filter(isOpenShare);
+		const names = open.map((s) => s.who.trim() || 'někdo');
+		const listed =
+			names.length <= 1
+				? (names[0] ?? 'někdo')
+				: `${names.slice(0, -1).join(', ')} a ${names[names.length - 1]}`;
+		const total = open.reduce((sum, s) => sum + s.amount, 0) as Minor;
+		return `${listed} dluží ${formatMoney(total, { currency: false })}`;
 	}
 </script>
 
@@ -353,14 +412,7 @@
 												<span class="row__payee">
 													{row.txn.payee}
 													{#if isOpenReceivable(row.txn)}
-														<span class="row__owed">
-															· {row.txn.owedBy || 'někdo'} dluží {formatMoney(
-																row.txn.owedAmount!,
-																{
-																	currency: false
-																}
-															)}
-														</span>
+														<span class="row__owed">· {owedLine(row.txn)}</span>
 													{/if}
 												</span>
 											{/if}
@@ -420,48 +472,73 @@
 
 		<!--
 		  Dluží mi. Only on an outflow — a share of money that came in is not a
-		  receivable — and it is the whole of it: mark it received, fix the
-		  figure, fix the name, or take it off the row entirely by clearing it.
+		  receivable — and since Q47 it is a list: one row per person, each with
+		  its own Přijato, because each slice arrives on its own. Mark one
+		  received, fix a figure, fix a name, add a second person, or take one
+		  off the row entirely by clearing their amount.
 		-->
 		{#if editing && editing.amount < 0}
 			<fieldset class="owed">
 				<legend class="field__label">Dluží mi</legend>
 
-				{#if editingSettled}
-					<p class="owed__done">
-						<Icon name="check" size={15} stroke={2.4} />
-						Vráceno{editing.owedBy ? ` — ${editing.owedBy}` : ''}. Příjem je na výpisu.
-					</p>
-				{:else}
-					<div class="owed__row">
-						<label class="field owed__amount">
-							<span class="field__label">Kolik ti vrátí</span>
-							<input
-								class="field__input field__input--mono"
-								bind:value={editOwed}
-								inputmode="decimal"
-								placeholder="0"
-							/>
-						</label>
-						<label class="field owed__who">
-							<span class="field__label">Kdo</span>
-							<input class="field__input" bind:value={editOwedBy} placeholder="kdo ti to vrátí" />
-						</label>
-					</div>
-
-					{#if editingOpenOwed}
-						<button type="button" class="btn owed__ok btn--block" onclick={receive}>
-							Přijato — {formatMoney(editing.owedAmount!)}
-						</button>
-						<p class="field__hint">
-							Zaplatil jsi celou částku, takže celá jde ze zůstatku. Tohle si jen pamatuje, kolik se
-							má vrátit — až dorazí, odškrtneš to a zapíše se příjem.
+				{#each editShares as row, index (row.id ?? `new-${index}`)}
+					{#if row.settledByTxnId !== null}
+						<p class="owed__done">
+							<Icon name="check" size={15} stroke={2.4} />
+							Vráceno{row.who.trim() ? ` — ${row.who}` : ''} · {row.amount}. Příjem je na výpisu.
 						</p>
 					{:else}
-						<p class="field__hint">
-							Prázdné pole znamená, že ti nikdo nic nevrací. Uloží se to spolu se záznamem.
-						</p>
+						<div class="owed__row">
+							<label class="field owed__amount">
+								<span class="field__label">Kolik ti vrátí</span>
+								<input
+									class="field__input field__input--mono"
+									bind:value={row.amount}
+									inputmode="decimal"
+									placeholder="0"
+								/>
+							</label>
+							<label class="field owed__who">
+								<span class="field__label">Kdo</span>
+								<input class="field__input" bind:value={row.who} placeholder="kdo ti to vrátí" />
+							</label>
+						</div>
+
+						{#if row.id !== null && storedShares.get(row.id) && isOpenShare(storedShares.get(row.id)!)}
+							<button
+								type="button"
+								class="btn owed__ok btn--block"
+								onclick={() => receive(row.id!)}
+							>
+								Přijato — {formatMoney(storedShares.get(row.id)!.amount)}
+							</button>
+						{/if}
 					{/if}
+				{/each}
+
+				{#if canAddShare}
+					<button
+						type="button"
+						class="btn btn--quiet owed__add"
+						onclick={() =>
+							(editShares = [
+								...editShares,
+								{ id: null, amount: '', who: '', settledByTxnId: null }
+							])}
+					>
+						Přidat dalšího
+					</button>
+				{/if}
+
+				{#if editShares.some((row) => row.settledByTxnId === null && row.amount.trim())}
+					<p class="field__hint">
+						Zaplatil jsi celou částku, takže celá jde ze zůstatku. Tohle si jen pamatuje, kolik se
+						má vrátit — až dorazí, odškrtneš to a zapíše se příjem, za každého zvlášť.
+					</p>
+				{:else}
+					<p class="field__hint">
+						Prázdné pole znamená, že ti nikdo nic nevrací. Uloží se to spolu se záznamem.
+					</p>
 				{/if}
 			</fieldset>
 		{/if}
@@ -869,5 +946,10 @@
 		font-size: var(--text-sm);
 		line-height: var(--leading-base);
 		color: var(--in);
+	}
+
+	/* Its width is its label — full-bleed here would read as the sheet's action. */
+	.owed__add {
+		align-self: flex-start;
 	}
 </style>

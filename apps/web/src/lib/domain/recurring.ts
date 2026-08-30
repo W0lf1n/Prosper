@@ -31,7 +31,8 @@
 
 import { daysInMonth, monthKey, shiftMonth, type IsoDate } from './datetime';
 import { ZERO, abs, minor, sum, type Minor } from './money';
-import type { Schedule } from './types';
+import { LEGACY_SHARE_ID } from './receivables';
+import type { Schedule, ScheduleShare } from './types';
 
 export const MODE_LABEL: Record<Schedule['mode'], string> = {
 	confirm: 'potvrdit',
@@ -176,12 +177,63 @@ export interface RecurringTotal {
 	grossYearly: Minor;
 }
 
-/** What a schedule really costs each month, once its share comes back. */
+/** The single-share pair schedules carried before v9 — read-only, and only here. */
+interface LegacyOwed {
+	owedAmount?: Minor | null;
+	owedBy?: string | null;
+}
+
+/**
+ * The one way to read a schedule's shares — `sharesOf` for the other table.
+ *
+ * Same reason as there: a schedule written by an older build carries the
+ * single `owedAmount` / `owedBy` pair and no array, and can keep arriving
+ * that way — from an old backup, or an unpaired device pushing after an
+ * update — long after the v9 migration has run.
+ */
+export function scheduleSharesOf(schedule: Schedule): ScheduleShare[] {
+	if (Array.isArray(schedule.shares)) return schedule.shares;
+	const legacy = schedule as Schedule & LegacyOwed;
+	if (!legacy.owedAmount) return [];
+	return [{ id: LEGACY_SHARE_ID, who: legacy.owedBy ?? '', amount: abs(legacy.owedAmount) }];
+}
+
+/** What a schedule really costs each month, once its shares come back. */
 export function netOfSchedule(schedule: Schedule): Minor {
 	const gross = abs(schedule.amount);
-	if (!schedule.owedAmount) return gross;
-	// A share larger than the payment would make it earn money; clamp, never lie.
-	return minor(Math.max(gross - abs(schedule.owedAmount), 0));
+	const shares = scheduleSharesOf(schedule);
+	if (shares.length === 0) return gross;
+	// Shares larger than the payment would make it earn money; clamp, never lie.
+	return minor(Math.max(gross - sum(shares.map((s) => abs(s.amount))), 0));
+}
+
+/**
+ * The shares a posted row should carry, given the amount actually posted.
+ *
+ * The declared shares are promises against the usual figure; the row carries
+ * whatever was confirmed, which can be smaller — and the shares must never add
+ * up to more than went out, or settling them would book back money that never
+ * left. So they are taken in declared order until the row is spoken for: the
+ * share that crosses the line is clamped, anything after it is dropped.
+ *
+ * Only an outflow can be owed back — a share of money that came *in* is not a
+ * receivable — so an incoming amount gets none.
+ */
+export function sharesForPosting(
+	schedule: Schedule,
+	amount: Minor
+): { who: string; amount: Minor }[] {
+	if (amount >= 0) return [];
+	let room: number = abs(amount);
+	const out: { who: string; amount: Minor }[] = [];
+	for (const share of scheduleSharesOf(schedule)) {
+		if (room <= 0) break;
+		const slice = Math.min(abs(share.amount), room);
+		if (slice <= 0) continue;
+		out.push({ who: share.who, amount: minor(slice) });
+		room -= slice;
+	}
+	return out;
 }
 
 /**

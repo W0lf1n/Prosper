@@ -162,7 +162,8 @@ export interface GoalStatus {
 	goal: Goal;
 	month: string;
 
-	/** Set aside since the goal started. Positive. */
+	/** Set aside since the goal started, the stated head start included (Q48).
+	    Positive. */
 	saved: Minor;
 	/** Still to find. Positive, clamped at zero. */
 	remaining: Minor;
@@ -205,7 +206,12 @@ export function goalStatus(input: GoalStatusInput): GoalStatus {
 	const today = input.today ?? todayIso();
 	const month = input.month ?? monthKey(today);
 
-	const saved = contributions(goal, txns, categories);
+	// The ledger's answer plus the stated head start (Q48). `startAmount` is
+	// signed — a pot can shrink without a row too — and absent on a goal written
+	// by a pre-v10 build, so it reads as zero rather than as NaN. Clamped at
+	// zero: a goal is never *less* than unstarted.
+	const base = (goal.startAmount ?? ZERO) as Minor;
+	const saved = minor(Math.max(base + contributions(goal, txns, categories), 0));
 	const target = abs(goal.targetAmount);
 	const remaining = minor(Math.max(target - saved, 0));
 	const isComplete = remaining === 0 && target > 0;

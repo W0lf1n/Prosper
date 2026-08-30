@@ -1619,3 +1619,89 @@ friends are resolved by first paint and the splash is correct in both themes
 with no hex written in `app.html` (the two `theme-color` metas remain the only
 exception). And `prefers-reduced-motion` gets the finished lockup as a still,
 not a blank — the same rule the toast fuse follows.
+
+## The 2026-08-30 pass — one payment split several ways, and a goal ahead of its ledger
+
+Two features asked for directly, and one plan agreed but deliberately not
+built. Schema moved twice (**v9**, **v10**) and the backup format to **6** —
+an older build reading a v6 file would silently flatten every second payer, so
+it refuses instead.
+
+### Q47 — Several people pay back one payment · answered 2026-08-30
+
+Asked for: Netflix is paid whole and two friends each send their slice back.
+Q25/Q46 could describe one share per row — `owedAmount` / `owedBy` /
+`settledByTxnId`, one person, settled all-or-nothing.
+
+**Answer: the trio became a list.** `Txn.shares` and `Schedule.shares` (schema
+**v9**) are arrays of shares — `{ id, who, amount }`, plus `settledByTxnId`
+per share on the txn side — because Friend1 paying up says nothing about
+Friend2. Each share settles on its own: its own **Přijato** on `/mesic` and on
+the tape's edit sheet, its own `vrácení —` inflow, its own undo. The shares
+together may never exceed the expense, and `sharesForPosting` clamps them in
+declared order when a confirmation overrides the amount downward.
+
+**An embedded array, not new tables.** The sync payload is opaque (Q41), so
+this is a client-only change — no protocol entity, no API work. LWW stays
+per-row, which one person's devices can live with, and IndexedDB could not
+index an array of objects anyway.
+
+**The legacy trio is a read format for ever.** The v9 migration only reaches
+rows present when it runs; an old backup merged later, or an unpaired device
+pushing after an update, delivers trio-shaped rows indefinitely. So nothing
+reads the fields directly: `sharesOf()` / `scheduleSharesOf()` are the
+accessors, and they synthesise a one-element array (share id `legacy`, the
+same constant the migration writes) from a trio-shaped row. Writers always
+write the array, which upgrades a legacy row the first time it is touched.
+
+**At most ten payers on one payment.** Petr's ceiling, set the same day.
+Not architecture — a share is a few dozen bytes and nothing indexes it — but a
+list with no ceiling is a form that can be scrolled into absurdity, and a
+payment split more than ten ways is not a payment this app is for.
+`MAX_SHARES` in `domain/receivables.ts`; the sheets stop offering "Přidat
+dalšího" at it and the repo clamps for any other caller.
+
+**The entry screen deliberately keeps one payer.** The fast path stays two
+fields; a second person is added on the tape's edit sheet, where there is room
+for a list. The schedule sheet takes the full list — that is where the Netflix
+case actually lives.
+
+### Q48 — A goal's value can be stated, not only derived · answered 2026-08-30
+
+Asked for: an initial value on a goal, and a way to restate its current value
+— a trade does better than expected and the pot is suddenly ahead of anything
+the ledger saw.
+
+**Answer: `Goal.startAmount` (schema v10), signed, stated by hand.** Progress
+stays measured from the ledger (Q26, Q27 unchanged — the bucket, the start
+date, the month record all still count only rows); this is the one number a
+goal carries that is not, the same concession `Valuation` already made for
+holdings: some value moves without a transaction, and pretending otherwise
+makes the screen lie. Signed, because a trade can also do worse; `goalStatus`
+clamps the displayed total at zero. The month record ignores it entirely — a
+head start has no month, so ✓/✗ history keeps meaning "what that month put
+aside".
+
+**The form speaks in totals, the row stores a difference.** On a new goal the
+field is "Už našetřeno". On an edit it opens showing the goal's *current*
+total and overwriting it restates that total — what is stored is the typed
+figure minus the ledger's contributions, so the ledger remains the measure of
+everything it actually witnessed. Left blank, it changes nothing.
+
+### Multi-account, multi-currency — answered 2026-08-30, deliberately unbuilt
+
+The plan was agreed and three questions answered; the work itself is queued
+behind Q47/Q48 and recorded in `TODO.md` §4.5. The decisions, so they are not
+re-litigated:
+
+- **`/mesic` gets both views** — per-account and all accounts, chosen by a
+  switcher, per Petr.
+- **The wealth total stays per-currency.** No stated exchange rate, no
+  combined figure; one subtotal line per currency, per Petr.
+- **Transfers live on `/tape` and in Settings — never on the entry screen.**
+  Decided by the project: the keypad's contract is the five-second expense,
+  and a transfer is a rare deliberate act.
+- Standing principles from the plan: an amount is an integer in *its
+  account's* minor unit; amounts in different currencies are never summed; no
+  exchange rate is ever fetched — where currencies meet (a transfer's two
+  legs), the rate is implied by two typed amounts and never stored.

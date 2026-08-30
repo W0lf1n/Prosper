@@ -36,9 +36,7 @@ function txn(payee: string, amount: number, patch: Partial<Txn> = {}): Txn {
 		isCleared: false,
 		createdAt: '2026-08-10T10:00:00.000Z',
 		isOneOff: false,
-		owedAmount: null,
-		owedBy: null,
-		settledByTxnId: null,
+		shares: [],
 		scheduleId: null,
 		...SYNCED,
 		...patch

@@ -302,10 +302,19 @@ interface Txn extends Synced {
 	createdAt: string;
 
 	isOneOff: boolean; // DEVIATION — DECISIONS.md Q22
-	owedAmount: Minor | null; // DEVIATION — DECISIONS.md Q25
-	owedBy: string | null;
-	settledByTxnId: string | null;
+	shares: TxnShare[]; // who pays parts back — DECISIONS.md Q25, Q47
 	scheduleId: string | null; // DECISIONS.md Q40 — null for anything hand-typed
+}
+
+/** One person's slice of an expense that is coming back — Q25 made plural by
+    Q47. Each settles on its own. Pre-v9 rows carry the old single
+    `owedAmount` / `owedBy` / `settledByTxnId` trio instead; `sharesOf()` in
+    `domain/receivables.ts` reads both shapes and is the only reader. */
+interface TxnShare {
+	id: string; // unique within its row
+	who: string; // '' = unnamed
+	amount: Minor; // positive; together never more than the expense
+	settledByTxnId: string | null;
 }
 
 /** A payment that repeats: a declaration, not a detection. Q40. */
@@ -318,8 +327,8 @@ interface Schedule extends Synced {
 	startMonth: string; // YYYY-MM
 	endMonth: string | null; // null = open-ended
 	mode: ScheduleMode; // default 'confirm'
-	owedAmount: Minor | null; // the share that comes back — DECISIONS.md Q46
-	owedBy: string | null;
+	shares: ScheduleShare[]; // the slices that come back — Q46, Q47; TxnShare
+	//                          minus the settlement, copied onto every posted row
 	lastPostedMonth: string | null; // a watermark, not a derivation
 	isArchived: boolean;
 	sortOrder: number;
@@ -344,6 +353,7 @@ interface Goal extends Synced {
 	linkedAccountId: string | null;
 	categoryId: string | null; // DEVIATION — DECISIONS.md Q26
 	startDate: string; // DEVIATION — DECISIONS.md Q27
+	startAmount: Minor; // the stated head start, signed — DECISIONS.md Q48
 }
 
 interface MonthTarget extends Synced {
@@ -414,14 +424,18 @@ interface MetaEntry {
 - **Transfers are two rows**, mirrored amounts, mutually referencing
   `transferPairId`. Never one row. Never a magic "transfer" category.
 - **Every transaction belongs to an account.** No orphans.
-- **An outstanding share is not money.** `owedAmount` never touches the balance
-  or any total until it is settled and `settledByTxnId` points at the inflow
-  that carried it.
+- **An outstanding share is not money.** A share never touches the balance or
+  any total until it is settled and its `settledByTxnId` points at the inflow
+  that carried it — and each share settles alone (Q47): one friend paying up
+  says nothing about the other.
 - **An inflow filed under a spending bucket is a refund**, and nets against that
   bucket rather than counting as income.
-- **Goal progress is read off the ledger, never stored.** A contribution is an
-  ordinary outflow into the goal's bucket. There is no second set of books, and
-  that is the only reason the progress figure can be trusted.
+- **Goal progress is read off the ledger, never stored** — with one stated
+  exception. A contribution is an ordinary outflow into the goal's bucket;
+  there is no second set of books, and that is the only reason the progress
+  figure can be trusted. `startAmount` (Q48) is the exception, on the same
+  terms as a holding's valuation: a value that moved without a transaction,
+  typed by hand, added to — never replacing — what the ledger measures.
 - **A computed monthly figure is not a target.** `MonthTarget` exists so the
   number he agreed to is distinguishable from the number the app worked out. The
   screen says which one it is showing.

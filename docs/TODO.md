@@ -1,6 +1,6 @@
 # TODO — what is left
 
-**Revised:** 2026-08-28 (second pass)
+**Revised:** 2026-08-30
 **Audience:** Petr (decisions), Claude Code (implementation)
 
 > The only file in `docs/` that carries a backlog. Everything else describes the
@@ -13,16 +13,16 @@
 
 ---
 
-## State, 2026-08-28
+## State, 2026-08-30
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 375 pass, 20 files              |
-| `pnpm check`               | 0 errors, 0 warnings, 412 files |
+| `pnpm test`                | 402 pass, 20 files              |
+| `pnpm check`               | 0 errors, 0 warnings, 413 files |
 | `pnpm lint`                | passes                          |
-| `pnpm budget`              | 86.1 kB of 150 kB brotli        |
+| `pnpm budget`              | 87.4 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v8** · **5**                  |
+| Schema · backup format     | **v10** · **6**                 |
 
 P0, P1, P2 (sync) and P5 (reporting) ship, along with targeting, investments,
 recurring payments, no-spend days and the streak, reconciliation, and draining
@@ -50,6 +50,14 @@ writes itself** and the Potvrdit step is gone, leaving the override that was
 the real reason for it; **which goal is `na očích` is chosen** rather than
 guessed from the nearest deadline (schema **v8**); and a **sheet is pulled
 down to close**, with the `✕` gone from every one of them.
+
+**Two features landed on 2026-08-30, both asked for directly** (`DECISIONS.md`,
+the 2026-08-30 pass): a payment's reimbursement became a **list of shares** —
+Netflix split with two friends is two receivables, each settled on its own
+(Q47, schema v9, backup 6) — and a goal gained a **stated head start** that can
+be restated whenever a pot moves without a row (Q48, schema v10). The
+multi-account / multi-currency plan was agreed the same day and is §4.5 below,
+deliberately unbuilt.
 
 **The 2026-08-29 design audit landed as colours and hints only** (`DECISIONS.md`,
 the audit section): debt recoloured copper, the meter/ring denominator made
@@ -205,6 +213,38 @@ days + exact amount + fuzzy payee, review-before-apply. **Never auto-apply.**
   monthly. Reasoning in `RECURRING.md` §6. Two more joined them on 2026-08-28
   with the shared-payment work: a reimbursement that lands on a different day
   from the payment, and a share that varies month to month (`DECISIONS.md` Q46).
+
+### 4.5 Multi-account, multi-currency — planned 2026-08-30
+
+The vacation case: CZK at KB, EUR on Revolut, and a beer in € has nowhere true
+to go. The plan is agreed and the three open questions are answered
+(`DECISIONS.md`, the 2026-08-30 pass) — what remains is the build, in this
+order:
+
+1. **`money.ts` becomes currency-aware.** Formatter/glyph cache per ISO code,
+   Czech locale throughout; `formatMoney` takes an optional currency
+   defaulting to CZK, so nothing changes until a screen opts in. A short
+   2-decimal currency list (CZK, EUR, USD, GBP) — minor units keep meaning
+   minor units.
+2. **Schema: `Schedule.accountId`**, backfilled to the active account — a
+   schedule must say which account it posts from.
+3. **Settings: the account card becomes a list** — add (name, kind, currency,
+   opening balance/date), rename, archive. Currency immutable once the
+   account has rows.
+4. **A switcher** — writing `activeAccountId` meta; every route already
+   follows the layout's `accountId`. A chip in the entry header, so the
+   keypad's currency symbol always says which account is being typed into.
+5. **Transfers ("Převod")** — two rows linked by `transferPairId`, each typed
+   in its own currency, rate implied and never stored; excluded from every
+   spending/income figure. Lives on `/tape` and in Settings, never the entry
+   screen.
+6. **`/mesic` gets the all-accounts view** beside per-account, chosen by a
+   switcher; cross-currency figures shown per currency, never summed.
+   `/jmeni` totals go per-currency (Holding.currency exists already).
+
+Principles that are not up for renegotiation: integer minor units of the
+account's own currency; no cross-currency sums anywhere; no fetched exchange
+rate, ever.
 
 ---
 

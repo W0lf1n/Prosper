@@ -194,19 +194,142 @@ describe('v6 → v7 — the share of a schedule that comes back', () => {
 		old.close();
 
 		const upgraded = new FinanceDb(name);
-		const schedule = await upgraded.schedules.get('s1');
+		const schedule = (await upgraded.schedules.get('s1')) as unknown as {
+			owedAmount?: number | null;
+			owedBy?: string | null;
+		};
 
 		// Absent is not null: `row.owedAmount === null` has to answer true for
-		// every schedule that existed before the field did.
+		// every schedule that existed before the field did. The fields left the
+		// model at v9, but the v7 backfill still has to have happened — v9 reads
+		// them to build the shares array.
 		expect(schedule).toHaveProperty('owedAmount');
-		expect(schedule?.owedAmount).toBeNull();
-		expect(schedule?.owedBy).toBeNull();
+		expect(schedule.owedAmount).toBeNull();
+		expect(schedule.owedBy).toBeNull();
 		// And the payment itself is untouched.
 		expect(schedule).toMatchObject({
 			amount: -32_000_00,
 			mode: 'auto',
 			lastPostedMonth: '2026-07'
 		});
+		upgraded.close();
+	});
+});
+
+describe('v8 → v9 — one share becomes a list of them', () => {
+	it('wraps an existing share into a one-element array, settlement and all', async () => {
+		const name = `mig-shares-${Date.now()}`;
+		const old = await openAtVersion(name, 8);
+		await old.table('txns').put({
+			id: 't-shared',
+			accountId: 'acc',
+			date: '2026-08-15',
+			amount: -250000,
+			categoryId: 'cat',
+			payee: 'plyn',
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			createdAt: '2026-08-15T10:00:00.000Z',
+			isOneOff: false,
+			owedAmount: 125000,
+			owedBy: 'Zůza',
+			settledByTxnId: 'txn-repayment',
+			scheduleId: null,
+			...SYNCED
+		});
+		await old.table('schedules').put({
+			id: 's-shared',
+			payee: 'Hypotéka',
+			categoryId: 'cat-home',
+			amount: -32_000_00,
+			dayOfMonth: 15,
+			startMonth: '2026-01',
+			endMonth: null,
+			mode: 'auto',
+			owedAmount: 16_000_00,
+			owedBy: 'Jana',
+			lastPostedMonth: '2026-07',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const txn = await upgraded.txns.get('t-shared');
+		const schedule = await upgraded.schedules.get('s-shared');
+
+		// The same id `sharesOf()` synthesises at read time, so the share keeps
+		// its identity whichever path a legacy row took into this build.
+		expect(txn?.shares).toEqual([
+			{ id: 'legacy', who: 'Zůza', amount: 125000, settledByTxnId: 'txn-repayment' }
+		]);
+		expect(schedule?.shares).toEqual([{ id: 'legacy', who: 'Jana', amount: 16_000_00 }]);
+		upgraded.close();
+	});
+
+	it('backfills an empty array rather than leaving the field absent', async () => {
+		const name = `mig-shares-empty-${Date.now()}`;
+		const old = await openAtVersion(name, 8);
+		await old.table('txns').put({
+			id: 't-plain',
+			accountId: 'acc',
+			date: '2026-08-15',
+			amount: -24900,
+			categoryId: 'cat',
+			payee: 'Oběd',
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			createdAt: '2026-08-15T10:00:00.000Z',
+			isOneOff: false,
+			owedAmount: null,
+			owedBy: null,
+			settledByTxnId: null,
+			scheduleId: null,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const txn = await upgraded.txns.get('t-plain');
+
+		// An absent field is not an empty list — every reader would need a guard
+		// for ever, which is the v5 lesson all over again.
+		expect(txn).toHaveProperty('shares');
+		expect(txn?.shares).toEqual([]);
+		upgraded.close();
+	});
+});
+
+describe('v9 → v10 — Goal.startAmount', () => {
+	it('backfills zero on a goal written before the field existed', async () => {
+		const name = `mig-start-${Date.now()}`;
+		const old = await openAtVersion(name, 9);
+		await old.table('goals').put({
+			id: 'g-old',
+			name: 'Rezerva na půl roku',
+			why: 'Abych mohl dát výpověď, aniž bych panikařil.',
+			targetAmount: 180_000_00,
+			targetDate: '2027-06-30',
+			linkedAccountId: null,
+			categoryId: 'cat-sporeni',
+			startDate: '2026-02-01',
+			isPinned: false,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const goal = await upgraded.goals.get('g-old');
+
+		// Absent would be NaN in every sum, and zero is also the honest value —
+		// a goal written before the field existed never claimed a head start.
+		expect(goal).toHaveProperty('startAmount');
+		expect(goal?.startAmount).toBe(0);
 		upgraded.close();
 	});
 });

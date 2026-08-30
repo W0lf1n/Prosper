@@ -10,9 +10,15 @@
 import { monthKey, nowIso, startOfMonth, today } from '$lib/domain/datetime';
 import { goalStatus, validateGoal, validateGoalShape } from '$lib/domain/goals';
 import { DEFAULT_REMINDER_DAYS } from '$lib/domain/holdings';
-import { dueSchedules, partitionByMode, type DueItem } from '$lib/domain/recurring';
+import {
+	dueSchedules,
+	partitionByMode,
+	sharesForPosting,
+	type DueItem
+} from '$lib/domain/recurring';
 import { newDeviceId, uuidv7 } from '$lib/domain/ids';
 import { ADJUSTMENT_PAYEE, reconcileDelta } from '$lib/domain/reconcile';
+import { MAX_SHARES, isOpenShare, sharesOf } from '$lib/domain/receivables';
 import { ZERO, abs, neg, type Minor } from '$lib/domain/money';
 import type {
 	Account,
@@ -23,8 +29,10 @@ import type {
 	MonthTarget,
 	Reconciliation,
 	Schedule,
+	ScheduleShare,
 	SyncedEntity,
 	Txn,
+	TxnShare,
 	TxnSource,
 	Valuation
 } from '$lib/domain/types';
@@ -220,6 +228,27 @@ export async function ensureSeeded(): Promise<SeedResult> {
 
 // ── transactions ────────────────────────────────────────────────────────────
 
+/** A share as a form hands it over — before an id, sign or trim. */
+export interface NewShare {
+	who?: string | null;
+	amount: Minor;
+}
+
+/** Positive magnitudes, trimmed names, zeroes dropped, fresh ids, and at most
+    `MAX_SHARES` of them. Clamped here rather than at the form, because the
+    sheets are not the only things that will ever call this. */
+function normalizeShares(shares: readonly NewShare[] | undefined): TxnShare[] {
+	return (shares ?? [])
+		.filter((share) => share.amount !== 0)
+		.slice(0, MAX_SHARES)
+		.map((share) => ({
+			id: uuidv7(),
+			who: share.who?.trim() ?? '',
+			amount: abs(share.amount),
+			settledByTxnId: null
+		}));
+}
+
 export interface NewTxn {
 	accountId: string;
 	amount: Minor;
@@ -229,8 +258,8 @@ export interface NewTxn {
 	note?: string | null;
 	source?: TxnSource;
 	isOneOff?: boolean;
-	owedAmount?: Minor | null;
-	owedBy?: string | null;
+	/** Who pays parts of this back. Empty for most rows. */
+	shares?: NewShare[];
 	/** Set only by the recurring catch-up. Everything typed by hand leaves it null. */
 	scheduleId?: string | null;
 }
@@ -249,9 +278,7 @@ export async function createTxn(input: NewTxn): Promise<Txn> {
 		source: input.source ?? 'manual',
 		isCleared: false,
 		isOneOff: input.isOneOff ?? false,
-		owedAmount: input.owedAmount ?? null,
-		owedBy: input.owedBy?.trim() || null,
-		settledByTxnId: null,
+		shares: normalizeShares(input.shares),
 		scheduleId: input.scheduleId ?? null,
 		createdAt: updatedAt,
 		updatedAt,
@@ -267,15 +294,7 @@ export async function createTxn(input: NewTxn): Promise<Txn> {
 export type TxnPatch = Partial<
 	Pick<
 		Txn,
-		| 'amount'
-		| 'date'
-		| 'categoryId'
-		| 'payee'
-		| 'note'
-		| 'isCleared'
-		| 'isOneOff'
-		| 'owedAmount'
-		| 'owedBy'
+		'amount' | 'date' | 'categoryId' | 'payee' | 'note' | 'isCleared' | 'isOneOff' | 'shares'
 	>
 >;
 
@@ -284,7 +303,20 @@ export async function updateTxn(id: string, patch: TxnPatch): Promise<Txn | unde
 	const existing = await database.txns.get(id);
 	if (!existing) return undefined;
 
-	const next: Txn = { ...existing, ...patch, ...(await stamp()) };
+	const next: Txn = {
+		...existing,
+		...patch,
+		/* Same normalisation as `createTxn`, but in place — ids and settlements
+		   survive an edit, a share emptied to zero is a share taken off the row. */
+		...(patch.shares === undefined
+			? {}
+			: {
+					shares: patch.shares
+						.filter((share) => share.amount !== 0)
+						.map((share) => ({ ...share, who: share.who.trim(), amount: abs(share.amount) }))
+				}),
+		...(await stamp())
+	};
 	await database.txns.put(next);
 	await enqueue('txn', next.id, next);
 	return next;
@@ -321,41 +353,64 @@ export async function restoreTxn(id: string): Promise<void> {
 // ── receivables ─────────────────────────────────────────────────────────────
 
 /**
- * Somebody paid you back.
+ * Somebody paid you back — one share of one expense (Q47).
  *
- * Creates the inflow that carries the money and links it to the expense it came
- * from. Until this runs, the outstanding amount is not in the balance and not in
- * any total — you paid the whole thing, because you did.
+ * Creates the inflow that carries the money and links it to the share it
+ * settles. Until this runs, the outstanding amount is not in the balance and
+ * not in any total — you paid the whole thing, because you did. The row's
+ * other shares are untouched: Friend1 paying up says nothing about Friend2.
+ *
+ * Writing the row back through `sharesOf` is deliberate — it is what upgrades
+ * a legacy single-share row to the array shape the first time it is settled.
  */
-export async function settleReceivable(txnId: string, date?: string): Promise<Txn | undefined> {
+export async function settleReceivable(
+	txnId: string,
+	shareId: string,
+	date?: string
+): Promise<Txn | undefined> {
 	const database = db();
 	const original = await database.txns.get(txnId);
 	if (!original || original.isDeleted) return undefined;
-	if (!original.owedAmount || original.settledByTxnId) return undefined;
+
+	const shares = sharesOf(original);
+	const share = shares.find((s) => s.id === shareId);
+	if (!share || !isOpenShare(share)) return undefined;
 
 	const repayment = await createTxn({
 		accountId: original.accountId,
-		amount: original.owedAmount,
+		amount: share.amount,
 		date: date ?? today(),
 		categoryId: original.categoryId,
-		payee: original.owedBy ? `vrácení — ${original.owedBy}` : 'vrácení',
+		payee: share.who.trim() ? `vrácení — ${share.who.trim()}` : 'vrácení',
 		note: `k výdaji „${original.payee || 'bez popisu'}“`
 	});
 
-	const next: Txn = { ...original, settledByTxnId: repayment.id, ...(await stamp()) };
+	const next: Txn = {
+		...original,
+		shares: shares.map((s) => (s.id === shareId ? { ...s, settledByTxnId: repayment.id } : s)),
+		...(await stamp())
+	};
 	await database.txns.put(next);
 	await enqueue('txn', next.id, next);
 	return repayment;
 }
 
-/** Undo of the above: removes the inflow and reopens the receivable. */
-export async function unsettleReceivable(txnId: string): Promise<void> {
+/** Undo of the above: removes the inflow and reopens that one share. */
+export async function unsettleReceivable(txnId: string, shareId: string): Promise<void> {
 	const database = db();
 	const original = await database.txns.get(txnId);
-	if (!original?.settledByTxnId) return;
+	if (!original) return;
 
-	await deleteTxn(original.settledByTxnId);
-	const next: Txn = { ...original, settledByTxnId: null, ...(await stamp()) };
+	const shares = sharesOf(original);
+	const share = shares.find((s) => s.id === shareId);
+	if (!share?.settledByTxnId) return;
+
+	await deleteTxn(share.settledByTxnId);
+	const next: Txn = {
+		...original,
+		shares: shares.map((s) => (s.id === shareId ? { ...s, settledByTxnId: null } : s)),
+		...(await stamp())
+	};
 	await database.txns.put(next);
 	await enqueue('txn', next.id, next);
 }
@@ -449,9 +504,17 @@ export async function archiveCategory(id: string): Promise<void> {
 
 // ── recurring payments ───────────────────────────────────────────
 
+/** The schedule flavour of `normalizeShares` — no settlement to carry. */
+function normalizeScheduleShares(shares: readonly NewShare[] | undefined): ScheduleShare[] {
+	return (shares ?? [])
+		.filter((share) => share.amount !== 0)
+		.slice(0, MAX_SHARES)
+		.map((share) => ({ id: uuidv7(), who: share.who?.trim() ?? '', amount: abs(share.amount) }));
+}
+
 export async function createSchedule(
 	input: Pick<Schedule, 'payee' | 'categoryId' | 'amount' | 'dayOfMonth'> &
-		Partial<Pick<Schedule, 'startMonth' | 'endMonth' | 'mode' | 'owedAmount' | 'owedBy'>>
+		Partial<Pick<Schedule, 'startMonth' | 'endMonth' | 'mode'>> & { shares?: NewShare[] }
 ): Promise<Schedule> {
 	const database = db();
 	const { updatedAt, deviceId } = await stamp();
@@ -464,11 +527,10 @@ export async function createSchedule(
 		startMonth: input.startMonth ?? monthKey(today()),
 		endMonth: input.endMonth ?? null,
 		mode: input.mode ?? 'confirm',
-		/* The share that comes back, if the payment is shared. Clamped to a
-		   positive magnitude here rather than at the form, because the sheet is
-		   not the only thing that will ever call this. */
-		owedAmount: input.owedAmount ? abs(input.owedAmount) : null,
-		owedBy: input.owedBy?.trim() || null,
+		/* The shares that come back, if the payment is shared. Normalised here
+		   rather than at the form, because the sheet is not the only thing that
+		   will ever call this. */
+		shares: normalizeScheduleShares(input.shares),
 		/**
 		 * Written as settled for the month before it starts, so a schedule added
 		 * on the 20th for a payment that went out on the 5th does not immediately
@@ -499,27 +561,25 @@ export async function updateSchedule(
 			| 'startMonth'
 			| 'endMonth'
 			| 'mode'
-			| 'owedAmount'
-			| 'owedBy'
 			| 'lastPostedMonth'
 			| 'sortOrder'
 			| 'isArchived'
 		>
-	>
+	> & { shares?: NewShare[] }
 ): Promise<void> {
 	const database = db();
 	const existing = await database.schedules.get(id);
 	if (!existing) return;
 
+	/* Shares are pulled out of the spread so the row never briefly holds the
+	   form's raw shape: same normalisation as `createSchedule` — positive
+	   magnitudes, and a share of zero is a share taken off the list. Fresh ids
+	   every save; schedule shares carry no settlement, so nothing points at them. */
+	const { shares, ...rest } = patch;
 	const next: Schedule = {
 		...existing,
-		...patch,
-		/* Same normalisation as `createSchedule`: a positive magnitude, and zero
-		   means nothing comes back rather than "a share of nothing". */
-		...(patch.owedAmount === undefined
-			? {}
-			: { owedAmount: patch.owedAmount ? abs(patch.owedAmount) : null }),
-		...(patch.owedBy === undefined ? {} : { owedBy: patch.owedBy?.trim() || null }),
+		...rest,
+		...(shares === undefined ? {} : { shares: normalizeScheduleShares(shares) }),
 		...(await stamp())
 	};
 	await database.schedules.put(next);
@@ -557,17 +617,14 @@ export async function confirmScheduled(
 		source: 'recurring',
 		scheduleId: item.schedule.id,
 		/**
-		 * The declared share rides onto the row, so a shared mortgage produces an
-		 * open receivable every month without anybody retyping who owes what
-		 * (Q46). Only on an outflow, and never more than the row itself — an
-		 * overridden amount smaller than the share would otherwise book back more
-		 * than went out.
+		 * The declared shares ride onto the row, so a shared mortgage produces
+		 * its open receivables every month without anybody retyping who owes
+		 * what (Q46, Q47). `sharesForPosting` owns the two rules: only an
+		 * outflow, and together never more than the row itself — an overridden
+		 * amount smaller than the shares would otherwise book back more than
+		 * went out.
 		 */
-		owedAmount:
-			amount < 0 && item.schedule.owedAmount
-				? (Math.min(abs(item.schedule.owedAmount), abs(amount)) as Minor)
-				: null,
-		owedBy: amount < 0 ? item.schedule.owedBy : null
+		shares: sharesForPosting(item.schedule, amount)
 	});
 	await settle(item.schedule, item.month);
 	return txn;
@@ -819,7 +876,7 @@ export async function deleteReconciliation(id: string): Promise<void> {
 
 export async function createGoal(
 	input: Pick<Goal, 'name' | 'why' | 'targetAmount' | 'targetDate'> &
-		Partial<Pick<Goal, 'linkedAccountId' | 'categoryId' | 'startDate'>>
+		Partial<Pick<Goal, 'linkedAccountId' | 'categoryId' | 'startDate' | 'startAmount'>>
 ): Promise<Goal> {
 	// The refusal is the mechanism, not a validation nicety. It lives in the
 	// domain layer so the form and the database agree on what a goal is.
@@ -845,6 +902,9 @@ export async function createGoal(
 		// A goal starts counting the month it was written, not from whatever
 		// happened to be in the savings bucket beforehand.
 		startDate: input.startDate ?? startOfMonth(today()),
+		// ...unless a head start is claimed on purpose — Q48. Signed, unlike the
+		// target: a pot restated later can also have shrunk.
+		startAmount: input.startAmount ?? ZERO,
 		isPinned: false,
 		updatedAt,
 		deviceId,
@@ -856,7 +916,10 @@ export async function createGoal(
 }
 
 export type GoalPatch = Partial<
-	Pick<Goal, 'name' | 'why' | 'targetAmount' | 'targetDate' | 'categoryId' | 'startDate'>
+	Pick<
+		Goal,
+		'name' | 'why' | 'targetAmount' | 'targetDate' | 'categoryId' | 'startDate' | 'startAmount'
+	>
 >;
 
 /**
@@ -1348,12 +1411,14 @@ async function tombstone<T extends Versioned>(
 /**
  * The backup format's own version, independent of the Dexie schema version.
  *
- * It moves whenever a table is added to the file, because that is exactly the
- * change an older build cannot represent:
+ * It moves whenever the file changes in a way an older build cannot represent —
+ * a table it does not carry, or a row shape it would silently flatten:
  *   1 → the original six tables · 2 → monthTargets · 3 → holdings, valuations
  *   4 → schedules · 5 → reconciliations
+ *   6 → `shares` on txns and schedules (Q47) — an older build would read only
+ *       the legacy single-share fields and lose every second payer on import
  */
-export const BACKUP_VERSION = 5;
+export const BACKUP_VERSION = 6;
 
 export interface Backup {
 	format: 'finance-backup';

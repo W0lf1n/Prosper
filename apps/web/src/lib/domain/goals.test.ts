@@ -55,9 +55,7 @@ function txn(amount: number, date: string, categoryId: string | null = SAVE): Tx
 		source: 'manual',
 		isCleared: false,
 		isOneOff: false,
-		owedAmount: null,
-		owedBy: null,
-		settledByTxnId: null,
+		shares: [],
 		scheduleId: null,
 		createdAt: `${date}T10:00:00.000Z`,
 		updatedAt: `${date}T10:00:00.000Z`,
@@ -76,6 +74,7 @@ function goal(extra: Partial<Goal> = {}): Goal {
 		linkedAccountId: null,
 		categoryId: SAVE,
 		startDate: '2026-08-01',
+		startAmount: minor(0),
 		isPinned: false,
 		updatedAt: '2026-08-01T00:00:00.000Z',
 		deviceId: 'dev-1',
@@ -165,6 +164,71 @@ describe('what counts as putting money aside', () => {
 	it('can be restricted to one month', () => {
 		const rows = [txn(-2_000_00, '2026-08-05'), txn(-2_000_00, '2026-09-05')];
 		expect(contributions(goal(), rows, categories, { month: '2026-09' })).toBe(2_000_00);
+	});
+});
+
+describe('the stated head start (Q48)', () => {
+	it('counts into the total, the percent and what is left', () => {
+		const status = goalStatus({
+			goal: goal({ startAmount: minor(10_000_00) }),
+			txns: [txn(-2_000_00, '2026-08-05')],
+			categories,
+			month: '2026-08',
+			today: '2026-08-24'
+		});
+		expect(status.saved).toBe(12_000_00);
+		expect(status.remaining).toBe(18_000_00);
+		expect(status.percent).toBe(40);
+		// The month's own record stays the ledger's: the head start has no month.
+		expect(status.monthSaved).toBe(2_000_00);
+	});
+
+	it('can finish a goal on its own', () => {
+		const status = goalStatus({
+			goal: goal({ startAmount: minor(30_000_00) }),
+			txns: [],
+			categories,
+			month: '2026-08',
+			today: '2026-08-24'
+		});
+		expect(status.isComplete).toBe(true);
+		expect(status.suggestedMonthly).toBe(0);
+	});
+
+	it('is signed — a pot restated downwards shrinks the total', () => {
+		const status = goalStatus({
+			goal: goal({ startAmount: minor(-500_00) }),
+			txns: [txn(-2_000_00, '2026-08-05')],
+			categories,
+			month: '2026-08',
+			today: '2026-08-24'
+		});
+		expect(status.saved).toBe(1_500_00);
+	});
+
+	it('never drags the total below zero', () => {
+		const status = goalStatus({
+			goal: goal({ startAmount: minor(-9_000_00) }),
+			txns: [txn(-2_000_00, '2026-08-05')],
+			categories,
+			month: '2026-08',
+			today: '2026-08-24'
+		});
+		expect(status.saved).toBe(0);
+		expect(status.remaining).toBe(30_000_00);
+	});
+
+	it('reads a pre-v10 goal, where the field is absent, as zero', () => {
+		const legacy: Record<string, unknown> = { ...goal() };
+		delete legacy.startAmount;
+		const status = goalStatus({
+			goal: legacy as unknown as Goal,
+			txns: [txn(-2_000_00, '2026-08-05')],
+			categories,
+			month: '2026-08',
+			today: '2026-08-24'
+		});
+		expect(status.saved).toBe(2_000_00);
 	});
 });
 

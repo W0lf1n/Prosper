@@ -11,12 +11,13 @@
 		updateCategory,
 		type Backup
 	} from '$lib/db/repo';
-	import { ZERO, formatMoney, parseAmount } from '$lib/domain/money';
+	import { ZERO, formatMoney, parseAmount, type Minor } from '$lib/domain/money';
 	import { formatDateTime, formatShortDate, today } from '$lib/domain/datetime';
 	import { summariseMonth } from '$lib/domain/checks';
 	import { RECORDS, counted } from '$lib/domain/czech';
 	import { KIND_LABEL } from '$lib/domain/holdings';
 	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
+	import { sharesOf } from '$lib/domain/receivables';
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
 	import type { Category, SpendType } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
@@ -183,17 +184,30 @@
 			],
 			rows: [...live]
 				.sort((a, b) => a.date.localeCompare(b.date))
-				.map((t) => [
-					{ date: t.date },
-					nameOf(t.categoryId),
-					t.payee,
-					{ money: t.amount },
-					cats.find((c) => c.id === t.categoryId)?.spendType ?? '',
-					t.isOneOff ? 'ano' : '',
-					t.owedAmount ? { money: t.owedAmount } : null,
-					t.owedBy ?? '',
-					t.settledByTxnId ? 'ano' : ''
-				])
+				.map((t) => {
+					// All shares together (Q47): the total, the names, and whether
+					// everything — or only part of it — has come back.
+					const shares = sharesOf(t);
+					const owedTotal = shares.reduce((sum, s) => sum + s.amount, 0);
+					const settled = shares.filter((s) => s.settledByTxnId !== null).length;
+					return [
+						{ date: t.date },
+						nameOf(t.categoryId),
+						t.payee,
+						{ money: t.amount },
+						cats.find((c) => c.id === t.categoryId)?.spendType ?? '',
+						t.isOneOff ? 'ano' : '',
+						owedTotal > 0 ? { money: owedTotal as Minor } : null,
+						shares.map((s) => s.who.trim() || 'někdo').join(', '),
+						shares.length === 0
+							? ''
+							: settled === shares.length
+								? 'ano'
+								: settled > 0
+									? 'zčásti'
+									: ''
+					];
+				})
 		};
 
 		const months = monthsCovered(live);

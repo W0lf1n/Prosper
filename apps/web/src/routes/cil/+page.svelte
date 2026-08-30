@@ -33,6 +33,7 @@
 	import { ZERO, formatMoney, parseAmount, type Minor } from '$lib/domain/money';
 	import { DAYS, plural } from '$lib/domain/czech';
 	import {
+		contributions,
 		defaultGoalCategory,
 		goalCategoryIds,
 		goalProblemText,
@@ -132,11 +133,30 @@
 	let fAmount = $state('');
 	let fDate = $state('');
 	let fCategoryId = $state<string | null>(null);
+	/**
+	 * "Našetřeno" — the stated side of progress (Q48).
+	 *
+	 * On a new goal it is the head start: what already sits in the pot before
+	 * the first row is typed. On an edit it opens showing the goal's *current*
+	 * total, and overwriting it restates that total — the trade that did better
+	 * than expected is typed here as the number it actually reached, and the
+	 * difference against the ledger is what gets stored.
+	 */
+	let fSaved = $state('');
 
 	const fParsedAmount = $derived.by(() => {
 		const parsed = parseAmount(fAmount);
 		return parsed.ok ? parsed.value : ZERO;
 	});
+
+	/** Null when the field is blank; the parsed total otherwise. */
+	const fParsedSaved = $derived.by(() => {
+		if (!fSaved.trim()) return null;
+		const parsed = parseAmount(fSaved);
+		return parsed.ok && parsed.value >= 0 ? parsed.value : null;
+	});
+
+	const fSavedInvalid = $derived(fSaved.trim() !== '' && fParsedSaved === null);
 
 	const problems = $derived(
 		validateGoal(
@@ -153,9 +173,11 @@
 	 */
 	const saveLabel = $derived(
 		problems.length === 0
-			? editingId
-				? 'Uložit změny'
-				: 'Napsat cíl'
+			? fSavedInvalid
+				? 'Oprav našetřeno'
+				: editingId
+					? 'Uložit změny'
+					: 'Napsat cíl'
 			: problems.includes('name')
 				? 'Pojmenuj cíl'
 				: problems.includes('why')
@@ -172,6 +194,7 @@
 		fAmount = '';
 		fDate = '';
 		fCategoryId = defaultCategory?.id ?? null;
+		fSaved = '';
 		formOpen = true;
 	}
 
@@ -182,18 +205,36 @@
 		fAmount = formatMoney(goal.targetAmount, { currency: false });
 		fDate = goal.targetDate;
 		fCategoryId = goal.categoryId;
+		const status = statuses.find((s) => s.goal.id === goal.id);
+		fSaved = status ? formatMoney(status.saved, { currency: false }) : '';
 		formOpen = true;
 	}
 
 	async function submitForm() {
-		if (problems.length > 0) return;
+		if (problems.length > 0 || fSavedInvalid) return;
 		if (editingId) {
+			const goal = (($goals ?? []) as Goal[]).find((g) => g.id === editingId);
 			await updateGoal(editingId, {
 				name: fName,
 				why: fWhy,
 				targetAmount: fParsedAmount,
 				targetDate: fDate,
-				categoryId: fCategoryId
+				categoryId: fCategoryId,
+				/* The field carries the *total*; what is stored is the difference
+				   against the ledger, so the ledger stays the measure of everything
+				   it actually saw (Q48). Measured against the bucket being saved,
+				   in case this same edit moved the goal to another one. Left blank
+				   = left alone. */
+				...(fParsedSaved !== null && goal
+					? {
+							startAmount: (fParsedSaved -
+								contributions(
+									{ ...goal, categoryId: fCategoryId },
+									$txns ?? [],
+									liveCategories
+								)) as Minor
+						}
+					: {})
 			});
 			toast.show('Cíl upraven');
 		} else {
@@ -203,7 +244,8 @@
 				targetAmount: fParsedAmount,
 				targetDate: fDate,
 				categoryId: fCategoryId,
-				startDate: startOfMonth(today())
+				startDate: startOfMonth(today()),
+				startAmount: (fParsedSaved ?? ZERO) as Minor
 			});
 			selectedId = goal.id;
 			// The layout writes this month's number on launch; a goal written
@@ -558,6 +600,29 @@
 		<label class="field">
 			<span class="field__label">Do kdy</span>
 			<input class="field__input field__input--mono" type="date" bind:value={fDate} />
+		</label>
+
+		<!--
+		  The stated side of progress (Q48). New goal: what already sits in the
+		  pot. Edit: the current total, overwritable — the honest way to say "the
+		  trade did better than the ledger knows".
+		-->
+		<label class="field">
+			<span class="field__label">
+				{editingId ? 'Našetřeno teď' : 'Už našetřeno'}
+				<span class="optional">nepovinné</span>
+			</span>
+			<input
+				class="field__input field__input--mono"
+				bind:value={fSaved}
+				inputmode="decimal"
+				placeholder="0"
+			/>
+			<span class="field__hint">
+				{editingId
+					? 'Přepiš, když se hodnota pohnula mimo záznamy — třeba se obchod povedl líp. Záznamy v appce se počítají dál.'
+					: 'Co už máš stranou, než začneš zapisovat. Další odkládání se počítá ze záznamů.'}
+			</span>
 		</label>
 
 		<label class="field">
@@ -1045,5 +1110,13 @@
 		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
 		color: var(--flag);
+	}
+
+	/* Same recipe as the other sheets' "nepovinné". */
+	.optional {
+		font-weight: 400;
+		text-transform: none;
+		letter-spacing: 0;
+		color: var(--ink-3);
 	}
 </style>

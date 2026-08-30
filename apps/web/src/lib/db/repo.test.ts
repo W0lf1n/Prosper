@@ -16,8 +16,10 @@ import type { Reconciliation } from '$lib/domain/types';
 import {
 	BACKUP_VERSION,
 	catchUpGoalTargets,
+	confirmScheduled,
 	createGoal,
 	createHolding,
+	createSchedule,
 	createTxn,
 	deleteTxn,
 	ensureSeeded,
@@ -28,6 +30,8 @@ import {
 	recordValuation,
 	resetLedger,
 	setCollapsedMonths,
+	settleReceivable,
+	unsettleReceivable,
 	updateAccount,
 	type Backup
 } from './repo';
@@ -273,6 +277,156 @@ describe('resetLedger', () => {
 		// exactly what a fresh import of an older file must *not* do.
 		await importBackup(backup);
 		expect((await db.txns.toArray()).every((t) => t.isDeleted)).toBe(true);
+	});
+});
+
+/**
+ * Settling a share writes a second row and links the two, which is exactly the
+ * kind of two-table fact the pure layer cannot assert — so it is tested here,
+ * against real (fake) persistence, like the backup is.
+ */
+describe('shares — one expense, several payers (Q47)', () => {
+	it('settles one share without touching its neighbour', async () => {
+		const netflix = await createTxn({
+			accountId,
+			amount: -39900 as Minor,
+			payee: 'Netflix',
+			shares: [
+				{ who: 'Kerhy', amount: 13300 as Minor },
+				{ who: 'Zůza', amount: 13300 as Minor }
+			]
+		});
+		const kerhy = netflix.shares[0]!;
+
+		const repayment = await settleReceivable(netflix.id, kerhy.id);
+
+		expect(repayment?.amount).toBe(13300);
+		expect(repayment?.payee).toBe('vrácení — Kerhy');
+
+		const after = await db.txns.get(netflix.id);
+		expect(after?.shares[0]?.settledByTxnId).toBe(repayment!.id);
+		expect(after?.shares[1]?.settledByTxnId).toBeNull();
+	});
+
+	it('keeps at most ten payers on one expense', async () => {
+		const crowd = Array.from({ length: 12 }, (_, i) => ({
+			who: `osoba ${i + 1}`,
+			amount: 100 as Minor
+		}));
+		const txn = await createTxn({
+			accountId,
+			amount: -39900 as Minor,
+			payee: 'Netflix',
+			shares: crowd
+		});
+		expect(txn.shares).toHaveLength(10);
+		expect(txn.shares[9]?.who).toBe('osoba 10');
+
+		const schedule = await createSchedule({
+			payee: 'Netflix',
+			categoryId: 'cat',
+			amount: -39900 as Minor,
+			dayOfMonth: 5,
+			shares: crowd
+		});
+		expect(schedule.shares).toHaveLength(10);
+	});
+
+	it('refuses to settle the same share twice', async () => {
+		const txn = await createTxn({
+			accountId,
+			amount: -39900 as Minor,
+			payee: 'Netflix',
+			shares: [{ who: 'Kerhy', amount: 13300 as Minor }]
+		});
+		const share = txn.shares[0]!;
+
+		expect(await settleReceivable(txn.id, share.id)).toBeDefined();
+		expect(await settleReceivable(txn.id, share.id)).toBeUndefined();
+	});
+
+	it('unsettle removes the inflow and reopens only that share', async () => {
+		const txn = await createTxn({
+			accountId,
+			amount: -39900 as Minor,
+			payee: 'Netflix',
+			shares: [
+				{ who: 'Kerhy', amount: 13300 as Minor },
+				{ who: 'Zůza', amount: 13300 as Minor }
+			]
+		});
+		const [kerhy, zuza] = txn.shares;
+		const repayKerhy = await settleReceivable(txn.id, kerhy!.id);
+		const repayZuza = await settleReceivable(txn.id, zuza!.id);
+
+		await unsettleReceivable(txn.id, kerhy!.id);
+
+		const after = await db.txns.get(txn.id);
+		expect(after?.shares[0]?.settledByTxnId).toBeNull();
+		expect(after?.shares[1]?.settledByTxnId).toBe(repayZuza!.id);
+		expect((await db.txns.get(repayKerhy!.id))?.isDeleted).toBe(true);
+		expect((await db.txns.get(repayZuza!.id))?.isDeleted).toBe(false);
+	});
+
+	it('confirmScheduled copies the declared shares onto the posted row, with fresh ids', async () => {
+		const schedule = await createSchedule({
+			payee: 'Netflix',
+			categoryId: 'cat',
+			amount: -39900 as Minor,
+			dayOfMonth: 5,
+			startMonth: '2026-08',
+			shares: [
+				{ who: 'Kerhy', amount: 13300 as Minor },
+				{ who: 'Zůza', amount: 13300 as Minor }
+			]
+		});
+
+		const posted = await confirmScheduled(
+			{ schedule, month: '2026-08', date: '2026-08-05' },
+			{ accountId }
+		);
+
+		expect(posted.shares.map((s) => [s.who, s.amount, s.settledByTxnId])).toEqual([
+			['Kerhy', 13300, null],
+			['Zůza', 13300, null]
+		]);
+		// Fresh ids: settling August's Kerhy must not implicate September's.
+		expect(posted.shares.map((s) => s.id)).not.toContain(schedule.shares[0]!.id);
+	});
+
+	it('a settled legacy row is upgraded to the array shape on the way through', async () => {
+		// A row as an old build left it — the trio, no array. It can arrive via
+		// an old backup or an old device's push long after the migration ran.
+		const legacy = {
+			id: 'legacy-txn',
+			accountId,
+			date: '2026-08-15',
+			amount: -250000 as Minor,
+			categoryId: null,
+			payee: 'plyn',
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			isOneOff: false,
+			owedAmount: 125000,
+			owedBy: 'Zůza',
+			settledByTxnId: null,
+			scheduleId: null,
+			createdAt: '2026-08-15T10:00:00.000Z',
+			updatedAt: '2026-08-15T10:00:00.000Z',
+			deviceId: 'old-device',
+			isDeleted: false
+		};
+		await db.txns.put(legacy as never);
+
+		const repayment = await settleReceivable('legacy-txn', 'legacy');
+
+		expect(repayment?.amount).toBe(125000);
+		const after = await db.txns.get('legacy-txn');
+		expect(after?.shares).toEqual([
+			{ id: 'legacy', who: 'Zůza', amount: 125000, settledByTxnId: repayment!.id }
+		]);
 	});
 });
 

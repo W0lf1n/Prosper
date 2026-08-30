@@ -14,14 +14,16 @@
 	 * that *arrives* every month is declared: pick an income bucket, and the
 	 * same form describes it (Q46).
 	 *
-	 * The second half of Q46 is the share that comes back. It is asked for only
-	 * on an outgoing payment, it is optional, and it changes nothing about the
-	 * amount — 32 000 Kč still leaves the account on the 15th. What it changes
-	 * is the year: the figure under the fields switches to what the payment
-	 * actually costs, which for a half-shared mortgage is a different decision
-	 * from the one the gross would lead to.
+	 * The second half of Q46 is the share that comes back — and since Q47 it is
+	 * a list, because Netflix split with two friends is one payment and two
+	 * people. It is asked for only on an outgoing payment, it is optional, and
+	 * it changes nothing about the amount — 32 000 Kč still leaves the account
+	 * on the 15th. What it changes is the year: the figure under the fields
+	 * switches to what the payment actually costs, which for a shared mortgage
+	 * is a different decision from the one the gross would lead to.
 	 */
-	import { MODE_LABEL } from '$lib/domain/recurring';
+	import { MODE_LABEL, scheduleSharesOf } from '$lib/domain/recurring';
+	import { MAX_SHARES } from '$lib/domain/receivables';
 	import { formatMoney, parseAmount, neg, abs, type Minor } from '$lib/domain/money';
 	import { monthKey, today } from '$lib/domain/datetime';
 	import type { Category, Schedule } from '$lib/domain/types';
@@ -36,9 +38,8 @@
 		dayOfMonth: number;
 		endMonth: string | null;
 		mode: Schedule['mode'];
-		/** Positive magnitude, or null. Always null on an incoming schedule. */
-		owedAmount: Minor | null;
-		owedBy: string | null;
+		/** Positive magnitudes, one per person. Always empty on an incoming schedule. */
+		shares: { who: string; amount: Minor }[];
 	}
 
 	interface Props {
@@ -59,8 +60,9 @@
 	let dayOfMonth = $state(15);
 	let endMonth = $state('');
 	let mode = $state<Schedule['mode']>('confirm');
-	let owedText = $state('');
-	let owedBy = $state('');
+	/** One row per person paying back. The trailing empty row is how a payer is
+	    added; a row emptied of its amount is a payer removed on save. */
+	let owedRows = $state<{ amount: string; who: string }[]>([{ amount: '', who: '' }]);
 	let error = $state('');
 	let confirmingArchive = $state(false);
 
@@ -80,10 +82,11 @@
 		dayOfMonth = schedule?.dayOfMonth ?? 15;
 		endMonth = schedule?.endMonth ?? '';
 		mode = schedule?.mode ?? 'confirm';
-		owedText = schedule?.owedAmount
-			? formatMoney(abs(schedule.owedAmount), { currency: false })
-			: '';
-		owedBy = schedule?.owedBy ?? '';
+		const shares = schedule ? scheduleSharesOf(schedule) : [];
+		owedRows =
+			shares.length > 0
+				? shares.map((s) => ({ amount: formatMoney(s.amount, { currency: false }), who: s.who }))
+				: [{ amount: '', who: '' }];
 		error = '';
 		confirmingArchive = false;
 	});
@@ -96,19 +99,37 @@
 		return parsed.ok && parsed.value !== 0 ? abs(parsed.value) : null;
 	});
 
-	/** The declared share, once it parses to something usable. Null otherwise. */
+	/** The declared shares, the rows that parse to something usable. */
 	const owed = $derived.by(() => {
-		if (isIncome || !owedText.trim()) return null;
-		const parsed = parseAmount(owedText);
-		return parsed.ok && parsed.value > 0 ? abs(parsed.value) : null;
+		if (isIncome) return [];
+		return owedRows.flatMap((row) => {
+			if (!row.amount.trim()) return [];
+			const parsed = parseAmount(row.amount);
+			return parsed.ok && parsed.value > 0
+				? [{ who: row.who.trim(), amount: abs(parsed.value) }]
+				: [];
+		});
 	});
+
+	/** What comes back each month, all payers together. Null when nobody does. */
+	const owedTotal = $derived(
+		owed.length === 0 ? null : (owed.reduce((sum, s) => sum + s.amount, 0) as Minor)
+	);
+
+	/** The last row is where the next payer starts; offer another only once it
+	    is used, and never past `MAX_SHARES` people on one payment. */
+	const canAddRow = $derived(
+		!isIncome && owedRows.length < MAX_SHARES && owedRows[owedRows.length - 1]!.amount.trim() !== ''
+	);
 
 	/** The year, which is the figure worth showing while the month is being typed. */
 	const yearly = $derived(monthly === null ? null : ((monthly * 12) as Minor));
 
 	/** The same year, less what comes back. Null when nothing does. */
 	const netYearly = $derived(
-		monthly === null || owed === null ? null : ((Math.max(monthly - owed, 0) * 12) as Minor)
+		monthly === null || owedTotal === null
+			? null
+			: ((Math.max(monthly - owedTotal, 0) * 12) as Minor)
 	);
 
 	async function commit() {
@@ -130,12 +151,19 @@
 			error = 'Konec je v minulosti.';
 			return;
 		}
-		if (!isIncome && owedText.trim() && owed === null) {
+		const badRow =
+			!isIncome &&
+			owedRows.some((row) => {
+				if (!row.amount.trim()) return false;
+				const share = parseAmount(row.amount);
+				return !share.ok || share.value <= 0;
+			});
+		if (badRow) {
 			error = 'Vrácená částka není číslo.';
 			return;
 		}
-		if (owed !== null && owed > abs(parsed.value)) {
-			error = 'Vrací se víc, než kolik platíš.';
+		if (owedTotal !== null && owedTotal > abs(parsed.value)) {
+			error = 'Dohromady se vrací víc, než kolik platíš.';
 			return;
 		}
 
@@ -147,8 +175,7 @@
 			dayOfMonth,
 			endMonth: endMonth || null,
 			mode,
-			owedAmount: owed,
-			owedBy: owed === null ? null : owedBy.trim() || null
+			shares: owed
 		});
 	}
 </script>
@@ -230,10 +257,14 @@
 		<!--
 		  ── vrací se ti část? ────────────────────────────────────────────
 
-		  The mortgage paid 50/50: the whole payment leaves the account and half
-		  of it comes back from the same person, every month. Declared once here
-		  instead of retyped onto twelve rows a year — every posted row carries
-		  it as a receivable, and it is settled on `/mesic` like any other.
+		  The mortgage paid 50/50, or Netflix split three ways: the whole payment
+		  leaves the account and the slices come back, each from its own person
+		  (Q46, Q47). Declared once here instead of retyped onto twelve rows a
+		  year — every posted row carries them as receivables, and each is
+		  settled on `/mesic` like any other.
+
+		  One row per person. The trailing button adds the next; clearing a
+		  row's amount takes that person off the list when it is saved.
 
 		  Only on an outgoing payment. "Part of this income comes back" is not a
 		  thing anybody means.
@@ -247,30 +278,43 @@
 							kolik se má vrátit — každý zapsaný měsíc pak čeká v přehledu měsíce k odškrtnutí, a až
 							peníze dorazí, zapíše se příjem.
 						</p>
+						<p>Skládá se vás víc? Každý, kdo ti vrací svůj díl, má svůj řádek.</p>
 					</Explainer>
 					<span class="optional">nepovinné</span>
 				</legend>
 
-				<div class="pair pair--owed">
-					<label class="field">
-						<span class="field__label">Kolik za měsíc</span>
-						<input
-							class="field__input field__input--mono"
-							bind:value={owedText}
-							inputmode="decimal"
-							placeholder="0"
-						/>
-					</label>
+				{#each owedRows as row, index (index)}
+					<div class="pair pair--owed">
+						<label class="field">
+							<span class="field__label">{index === 0 ? 'Kolik za měsíc' : 'Kolik'}</span>
+							<input
+								class="field__input field__input--mono"
+								bind:value={row.amount}
+								inputmode="decimal"
+								placeholder="0"
+							/>
+						</label>
 
-					<label class="field">
-						<span class="field__label">Od koho</span>
-						<input class="field__input" bind:value={owedBy} placeholder="kdo ti to vrací" />
-					</label>
-				</div>
+						<label class="field">
+							<span class="field__label">Od koho</span>
+							<input class="field__input" bind:value={row.who} placeholder="kdo ti to vrací" />
+						</label>
+					</div>
+				{/each}
+
+				{#if canAddRow}
+					<button
+						type="button"
+						class="btn btn--quiet add-person"
+						onclick={() => (owedRows = [...owedRows, { amount: '', who: '' }])}
+					>
+						Přidat dalšího
+					</button>
+				{/if}
 
 				<p class="field__hint">
 					Celá částka jde ze zůstatku — platíš ji ty. Tohle jen pamatuje, kolik se má vrátit: každý
-					zapsaný měsíc se objeví v přehledu měsíce k odškrtnutí.
+					zapsaný měsíc se objeví v přehledu měsíce k odškrtnutí, za každého zvlášť.
 				</p>
 			</fieldset>
 		{/if}
@@ -449,6 +493,11 @@
 		text-transform: none;
 		letter-spacing: 0;
 		color: var(--ink-3);
+	}
+
+	/* Its width is its label — a full-bleed bar here would read as the submit. */
+	.add-person {
+		align-self: flex-start;
 	}
 
 	.archive {

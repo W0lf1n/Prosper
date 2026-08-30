@@ -68,6 +68,33 @@ export interface Category extends Synced {
 	isIncome: boolean;
 }
 
+/**
+ * One person's slice of an expense that is coming back — Q25 grown plural
+ * (Q47). You paid the whole thing, so the whole thing hits the balance; a
+ * share only records that part of it returns. Nothing touches the balance
+ * until the money actually arrives and `settledByTxnId` points at the inflow
+ * that carried it — each share settles on its own, because Friend1 paying up
+ * says nothing about Friend2.
+ *
+ * `amount` is a positive magnitude; the shares together never exceed the
+ * expense. `id` only has to be unique within its row — it exists so a screen
+ * can settle *this* share and not its neighbour.
+ */
+export interface TxnShare {
+	id: string;
+	who: string; // '' = unnamed; screens fall back to "někdo"
+	amount: Minor;
+	settledByTxnId: string | null;
+}
+
+/** The declared half of the same thing: what a schedule promises comes back
+    each month, copied onto every row it posts as a fresh `TxnShare`. */
+export interface ScheduleShare {
+	id: string;
+	who: string;
+	amount: Minor;
+}
+
 export interface Txn extends Synced {
 	id: string;
 	accountId: string;
@@ -90,18 +117,15 @@ export interface Txn extends Synced {
 	 */
 	isOneOff: boolean;
 	/**
-	 * DEVIATION from PROJECT-PLAN §4 — see DECISIONS.md, Q25.
+	 * Who pays parts of this back — empty on most rows (Q25, Q47).
 	 *
-	 * Somebody else's share of this expense. You paid the whole thing, so the
-	 * whole thing hits the balance; this only records that part of it is coming
-	 * back. Nothing about it touches the balance until the money actually
-	 * arrives and `settledByTxnId` points at the inflow that carried it.
-	 *
-	 * Positive magnitude, always less than or equal to the expense.
+	 * Until v9 this was a single `owedAmount` / `owedBy` / `settledByTxnId`
+	 * trio. Rows written by older builds — an old backup merged in, an unpaired
+	 * device pushing after an update — may still carry the trio and no array,
+	 * so nothing reads this field directly: `sharesOf()` in
+	 * `domain/receivables.ts` is the accessor, and it understands both shapes.
 	 */
-	owedAmount: Minor | null;
-	owedBy: string | null;
-	settledByTxnId: string | null;
+	shares: TxnShare[];
 	/**
 	 * The schedule that produced this row — DECISIONS Q40. Null for anything
 	 * typed by hand, which is most of the ledger.
@@ -154,21 +178,24 @@ export interface Schedule extends Synced {
 	endMonth: string | null;
 	mode: ScheduleMode;
 	/**
-	 * The part of this payment somebody else pays back, every month — DECISIONS
-	 * Q46.
+	 * The parts of this payment other people pay back, every month — DECISIONS
+	 * Q46, made plural by Q47.
 	 *
-	 * The mortgage is the case it was written for: 32 000 Kč leaves the account
-	 * and half of it comes back, every month, from the same person. The whole
+	 * The mortgage was the case Q46 was written for: 32 000 Kč leaves the
+	 * account and half comes back from the same person. Q47 added the Netflix
+	 * case: one payment, two friends, each with their own slice. The whole
 	 * payment is still the payment — `amount` is untouched and the balance sees
-	 * all of it — and this rides along onto every row the schedule posts, as
-	 * `Txn.owedAmount` / `Txn.owedBy`, so a recurring reimbursement is settled
-	 * on `/mesic` exactly like one typed by hand (Q25).
+	 * all of it — and the shares ride along onto every row the schedule posts,
+	 * as `Txn.shares`, so a recurring reimbursement is settled on `/mesic`
+	 * exactly like one typed by hand (Q25).
 	 *
-	 * Positive magnitude, never larger than the payment. Null on a schedule
-	 * nobody shares, which is most of them, and on every incoming one.
+	 * Positive magnitudes, together never larger than the payment. Empty on a
+	 * schedule nobody shares, which is most of them, and on every incoming one.
+	 * Same v9 caveat as `Txn.shares`: older rows may carry the single
+	 * `owedAmount` / `owedBy` pair instead — read through `scheduleSharesOf()`
+	 * in `domain/recurring.ts`, never directly.
 	 */
-	owedAmount: Minor | null;
-	owedBy: string | null;
+	shares: ScheduleShare[];
 	/**
 	 * The last month this schedule was settled in, whether by posting a row or
 	 * by being skipped. A watermark rather than a derivation: it makes the
@@ -213,6 +240,20 @@ export interface Goal extends Synced {
 	 * put aside for this".
 	 */
 	startDate: IsoDate;
+	/**
+	 * What the goal holds beyond what the ledger shows — Q48.
+	 *
+	 * A goal opened against a pot that already exists, or one whose money grew
+	 * on its own (a trade that did better than expected), is ahead of its
+	 * ledger. This is that difference, *stated* the way a holding's value is
+	 * stated: typed by hand, restated whenever reality moves without a row.
+	 * Everything else about progress stays measured from the ledger (Q26) —
+	 * this is the one number a goal carries that is not.
+	 *
+	 * Signed: a trade can also do worse. `goalStatus` clamps the total at zero.
+	 * Rows written before v10 may lack it — readers treat absent as zero.
+	 */
+	startAmount: Minor;
 	/**
 	 * "Na očích" — this is the goal the entry screen puts a line about.
 	 *
