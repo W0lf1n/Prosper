@@ -1784,3 +1784,16 @@ instead of owning a query.
 cross-currency figure; editing an account's currency; a transfer on the entry
 screen; multi-currency holdings (`Holding.currency` still waits, as
 `Account.currency` did).
+
+### The keypad flips to phone order · 2026-09-01
+
+The entry keypad shipped in calculator order — 7-8-9 on top, low digits
+nearest the thumb, on the argument that a sum is typed on a till. Petr asked
+for it to be reversed: the numeric keyboard the phone itself shows everywhere
+else — including the native `inputmode="decimal"` keyboard on this app's own
+sheet inputs — puts **1-2-3 on top**, so the one pad in the app that did the
+opposite fought the muscle memory the rest of the phone trains all day.
+
+`Keypad.svelte` now lays out 1-2-3 / 4-5-6 / 7-8-9. The bottom row
+(`, 0 ⌫`) is unchanged. The calculator-order argument was not wrong about
+tills; it was wrong about which device the thumb lives on.

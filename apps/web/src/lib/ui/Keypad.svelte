@@ -11,13 +11,15 @@
 	let { ondigit, oncomma, onbackspace, onclear }: Props = $props();
 
 	/**
-	 * Calculator order — 7-8-9 on top, 1-2-3 at the bottom.
+	 * Phone order — 1-2-3 on top, 7-8-9 at the bottom.
 	 *
-	 * Not phone-dialler order. The thing being typed is a sum, and every keypad
-	 * that exists for typing sums, from a till to a pocket calculator, puts the
-	 * low digits nearest the thumb.
+	 * This started as calculator order (7-8-9 on top), on the theory that a sum
+	 * is typed on a till. In practice every numeric keyboard the phone itself
+	 * shows — including the native one on this app's own amount fields — puts
+	 * 1-2-3 on top, and the pad kept losing to that muscle memory
+	 * (DECISIONS.md, 2026-09-01).
 	 */
-	const keys = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+	const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 	let holdTimer: ReturnType<typeof setTimeout> | undefined;
 	let clearedByHold = false;
