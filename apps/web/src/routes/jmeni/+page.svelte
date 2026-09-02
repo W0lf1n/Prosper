@@ -21,7 +21,7 @@
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
 	import { archiveHolding, createHolding, recordValuation, updateHolding } from '$lib/db/repo';
-	import { groupByCurrency, homeCurrency } from '$lib/domain/accounts';
+	import { groupByCurrency, homeCurrency, openingTotal } from '$lib/domain/accounts';
 	import {
 		contributionOf,
 		readHoldings,
@@ -70,7 +70,7 @@
 		const rows = ($allTxns ?? []) as Txn[];
 		const totals: { code: string; total: Minor }[] = [];
 		for (const [code, group] of groupByCurrency(($allAccounts ?? []) as Account[])) {
-			const opening = sum(group.map((a) => a.openingBalance));
+			const opening = sum(group.map(openingTotal));
 			const ids = new Set(group.map((a) => a.id));
 			totals.push({
 				code,

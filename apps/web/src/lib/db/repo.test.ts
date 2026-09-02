@@ -10,6 +10,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { EXCHANGE_CATEGORY_ID } from '$lib/domain/accounts';
 import { monthKey, today } from '$lib/domain/datetime';
 import type { Minor } from '$lib/domain/money';
 import type { Reconciliation } from '$lib/domain/types';
@@ -452,6 +453,7 @@ describe('transfers — two accounts, one movement (Q49)', () => {
 			toAccountId: revolut.id,
 			amountOut: 2470_00 as Minor,
 			amountIn: 100_00 as Minor,
+			categoryId: 'cat-dovolena',
 			date: '2026-08-30'
 		});
 
@@ -462,20 +464,53 @@ describe('transfers — two accounts, one movement (Q49)', () => {
 		// Mutually referencing (§6.1): each leg names the other.
 		expect(transfer.out.transferPairId).toBe(transfer.in.id);
 		expect(transfer.in.transferPairId).toBe(transfer.out.id);
-		// No bucket, ever — a transfer is not spending.
-		expect(transfer.out.categoryId).toBeNull();
-		expect(transfer.in.categoryId).toBeNull();
+		// An exchange counts the way it reads (2026-09-02): the koruny are spent
+		// from the chosen bucket, the euros arrive as SMĚNA income.
+		expect(transfer.out.categoryId).toBe('cat-dovolena');
+		expect(transfer.in.categoryId).toBe(EXCHANGE_CATEGORY_ID);
 	});
 
-	it('refuses a transfer onto the same account', async () => {
+	it('creates the SMĚNA bucket once, under its constant id, and reuses it', async () => {
+		const revolut = await secondAccount();
+		expect(await db.categories.get(EXCHANGE_CATEGORY_ID)).toBeUndefined();
+
+		for (const amountOut of [100_00, 200_00]) {
+			await createTransfer({
+				fromAccountId: accountId,
+				toAccountId: revolut.id,
+				amountOut: amountOut as Minor,
+				amountIn: 4_00 as Minor,
+				categoryId: 'cat-dovolena'
+			});
+		}
+
+		const exchange = await db.categories.get(EXCHANGE_CATEGORY_ID);
+		expect(exchange?.name).toBe('SMĚNA');
+		expect(exchange?.isIncome).toBe(true);
+		expect((await db.categories.toArray()).filter((c) => c.name === 'SMĚNA')).toHaveLength(1);
+	});
+
+	it('refuses a transfer onto the same account, and one without a bucket', async () => {
 		await expect(
 			createTransfer({
 				fromAccountId: accountId,
 				toAccountId: accountId,
 				amountOut: 100_00 as Minor,
-				amountIn: 100_00 as Minor
+				amountIn: 100_00 as Minor,
+				categoryId: 'cat-dovolena'
 			})
 		).rejects.toThrow(/dva různé účty/);
+
+		const revolut = await secondAccount();
+		await expect(
+			createTransfer({
+				fromAccountId: accountId,
+				toAccountId: revolut.id,
+				amountOut: 100_00 as Minor,
+				amountIn: 4_00 as Minor,
+				categoryId: ''
+			})
+		).rejects.toThrow(/kategorii/);
 	});
 
 	it('deleting one leg takes the pair, and the undo brings back both', async () => {
@@ -484,7 +519,8 @@ describe('transfers — two accounts, one movement (Q49)', () => {
 			fromAccountId: accountId,
 			toAccountId: revolut.id,
 			amountOut: 500_00 as Minor,
-			amountIn: 500_00 as Minor
+			amountIn: 500_00 as Minor,
+			categoryId: 'cat-dovolena'
 		});
 
 		await deleteTxn(transfer.out.id);

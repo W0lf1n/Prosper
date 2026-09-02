@@ -2,12 +2,15 @@
 	import { liveQuery } from 'dexie';
 	import { db, SCHEMA_VERSION } from '$lib/db/schema';
 	import {
+		CurrencyTakenError,
+		addPocket,
 		archiveCategory,
 		createAccount,
 		createCategory,
 		createTransfer,
 		exportBackup,
 		importBackup,
+		removePocket,
 		resetLedger,
 		setActiveAccountId,
 		updateAccount,
@@ -16,13 +19,19 @@
 		type Transfer
 	} from '$lib/db/repo';
 	import { invalidateAll } from '$app/navigation';
-	import { ACCOUNT_KIND_LABEL, liveAccounts } from '$lib/domain/accounts';
 	import {
-		CURRENCIES,
+		ACCOUNT_KIND_LABEL,
+		availableCurrencies,
+		liveAccounts,
+		pocketsOf,
+		validatePocket
+	} from '$lib/domain/accounts';
+	import {
 		ZERO,
 		currencySymbol,
 		formatMoney,
 		parseAmount,
+		sum,
 		type Minor
 	} from '$lib/domain/money';
 	import { formatDateTime, formatShortDate, today } from '$lib/domain/datetime';
@@ -32,7 +41,7 @@
 	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
 	import { sharesOf } from '$lib/domain/receivables';
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
-	import type { Account, AccountKind, Category, SpendType } from '$lib/domain/types';
+	import type { Account, AccountKind, Category, SpendType, Txn } from '$lib/domain/types';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
 	import { defaultBaseUrl, pair, unpair } from '$lib/sync/pair';
 	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
@@ -62,6 +71,13 @@
 	const otherAccounts = $derived(accountRows.filter((a) => a.id !== data.accountId));
 	const activeCurrency = $derived(account?.currency ?? 'CZK');
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
+	/** Every exchange ever written — the transfer sheet opens its bucket on the
+	    last one used (2026-09-02). */
+	const exchanges = liveQuery(() =>
+		db()
+			.txns.filter((t) => t.transferPairId !== null)
+			.toArray()
+	);
 	/**
 	 * Live rows, not every row ever written.
 	 *
@@ -128,10 +144,50 @@
 		toast.show('Účet uložen');
 	}
 
+	// ── money elsewhere (Q50) ───────────────────────────────────────────────
+	// One account per currency, so the koruny on a Revolut card join the CZK
+	// account here — as a named amount that opens it, not as a second account
+	// nobody wants to choose between.
+	const pockets = $derived(account ? pocketsOf(account) : []);
+	const pocketsTotal = $derived(sum(pockets.map((p) => p.amount)));
+	let pocketName = $state('');
+	let pocketAmount = $state('');
+	let pocketError = $state('');
+
+	async function savePocket() {
+		if (!data.accountId) return;
+		const parsed = parseAmount(pocketAmount);
+		if (!parsed.ok) {
+			pocketError = 'Částka není číslo.';
+			return;
+		}
+		const problems = validatePocket({ name: pocketName, amount: parsed.value });
+		if (problems.includes('name')) {
+			pocketError = 'Napiš, kde ty peníze jsou — třeba Revolut.';
+			return;
+		}
+		if (problems.includes('amount')) {
+			pocketError = 'Částka musí být větší než nula.';
+			return;
+		}
+		pocketError = '';
+		await addPocket(data.accountId, { name: pocketName, amount: parsed.value });
+		pocketName = '';
+		pocketAmount = '';
+		toast.show(`K účtu přičteno ${formatMoney(parsed.value, { code: activeCurrency })}`);
+	}
+
+	async function dropPocket(id: string) {
+		if (!data.accountId) return;
+		await removePocket(data.accountId, id);
+	}
+
 	/**
 	 * Which account the keypad writes to — the one everything else reads (Q49).
 	 * The layout hands `accountId` to every route, so a switch re-runs its load
-	 * and the whole app follows.
+	 * and the whole app follows. The same switch sits on the entry screen, on
+	 * the currency glyph (Q50); this one stays because this is also where an
+	 * account is added or archived.
 	 */
 	async function switchTo(next: Account) {
 		await setActiveAccountId(next.id);
@@ -150,6 +206,18 @@
 
 	const ACCOUNT_KINDS = Object.entries(ACCOUNT_KIND_LABEL) as [AccountKind, string][];
 
+	/**
+	 * One account per currency (Q50): the form offers only the currencies no
+	 * live account holds, and disappears when there are none left. Archiving
+	 * an account frees its currency again.
+	 */
+	const freeCurrencies = $derived(availableCurrencies(($allAccounts ?? []) as Account[]));
+
+	function openAdd() {
+		newAccountCurrency = freeCurrencies[0] ?? 'CZK';
+		addOpen = true;
+	}
+
 	async function addAccount() {
 		const name = newAccountName.trim();
 		if (!name) {
@@ -164,13 +232,21 @@
 			return;
 		}
 		newAccountError = '';
-		await createAccount({
-			name,
-			kind: newAccountKind,
-			currency: newAccountCurrency,
-			openingBalance: parsed.value,
-			openingDate: newAccountDate
-		});
+		try {
+			await createAccount({
+				name,
+				kind: newAccountKind,
+				currency: newAccountCurrency,
+				openingBalance: parsed.value,
+				openingDate: newAccountDate
+			});
+		} catch (error) {
+			if (error instanceof CurrencyTakenError) {
+				newAccountError = `Účet v ${error.currency} už máš — další peníze v téhle měně přidej k němu jako peníze jinde.`;
+				return;
+			}
+			throw error;
+		}
 		addOpen = false;
 		newAccountName = '';
 		newAccountBalance = '';
@@ -533,6 +609,61 @@
 				<input class="field__input field__input--mono" type="date" bind:value={openingDate} />
 			</label>
 
+			<!--
+			  Money in this currency that sits somewhere else — Q50. One account
+			  per currency, so the koruny on a Revolut card join this account
+			  here, as a named amount that opens it, rather than becoming an
+			  account nobody wants to choose between on the keypad.
+			-->
+			<div class="pockets">
+				<span class="field__label">Peníze jinde</span>
+
+				{#if pockets.length > 0}
+					<ul class="pockets__list">
+						{#each pockets as pocket (pocket.id)}
+							<li class="pockets__row">
+								<span class="pockets__name">{pocket.name}</span>
+								<span class="mono">{formatMoney(pocket.amount, { code: activeCurrency })}</span>
+								<button
+									type="button"
+									class="pockets__drop"
+									aria-label={`Odebrat ${pocket.name}`}
+									onclick={() => dropPocket(pocket.id)}
+								>
+									<Icon name="close" size={16} />
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+
+				<div class="pockets__add">
+					<input
+						class="field__input"
+						bind:value={pocketName}
+						placeholder="Revolut"
+						aria-label="Kde"
+					/>
+					<input
+						class="field__input field__input--mono"
+						bind:value={pocketAmount}
+						inputmode="decimal"
+						placeholder="0"
+						aria-label="Kolik"
+					/>
+					<button type="button" class="btn" onclick={savePocket}>Přidat</button>
+				</div>
+
+				{#if pocketError}
+					<p class="error-text">{pocketError}</p>
+				{/if}
+
+				<span class="field__hint">
+					Peníze v téhle měně na jiné kartě nebo v hotovosti. Přičtou se k zůstatku tohohle účtu;
+					výdaje z nich zapisuješ sem jako z každého jiného.
+				</span>
+			</div>
+
 			{#if accountError}
 				<p class="error-text">{accountError}</p>
 			{/if}
@@ -588,6 +719,10 @@
 							{formatMoney(account?.openingBalance ?? ZERO, { code: activeCurrency })}
 						</span>
 						{formatShortDate(openingDate)}
+						{#if pocketsTotal > 0}
+							· jinde
+							<span class="mono">{formatMoney(pocketsTotal, { code: activeCurrency })}</span>
+						{/if}
 					</span>
 				</span>
 				<span class="summary__go">Upravit</span>
@@ -616,15 +751,19 @@
 		{/if}
 
 		<div class="row-actions">
-			<button type="button" class="btn" onclick={() => (addOpen = true)}>Přidat účet</button>
+			{#if freeCurrencies.length > 0}
+				<button type="button" class="btn" onclick={openAdd}>Přidat účet</button>
+			{/if}
 			{#if accountRows.length > 1}
 				<button type="button" class="btn" onclick={() => (transferOpen = true)}>Převod</button>
 			{/if}
 		</div>
 
 		<p class="hint prose">
-			Klávesnice zapisuje na účet nahoře; ostatní obrazovky ukazují ten samý. Druhý účet se hodí na
-			dovolenou v eurech — každý účet počítá ve své měně a dohromady se nesčítají.
+			Klávesnice zapisuje na účet nahoře; přepnout jde tady, nebo na hlavní obrazovce klepnutím na
+			měnu u částky. V každé měně je jeden účet — koruny z jiné banky se k tomu korunovému přidají
+			jako peníze jinde. Druhý účet se hodí na dovolenou v eurech; každý účet počítá ve své měně a
+			dohromady se nesčítají.
 		</p>
 	</section>
 
@@ -898,11 +1037,13 @@
 			<label class="field">
 				<span class="field__label">Měna</span>
 				<select class="field__input" bind:value={newAccountCurrency}>
-					{#each CURRENCIES as code (code)}
+					{#each freeCurrencies as code (code)}
 						<option value={code}>{code} — {currencySymbol(code)}</option>
 					{/each}
 				</select>
-				<span class="field__hint">Napořád — účet s historií měnu změnit nemůže.</span>
+				<span class="field__hint">
+					Napořád — účet s historií měnu změnit nemůže. V každé měně je jeden účet.
+				</span>
 			</label>
 		</div>
 
@@ -936,6 +1077,8 @@
 <TransferSheet
 	open={transferOpen}
 	accounts={($allAccounts ?? []) as Account[]}
+	categories={($categories ?? []) as Category[]}
+	exchanges={($exchanges ?? []) as Txn[]}
 	defaultFromId={data.accountId}
 	onsave={saveTransfer}
 	onclose={() => (transferOpen = false)}
@@ -1349,6 +1492,73 @@
 
 	.row-actions .btn {
 		flex: 1 1 auto;
+	}
+
+	/* ── money elsewhere (Q50) ───────────────────────────────────────────── */
+
+	.pockets {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.pockets__list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	/* A pocket sits in a pocket: recessed is --ground-2, like every other
+	   thing inside a card that is held rather than raised. */
+	.pockets__row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		min-height: var(--touch);
+		padding-left: var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--ground-2);
+	}
+
+	.pockets__name {
+		flex: 1;
+		min-width: 0;
+		font-size: var(--text-md);
+		color: var(--ink);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.pockets__drop {
+		display: grid;
+		place-items: center;
+		flex: none;
+		width: var(--touch);
+		height: var(--touch);
+		color: var(--ink-3);
+		border-radius: var(--radius-full);
+		transition: color var(--dur-fast) var(--ease-out);
+	}
+
+	.pockets__drop:active {
+		color: var(--danger);
+	}
+
+	@media (hover: hover) {
+		.pockets__drop:hover {
+			color: var(--danger);
+		}
+	}
+
+	.pockets__add {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 0.7fr) auto;
+		gap: var(--space-2);
+		align-items: stretch;
 	}
 
 	.facts {

@@ -38,12 +38,38 @@ export interface Synced {
 	isDeleted: boolean;
 }
 
+/**
+ * Money held elsewhere in an account's currency — Q50.
+ *
+ * There is one account per currency, so the koruny on a Revolut card have no
+ * account of their own: they are part of the CZK account. A pocket is the
+ * stated amount that arrived from somewhere else and joins the opening
+ * balance, with a name so Settings can say where it sits. It is *opening*
+ * money, not a live balance — every flow after it is a row like any other,
+ * so a pocket is never restated the way a holding's value is.
+ *
+ * Positive magnitude, in the account's currency. `id` only has to be unique
+ * within its account.
+ */
+export interface AccountPocket {
+	id: string;
+	name: string;
+	amount: Minor;
+}
+
 export interface Account extends Synced {
 	id: string;
 	name: string;
 	kind: AccountKind;
 	openingBalance: Minor;
 	openingDate: IsoDate;
+	/**
+	 * Money that opened this account from elsewhere — Q50, schema v12. The
+	 * balance starts at `openingBalance` plus the sum of these. Rows written
+	 * by older builds may lack the field, so nothing reads it directly:
+	 * `pocketsOf()` in `domain/accounts.ts` is the accessor.
+	 */
+	pockets: AccountPocket[];
 	/**
 	 * ISO code from `money.CURRENCIES` — live since 2026-08-30, having sat
 	 * unused since v1 exactly so this day would not be a migration. Every

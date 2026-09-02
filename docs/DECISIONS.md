@@ -1797,3 +1797,230 @@ opposite fought the muscle memory the rest of the phone trains all day.
 `Keypad.svelte` now lays out 1-2-3 / 4-5-6 / 7-8-9. The bottom row
 (`, 0 ⌫`) is unchanged. The calculator-order argument was not wrong about
 tills; it was wrong about which device the thumb lives on.
+
+## The 2026-09-02 pass — one account per currency, the switch on the keypad, a room that changes colour
+
+Three asks out of the first days with two accounts, each challenged before
+it was built. Schema **v12**.
+
+### Q50 — One account per currency · answered 2026-09-02
+
+Asked for, in order: koruny on KB and koruny on Revolut read as one sum, and
+"which account" never asked on the keypad; then a merge — a second account
+in an already-held currency folded into the first at creation, with a
+sentence saying why.
+
+**The merge was refused.** A merge is a soft-deleted account plus rows moved
+onto another, which nothing can undo; accounts are synced rows, so a merge on
+the phone while the laptop still holds both is exactly the conflict the sync
+layer exists to avoid; and a form that does something other than what was
+typed is the pattern the check strip was designed against. What the ask
+actually wanted was to **choose by currency, not by account** — and that
+needs no merge, because with one account per currency the currency *is* the
+account.
+
+**So the rule is one account per currency**, enforced where writes happen:
+`createAccount` throws `CurrencyTakenError` for a currency a live account
+already holds, and the Settings form offers only the free currencies
+(`availableCurrencies`) and hides **Přidat účet** when there are none.
+Archiving frees the currency — changing banks is the case that needs it.
+Duplicates that already exist are not merged; one of them is archived by
+hand.
+
+**Koruny held elsewhere join the CZK account as a pocket** (`Account.pockets`,
+`pocketsOf`, `openingTotal`). A pocket is a named amount that opened the
+account from somewhere else — "Revolut · 5 000 Kč" — and it is *opening*
+money, not a live balance: every flow after it is a row like any other, so a
+pocket is never restated the way a holding's value is. It is written like
+the opening balance, a field on the account row, one stamped change; removing
+one is editing the field, since there is no row to tombstone. `balanceOf`,
+the tape, `/jmeni` and the reconciliation's computed figure all start from
+`openingTotal`. `resetLedger` clears pockets along with the opening balance,
+because they are the same kind of fact.
+
+**Migration v12** backfills `pockets: []`, for the standing reason. The
+backup format stays at **6**: an older build imports the row whole and keeps
+the field it does not read, which is not the flatten the version exists for.
+
+**The per-currency reading planned in the first challenge was not built.**
+With one account per currency, per-account and per-currency reading are the
+same thing, so `/tape`, `/platby`, the entry screen and `/mesic`'s chips
+are correct as they stand.
+
+**Reconciling against one bank's statement** now differs by whatever sits in
+the pockets, by construction. Petr chose the sum over per-bank truth; the
+statement figure is the two balances added, or the sheet is left alone.
+
+### The switch lives on the keypad — currency glyph, sheet, sticky · 2026-09-02
+
+Asked for: switching accounts while entering, for the euro lunch on holiday.
+
+**Sticky, not per-row.** A choice that reset after every save would cost a
+tap on each of thirty holiday rows. The account the keypad writes to is what
+"active" has always meant, so the control makes the same meta write Settings
+does and `invalidateAll()`s; Settings keeps its **Přepnout** because that is
+also where accounts are added and archived. The date survives a save for the
+same reason, and it is the precedent.
+
+**The glyph is the control.** With one account per currency the `Kč` / `€`
+beside the amount *is* the account, so it became the capsule that changes it
+— no row of chips, no height taken from the number on the screen that has
+none to spare. It opens a sheet (**Kam zapisovat**) rather than cycling like
+the direction coin: the coin has two positions, this has as many as there are
+currencies. With a single account it is the plain glyph it always was. The
+half-typed amount survives a switch; only the glyph changes meaning.
+
+**The trap this found again.** The entry screen's transactions were a
+`liveQuery` keyed on `data.accountId`, which re-runs on Dexie writes and not
+on `data` changes — harmless while every switch happened in Settings and the
+screen re-mounted, wrong the moment the switch moved onto the screen itself.
+It now holds the whole table and derives the active slice, the fix
+`CLAUDE.md` prescribes; the payee search wanted the whole table anyway.
+
+### The room takes the colour of the currency · 2026-09-02
+
+Asked for: a different background per currency, "like Revolut", so a foreign
+account is recognised before a digit is typed — and either chosen or
+automatic, without breaking the design.
+
+**Automatic.** The home currency is the graphite the app has always been and
+every other currency shifts the *ground* — `--ground`, `--ground-2` and the
+ambient bloom — a few degrees of hue at the same lightness. Nothing on the
+ground moves: cards are raised by luminance, ink and data colours are
+defined against surfaces, so the tint is the temperature of the room and
+never the colour of anything in it. Every saturated hue in `tokens.css`
+already means something; at oklch chroma 0.018 these mean only "not home",
+which is the whole message, and a setting for it would be a control for a
+decision the app can make.
+
+**Dark stays true black.** The lights-off decision holds; the dark tint lives
+in the gradient's foot and the bloom, written into the `--dark-*` bank so
+both dark blocks stay untouched. Light `--ink-3` on the tinted grounds
+measures 5.2:1 and 4.95:1, within a hundredth of the neutral figures.
+
+**Mechanism.** `lib/ui/tint.ts` decides the root attribute from the active
+account against the home currency; the layout sets it, subscribed by hand
+because the layout is the one component outside every scroll region. The
+`theme-color` metas follow the resolved ground — read off the root, so the
+number is still written once — and are restored when the tint goes. The
+sheet's account rows carry a `--tint-*` swatch, the same hue as the ground
+takes, mid-tone so one value serves both themes.
+
+**The ground switches; it does not fade.** Two fades were tried and both
+came out. A transition on the body's `background-color` is invisible, because
+the opaque ground gradient is painted over it. Registering `--ground` and
+`--ground-2` with `@property` so the gradient itself interpolates left
+Chromium painting a mid-grey ground while `getComputedStyle` reported the
+start colour, and the tinted value never arrived — a registered-property
+transition on the root is not something to ship on one browser's say-so. A
+switch is a deliberate, rare act; a snap is honest and costs nothing.
+
+### The payee list is a search, and it waits for three characters · 2026-09-02
+
+Asked for: no suggestions on an empty field, only from the third character —
+and only ever from the ledger's own history.
+
+The second half was already true: there has never been a seed list of
+payees, and an empty ledger offers nothing. The first half exposed the real
+bug: the list was the *twelve most recent* names, which is a shortlist, and
+a shortlist filtered by a prefix is wrong — "kaf" must find March's "ranní
+kafe" however much was bought since. `suggestPayees` searches the whole
+history, every account, matching the start of any word with case and
+diacritics folded, most recent first, eight at most, and returns nothing
+below `MIN_PAYEE_QUERY` — the same three characters `isVagueDescription`
+already treats as "not a description". The `<datalist>` is fed only the
+matches, so it has nothing to open on a bare field.
+
+**Deliberately not built:** merging accounts; a per-currency reading across
+several accounts in one currency; any exchange rate; a tint the user picks;
+a hand-rolled suggestion row (the native list, gated, was enough — revisit
+only if a browser refuses to reopen it once options appear).
+
+### An exchange counts the way it reads · 2026-09-02 · reverses part of Q49
+
+Asked: what the app should do when koruny on Revolut become euros on
+Revolut. Under Q50 that is a transfer from the CZK account to the EUR one,
+and the sheet for it already existed — from, to, two amounts, both balances
+move. Petr's answer to the rest was the simplest one: **the koruna leg is an
+expense and the euro leg is income.**
+
+**Why Q49's rule gave way.** "Moving your own money is not spending it" was
+written for KB → Revolut CZK, a move the app can no longer make: with one
+account per currency, every transfer is an exchange, and an exchange is the
+moment koruny become the holiday. Keeping the legs out of every measurement
+made the trip vanish from the koruna month — the only figure in CZK for a
+week in Italy was nowhere — while the euro month read as spending from
+nothing. Counting the legs puts the holiday in the koruna month as what the
+euros cost, and reads the euro month as "400 € came in, 380 € went out, 20 €
+left", which is how a holiday wallet feels. The two currencies are still
+never summed; each month tells its own half of one fact.
+
+**What changed.** `summariseMonth` (and so trends and the split) measures
+transfer legs like any row; `monthCoverage` counts the day koruny left as a
+spending day. The outgoing leg carries a bucket chosen in the sheet (a
+`<select>`, not the chip rail — the rail opens a sheet of its own for search,
+and a sheet inside a sheet is one modal too many), ranked by past exchanges
+and opening on the last one used (`lastExchangeCategoryId`). The incoming
+leg lands in **SMĚNA**, an income bucket created on first use under a
+constant id (`EXCHANGE_CATEGORY_ID`), so two paired devices that each write
+their first exchange before syncing produce the same row and the merge
+collapses them. Not PŘÍJEM: an exchange is not earnings, and a conversion
+back to koruny must not read as a raise. `validateTransfer` and
+`createTransfer` both refuse a leg without a bucket.
+
+**What did not change.** The legs stay linked, deleted together and restored
+together; the pair of amounts is still the only rate the app knows; transfer
+legs stay out of the payee suggestions and out of `findMissingRecurring`,
+because "Převod → Revolut" is not a payee and an exchange is not a
+subscription. The sheet stays on `/tape` and in Settings — Petr declined a
+row for it on the keypad's account sheet.
+
+**Legs written before today** carry no bucket. The outgoing one is nagged as
+an uncategorised row and the tape's edit sheet, which used to hide the bucket
+on a transfer leg, now offers it; the incoming one already counted as income
+by the "no bucket means income" rule and can be filed into SMĚNA the same
+way. No migration: a handful of rows, and a guess at their bucket would be
+wrong.
+
+**The split measures against what was earned, not what arrived.** The
+first exchange in the browser showed why: on the euro account the
+10/10/10/70 ring took the 100 € that had just arrived as income and opened
+a ten-percent hole in giving and saving, and a conversion back would have
+read as a raise at home. `MonthSummary` now carries `earned` — `income`
+without SMĚNA — and `/mesic` hands that to `prosperitySplit`. The month
+slab keeps showing `income`, because "400 € came in" is the true reading of
+a holiday wallet; only the shares are of earnings.
+
+**Deliberately not built:** a line of "what the euros cost" beside the
+month (the legs counting makes it redundant); the sheet on the entry
+screen's account sheet; the implied rate shown while typing (Petr's "keep it
+simple" — the two amounts are the rate, and a wrong one is the person's own
+to notice); any exchange rate.
+
+### The switch cycles, and the bucket got its right name · 2026-09-02
+
+Two corrections from Petr's first look at the day's work.
+
+**"Z kategorie" was the wrong sentence.** The transfer sheet asked which
+category the money leaves *from*, and nothing leaves a category. The field
+exists because the outgoing leg is an expense and every expense in this app
+has a bucket; it is now labelled **Kategorie výdaje**, opens on "za co to
+je…" when nothing is remembered, and carries one line saying the outgoing
+amount is an expense like any other — dovolená, lifestyle, hypotéka. The
+choice stays: a holiday and a euro mortgage are different buckets, and a
+single SMĚNA expense bucket would have filed both as one thing.
+
+**The account switch is a cycle, not a sheet.** Petr asked for the coin's
+gesture: one tap on the currency glyph, the next account, round and round —
+Kč, €, Kč. The sheet ("Kam zapisovat"), its rows, its swatch dots and the
+`--tint-*` tokens that fed them are gone. The glyph is a slab at the coin's
+other side, hairline and lit edge, `--radius-sm` because the pill is
+reserved for the action, centred on the number rather than on its baseline
+because the well that clips the roll has no baseline worth aligning to. On
+every switch the new glyph rolls up out of the slab's floor, keyed on the
+currency so the roll runs once per change and never on a re-render — the
+recipe the digits already use to land. The order is the accounts' own
+`sortOrder`, wrapping; a tap while the previous switch is still landing is
+dropped rather than queued, so the glyph never shows an account the keypad
+is not yet writing to. Persistence is unchanged: the same meta write
+Settings makes, sticky like the date, the half-typed amount surviving.

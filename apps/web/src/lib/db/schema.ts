@@ -330,6 +330,29 @@ export const migrations: Migration[] = [
 					if (row.accountId === undefined) row.accountId = fallback;
 				});
 		}
+	},
+	{
+		/**
+		 * `Account.pockets` — money that opened the account from elsewhere in
+		 * its currency (DECISIONS Q50, one account per currency).
+		 *
+		 * No index changes, so `accounts` is not restated. Backfilled to an
+		 * empty array rather than left absent, for the standing reason (v5, v7,
+		 * v8, v9, v10): an absent field is not an empty list, and `pocketsOf()`
+		 * would otherwise be the only thing standing between every reader and
+		 * `undefined.map`. It still exists — a backup written before today is
+		 * imported without running this — so both paths meet the same shape.
+		 */
+		version: 12,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			await tx
+				.table('accounts')
+				.toCollection()
+				.modify((row: { pockets?: unknown }) => {
+					if (!Array.isArray(row.pockets)) row.pockets = [];
+				});
+		}
 	}
 ];
 

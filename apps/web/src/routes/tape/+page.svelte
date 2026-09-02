@@ -13,7 +13,7 @@
 		updateTxn,
 		type Transfer
 	} from '$lib/db/repo';
-	import { liveAccounts } from '$lib/domain/accounts';
+	import { liveAccounts, openingTotal } from '$lib/domain/accounts';
 	import { formatDayHeading, formatMonthHeading, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
 	import { buildTape } from '$lib/domain/ledger';
@@ -53,15 +53,25 @@
 
 	const categories = liveQuery(() => db().categories.toArray());
 
+	/** Every exchange ever written, on any account — the transfer sheet opens
+	    its bucket on the last one used (2026-09-02). */
+	const exchanges = liveQuery(() =>
+		db()
+			.txns.filter((t) => t.transferPairId !== null)
+			.toArray()
+	);
+
 	const categoryById = $derived(new Map(($categories ?? []).map((c: Category) => [c.id, c])));
 
 	const months = $derived(
 		$account
-			? buildTape($txns ?? [], { openingBalance: $account.openingBalance, today: today() })
+			? buildTape($txns ?? [], { openingBalance: openingTotal($account), today: today() })
 			: []
 	);
 
-	const balance = $derived(months[0]?.days[0]?.balance ?? $account?.openingBalance ?? ZERO);
+	const balance = $derived(
+		months[0]?.days[0]?.balance ?? ($account ? openingTotal($account) : ZERO)
+	);
 
 	// ── folded months ───────────────────────────────────────────────────────
 	//
@@ -375,6 +385,8 @@
 <TransferSheet
 	open={transferring}
 	accounts={($allAccounts ?? []) as Account[]}
+	categories={($categories ?? []) as Category[]}
+	exchanges={($exchanges ?? []) as Txn[]}
 	defaultFromId={data.accountId}
 	onsave={saveTransfer}
 	onclose={() => (transferring = false)}
@@ -450,9 +462,8 @@
 												class="row__category"
 												class:row__category--none={!row.txn.categoryId && !row.txn.transferPairId}
 											>
-												{row.txn.transferPairId
-													? 'převod'
-													: (categoryById.get(row.txn.categoryId ?? '')?.name ?? 'bez kategorie')}
+												{categoryById.get(row.txn.categoryId ?? '')?.name ??
+													(row.txn.transferPairId ? 'převod' : 'bez kategorie')}
 											</span>
 											{#if row.txn.payee || isOpenReceivable(row.txn)}
 												<span class="row__payee">
@@ -493,25 +504,27 @@
 			<input class="field__input field__input--mono" type="date" bind:value={editDate} />
 		</label>
 
-		{#if editing?.transferPairId === null}
-			<label class="field">
-				<span class="field__label">Kategorie</span>
-				<select class="field__input" bind:value={editCategory}>
-					<!-- Only offered when the row already is one, so it can be fixed. -->
-					{#if editing?.categoryId === null}
-						<option value="">bez kategorie</option>
-					{/if}
-					{#each ($categories ?? []).filter((c: Category) => !c.isArchived && !c.isDeleted) as category (category.id)}
-						<option value={category.id}>{category.name}</option>
-					{/each}
-				</select>
-			</label>
-		{:else}
-			<!-- A transfer has no bucket and owes nobody anything — it is the same
-			     money on the move. Deleting either leg removes both. -->
+		<label class="field">
+			<span class="field__label">Kategorie</span>
+			<select class="field__input" bind:value={editCategory}>
+				<!-- Only offered when the row already is one, so it can be fixed. -->
+				{#if editing?.categoryId === null}
+					<option value="">bez kategorie</option>
+				{/if}
+				{#each ($categories ?? []).filter((c: Category) => !c.isArchived && !c.isDeleted) as category (category.id)}
+					<option value={category.id}>{category.name}</option>
+				{/each}
+			</select>
+		</label>
+
+		{#if editing?.transferPairId !== null}
+			<!-- One leg of an exchange. It counts like any row since 2026-09-02,
+			     which is why its bucket is editable here — a leg written before
+			     that day has none and is filed the same way. Deleting either leg
+			     removes both. -->
 			<p class="field__hint">
-				Tohle je převod mezi účty. Nepočítá se do výdajů ani příjmů a smazáním zmizí obě jeho
-				strany.
+				Tohle je jedna strana převodu mezi účty. Co odešlo, je výdaj z vybrané kategorie; co
+				dorazilo, je příjem ve SMĚNA. Smazáním zmizí obě strany.
 			</p>
 		{/if}
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { balanceOf, buildTape, categoryOrder, categoryRanking, recentPayees } from './ledger';
+import {
+	MIN_PAYEE_QUERY,
+	balanceOf,
+	buildTape,
+	categoryOrder,
+	categoryRanking,
+	recentPayees,
+	suggestPayees
+} from './ledger';
 import { minor, type Minor } from './money';
 import type { Txn } from './types';
 
@@ -176,5 +184,55 @@ describe('categoryRanking()', () => {
 	it('ignores deleted rows', () => {
 		const rows = [txn('2026-08-01', -1000, { categoryId: 'c-fuel', isDeleted: true })];
 		expect(categoryRanking(rows, ['c-food', 'c-fuel'])).toEqual(['c-food', 'c-fuel']);
+	});
+});
+
+describe('suggestPayees()', () => {
+	const history = [
+		txn('2026-03-02', -6500, { payee: 'ranní kafe' }),
+		txn('2026-05-11', -24900, { payee: 'Albert' }),
+		txn('2026-07-19', -12000, { payee: 'Káva u Petra' }),
+		txn('2026-08-01', -9000, { payee: 'Kafe Jedna' }),
+		txn('2026-08-02', -3000, { payee: 'albert' })
+	];
+
+	it('stays shut until the third character', () => {
+		expect(MIN_PAYEE_QUERY).toBe(3);
+		expect(suggestPayees(history, '')).toEqual([]);
+		expect(suggestPayees(history, 'k')).toEqual([]);
+		expect(suggestPayees(history, 'ka')).toEqual([]);
+		expect(suggestPayees(history, 'kaf')).not.toEqual([]);
+	});
+
+	it('matches the start of any word, folding case and diacritics', () => {
+		expect(suggestPayees(history, 'kaf')).toEqual(['Kafe Jedna', 'ranní kafe']);
+		expect(suggestPayees(history, 'káv')).toEqual(['Káva u Petra']);
+		expect(suggestPayees(history, 'PET')).toEqual(['Káva u Petra']);
+	});
+
+	it('does not match inside a word', () => {
+		expect(suggestPayees(history, 'afe')).toEqual([]);
+	});
+
+	it('searches the whole history, most recent first, in the casing last typed', () => {
+		expect(suggestPayees(history, 'alb')).toEqual(['albert']);
+		// The March row is found even though it is the oldest thing in the ledger.
+		expect(suggestPayees(history, 'ran')).toEqual(['ranní kafe']);
+	});
+
+	it('never offers a transfer leg, and finds nothing in an empty ledger', () => {
+		const rows = [
+			txn('2026-08-03', -100000, { payee: 'Převod → Revolut', transferPairId: 'pair' })
+		];
+		expect(suggestPayees(rows, 'pře')).toEqual([]);
+		expect(suggestPayees([], 'alb')).toEqual([]);
+	});
+
+	it('cuts the list at the limit', () => {
+		const many = Array.from({ length: 12 }, (_, i) =>
+			txn(`2026-08-${String(i + 1).padStart(2, '0')}`, -100, { payee: `Kafe ${i}` })
+		);
+		expect(suggestPayees(many, 'kaf')).toHaveLength(8);
+		expect(suggestPayees(many, 'kaf', 3)).toHaveLength(3);
 	});
 });

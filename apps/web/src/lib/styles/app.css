@@ -94,6 +94,8 @@ body {
 	background-image: var(--ambient), linear-gradient(175deg, var(--ground) 0%, var(--ground-2) 100%);
 	background-attachment: fixed, fixed;
 	background-repeat: no-repeat, no-repeat;
+	/* The ground switches with the currency (Q50) and does not fade: a
+	   transition here would sit under the opaque gradient — see tokens.css. */
 	color: var(--ink);
 	font-family: var(--font-ui);
 	font-size: var(--text-base);

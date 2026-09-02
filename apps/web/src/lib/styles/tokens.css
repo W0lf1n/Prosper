@@ -207,6 +207,111 @@
 }
 
 /**
+ * The currency tint — Q50.
+ *
+ * The room takes the colour of the currency the keypad writes in. The home
+ * currency is the graphite above, untouched; any other currency shifts the
+ * *ground* — and only the ground — a few degrees of hue at the same
+ * lightness, so every card still floats by luminance and every ink still
+ * measures what it measured. The tint is the temperature of the room, never
+ * the colour of anything in it: every saturated hue in this file already
+ * means something (signal, in, flag, danger, the split), and at this chroma
+ * these mean nothing but "not home".
+ *
+ * Light: oklch 0.972 / 0.018 for the ground and 0.93 / 0.024 for its foot,
+ * the neutral pair's own lightness. --ink-3 on them measures 5.2:1 and
+ * 4.95:1, within a hundredth of the neutral ground's own figures.
+ *
+ * Dark: the ground stays true black — the lights-off decision holds — and the
+ * tint lives in the gradient's foot (0.17 / 0.022) and in the bloom behind
+ * the amount. Both are written into the dark bank's values, so the two dark
+ * blocks above stay untouched and still name every dark value once.
+ *
+ * The root attribute is set by `lib/ui/tint.ts` from the active account.
+ * CZK carries a tint too, for a ledger whose home is not koruny — in
+ * practice it is never active.
+ */
+
+/*
+ * The ground switches, it does not fade. A transition on the body's flat
+ * colour sits under the opaque gradient and shows nothing; registering the
+ * tokens with `@property` so the gradient itself interpolates left Chromium
+ * painting a mid-grey while reporting the start colour, and never arriving.
+ * A switch is a deliberate, rare act, and neither fix earns its place.
+ */
+:root[data-currency='EUR'] {
+	--ground: #ecf7ff;
+	--ground-2: #dbeaf7;
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(118 181 233 / 22%) 0%,
+		rgb(118 181 233 / 8%) 40%,
+		transparent 72%
+	);
+	--dark-ground-2: #071018;
+	--dark-ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(118 181 233 / 10%) 0%,
+		rgb(118 181 233 / 3%) 40%,
+		transparent 72%
+	);
+}
+
+:root[data-currency='USD'] {
+	--ground: #eff9ef;
+	--ground-2: #deecde;
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(133 191 134 / 22%) 0%,
+		rgb(133 191 134 / 8%) 40%,
+		transparent 72%
+	);
+	--dark-ground-2: #091209;
+	--dark-ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(133 191 134 / 10%) 0%,
+		rgb(133 191 134 / 3%) 40%,
+		transparent 72%
+	);
+}
+
+:root[data-currency='GBP'] {
+	--ground: #fff1f9;
+	--ground-2: #f5e2eb;
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(220 148 188 / 22%) 0%,
+		rgb(220 148 188 / 8%) 40%,
+		transparent 72%
+	);
+	--dark-ground-2: #160b12;
+	--dark-ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(220 148 188 / 10%) 0%,
+		rgb(220 148 188 / 3%) 40%,
+		transparent 72%
+	);
+}
+
+:root[data-currency='CZK'] {
+	--ground: #fff3ea;
+	--ground-2: #f5e5d8;
+	--ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(221 159 107 / 22%) 0%,
+		rgb(221 159 107 / 8%) 40%,
+		transparent 72%
+	);
+	--dark-ground-2: #160d06;
+	--dark-ambient: radial-gradient(
+		78% 46% at 50% 0%,
+		rgb(221 159 107 / 10%) 0%,
+		rgb(221 159 107 / 3%) 40%,
+		transparent 72%
+	);
+}
+
+/**
  * Dark — the primary theme. True black ground (this app is used in bed with
  * the lights off, on an OLED), then the reference system's near-black
  * micro-steps as the raised surfaces. Elevation is the luminance step itself;

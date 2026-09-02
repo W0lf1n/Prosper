@@ -17,6 +17,7 @@
 
 import { ZERO, add, minor, sum, type Minor } from './money';
 import { addDays, daysBetween, monthKey, today as todayIso, type IsoDate } from './datetime';
+import { normalize } from './vocabulary';
 import type { Txn } from './types';
 
 export interface TapeTxn {
@@ -173,6 +174,54 @@ export function recentPayees(txns: readonly Txn[], limit = 20): string[] {
 		if (seen.size >= limit) break;
 	}
 	return [...seen.values()];
+}
+
+/** Fewer characters than this is not yet a question, and the list stays shut. */
+export const MIN_PAYEE_QUERY = 3;
+
+/**
+ * Payees from the ledger's own history that match what is being typed.
+ *
+ * A search, not a shortlist: the whole history is the pool, so "kaf" finds
+ * "ranní kafe" from March even if thirty other things were bought since.
+ * The match is on the start of any word, with case and diacritics folded —
+ * "alb" finds "Albert", "kav" finds "Káva u Petra". Most recent first, the
+ * casing it was last typed in, and nothing at all until the query reaches
+ * `MIN_PAYEE_QUERY` characters, because a list that opens on an empty field
+ * is noise in front of the one thing the field is for.
+ *
+ * Transfer legs are machine-written and never offered (Q49). An empty ledger
+ * yields an empty list — there is no seed vocabulary of payees anywhere.
+ */
+export function suggestPayees(txns: readonly Txn[], query: string, limit = 8): string[] {
+	const needle = normalize(query);
+	if (needle.length < MIN_PAYEE_QUERY) return [];
+
+	const seen = new Map<string, string>();
+	const ordered = [...txns].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+	for (const txn of ordered) {
+		if (txn.transferPairId !== null) continue;
+		const name = txn.payee.trim();
+		if (!name) continue;
+		const key = name.toLocaleLowerCase('cs');
+		if (seen.has(key)) continue;
+		if (!wordStartsWith(normalize(name), needle)) continue;
+		seen.set(key, name);
+		if (seen.size >= limit) break;
+	}
+	return [...seen.values()];
+}
+
+/** Does any word of `text` begin with `prefix`? Words are runs of letters and
+    digits; "u-petra" is two of them. */
+function wordStartsWith(text: string, prefix: string): boolean {
+	if (text.startsWith(prefix)) return true;
+	let at = text.indexOf(prefix, 1);
+	while (at !== -1) {
+		if (!/[a-z0-9]/.test(text[at - 1]!)) return true;
+		at = text.indexOf(prefix, at + 1);
+	}
+	return false;
 }
 
 /**

@@ -133,7 +133,7 @@ in the header slab.
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-one files, **425
+Vitest, node environment, `requireAssertions: true`. Twenty-two files, **450
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -164,7 +164,7 @@ force-close → reopen → reconnect → verify.
 
 ## Data layer
 
-`lib/db/schema.ts` holds the `migrations` array, currently at **v11**. Add a new
+`lib/db/schema.ts` holds the `migrations` array, currently at **v12**. Add a new
 entry; never edit an existing one, even in development — a released version is
 already on the phone. `schema.test.ts` builds a database at the _old_ version
 and opens it with the current code: a migration that has only ever run against

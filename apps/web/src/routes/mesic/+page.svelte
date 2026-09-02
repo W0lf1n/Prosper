@@ -283,7 +283,9 @@
 
 	// ── the 10/10/10/70 split ───────────────────────────────────────────────
 
-	const split = $derived(prosperitySplit({ income: summary.income, buckets: summary.buckets }));
+	/* Against what was earned, not what arrived: an exchange's euros are not
+	   income the split may claim a tenth of (2026-09-02). */
+	const split = $derived(prosperitySplit({ income: summary.earned, buckets: summary.buckets }));
 
 	const CLASS_COLOUR: Record<ProsperityClass, string> = {
 		give: 'var(--split-give)',

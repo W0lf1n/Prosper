@@ -17,6 +17,7 @@ import { abs, percentOf, sum, type Minor } from './money';
 import { RECORDS, counted } from './czech';
 import { daysBetween, monthKey, shiftMonth, type IsoDate } from './datetime';
 import type { Category, Txn } from './types';
+import { EXCHANGE_CATEGORY_ID } from './accounts';
 import { isVagueDescription, normalize, numbersIn, suggestBucket } from './vocabulary';
 
 export type Severity = 'warn' | 'info';
@@ -244,7 +245,17 @@ export interface BucketTotal {
 
 export interface MonthSummary {
 	month: string;
+	/** Everything that arrived as income — salary, refunds of income kind,
+	    and the euros an exchange brought in. What the month slab shows. */
 	income: Minor;
+	/**
+	 * Income the split may measure against: `income` without SMĚNA. An
+	 * exchange brings money in without anybody having earned it, and the
+	 * 10/10/10/70 shares are shares of earnings — on the euro account every
+	 * exchange would otherwise open a ten-percent hole in giving and saving,
+	 * and a conversion back to koruny would read as a raise at home.
+	 */
+	earned: Minor;
 	outflow: Minor; // negative
 	net: Minor;
 	/** Outflow excluding one-offs — the number that says what life actually costs. */
@@ -255,15 +266,18 @@ export interface MonthSummary {
 }
 
 /**
- * The rows a month is measured over: live, in the month, and **not a transfer
- * leg** (Q49). Moving money to the EUR account is not spending and the money
- * arriving there is not income — the balance sees both legs, the summary sees
- * neither, or every transfer would inflate both sides of the same koruna.
+ * The rows a month is measured over: live and in the month — transfer legs
+ * included, since 2026-09-02. With one account per currency (Q50) a transfer
+ * is an exchange, and an exchange is the moment koruny become the holiday:
+ * the outgoing leg is an expense from the bucket it was spent from, the
+ * incoming leg is income in SMĚNA. Q49 kept both legs out on the argument
+ * that moving your own money is not spending it, which was true of KB to
+ * Revolut CZK and is no longer a move the app can make. The two currencies
+ * are still never summed, so the koruna month and the euro month each tell
+ * their own half of the same fact.
  */
 function measuredRows(context: MonthContext): Txn[] {
-	return context.txns.filter(
-		(t) => !t.isDeleted && t.transferPairId === null && monthKey(t.date) === context.month
-	);
+	return context.txns.filter((t) => !t.isDeleted && monthKey(t.date) === context.month);
 }
 
 export function summariseMonth(context: MonthContext): MonthSummary {
@@ -278,7 +292,11 @@ export function summariseMonth(context: MonthContext): MonthSummary {
 		txn.categoryId === null || (categories.find((c) => c.id === txn.categoryId)?.isIncome ?? false);
 
 	const inflowRows = rows.filter((t) => t.amount > 0);
-	const income = sum(inflowRows.filter(isIncomeRow).map((t) => t.amount));
+	const incomeRows = inflowRows.filter(isIncomeRow);
+	const income = sum(incomeRows.map((t) => t.amount));
+	const earned = sum(
+		incomeRows.filter((t) => t.categoryId !== EXCHANGE_CATEGORY_ID).map((t) => t.amount)
+	);
 
 	const spendRows = [
 		...rows.filter((t) => t.amount < 0),
@@ -315,6 +333,7 @@ export function summariseMonth(context: MonthContext): MonthSummary {
 	return {
 		month,
 		income,
+		earned,
 		outflow,
 		net: (income + outflow) as Minor,
 		recurringOutflow,

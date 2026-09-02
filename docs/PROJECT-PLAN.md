@@ -181,7 +181,7 @@ Full reasoning, including every rejected alternative, is in `DECISIONS.md`.
 | Ids            | Client-generated **UUIDv7**, hand-rolled, no dependency                          |
 | Hosting        | Static output (`adapter-static`), served by its own nginx container from the API's origin — `deploy/`, runbook in `DEPLOYMENT.md` |
 | UI language    | **Czech.** Code, identifiers, comments and docs stay English                     |
-| Currency       | Per account since Q49 (CZK, EUR, USD, GBP); never summed across, no rates        |
+| Currency       | One account per currency since Q50 (CZK, EUR, USD, GBP); never summed across, no rates; koruny held elsewhere join the CZK account as pockets |
 | Phone          | Android primary; iOS kept working as a degraded case                             |
 | History import | **None.** Clean start — the 2026 workbook has no dates to import                 |
 | Repository     | `github.com/W0lf1n/Prosper`, public, **MIT**                                     |
@@ -272,9 +272,18 @@ interface Account extends Synced {
 	kind: AccountKind;
 	openingBalance: Minor;
 	openingDate: string;
-	currency: string; // per account since Q49 — immutable once the account has rows
+	currency: string; // per account since Q49 — immutable once the account has rows; one account per currency since Q50
+	pockets: AccountPocket[]; // money from elsewhere in this currency, opening the account — Q50, v12
 	isArchived: boolean;
 	sortOrder: number;
+}
+
+/** A named amount that opened the account from somewhere else — "Revolut · 5 000 Kč".
+    Opening money, not a live balance; never restated. Read through `pocketsOf()`. */
+interface AccountPocket {
+	id: string;
+	name: string;
+	amount: Minor; // positive, in the account's currency
 }
 
 interface Category extends Synced {
@@ -422,8 +431,13 @@ interface MetaEntry {
 - **A transaction must have a category.** The UI offers no way to save without
   one; `categoryId` stays nullable only so pre-existing and future imported rows
   can be represented and then fixed. See §6.2.
-- **Transfers are two rows**, mirrored amounts, mutually referencing
-  `transferPairId`. Never one row. Never a magic "transfer" category.
+- **Transfers are two rows**, mutually referencing `transferPairId`. Never
+  one row. With one account per currency every transfer is an exchange, and
+  since 2026-09-02 the legs count the way they read: the outgoing leg is an
+  expense from a bucket chosen in the sheet, the incoming leg is income in
+  `SMĚNA` — one income bucket under a constant id, created on first use.
+  The two amounts are the only rate the app knows; deleting either leg
+  removes both (`DECISIONS.md`, "An exchange counts the way it reads").
 - **Every transaction belongs to an account.** No orphans.
 - **An outstanding share is not money.** A share never touches the balance or
   any total until it is settled and its `settledByTxnId` points at the inflow
@@ -690,16 +704,26 @@ with* standing orders.
 
 ### `/settings`
 
-Account name and opening balance · category management (rename, spend type,
-archive, add) · theme · sync pairing and the last cycle, to the minute · JSON
-export/import backup, storage-persistence status, schema version · **Začít
-znovu**.
+Account name, opening balance and **peníze jinde** (pockets, Q50) · the other
+accounts with **Přepnout**, **Přidat účet** for a currency not yet held, and
+**Převod** · category management (rename, spend type, archive, add) · theme ·
+sync pairing and the last cycle, to the minute · JSON export/import backup,
+storage-persistence status, schema version · **Začít znovu**.
 
 **The account card is setup, not maintenance.** Three fields typed once, and it
-folds to a single line — name, opening balance, the day it was true — the moment
-the ledger has a row in it. It is not disabled: a wrong opening balance is
-precisely what reconciling finds out three months later, and a setting nobody can
-reach is a bug report. `Upravit` opens it again.
+folds to a single line — name, opening balance, the day it was true, and what
+sits elsewhere — the moment the ledger has a row in it. It is not disabled: a
+wrong opening balance is precisely what reconciling finds out three months
+later, and a setting nobody can reach is a bug report. `Upravit` opens it again.
+
+**One account per currency** (Q50). The add form offers only currencies no
+live account holds and disappears when there are none. Koruny on another card
+are not a second CZK account: they are a *pocket* on the CZK account — a name
+and an amount that opened it — and every flow after that is a row like any
+other. The switch between accounts also lives on the entry screen, on the
+currency glyph beside the amount, and the ground of every screen takes the
+colour of a foreign currency so the account being written to is known before a
+digit is typed.
 
 **Začít znovu** is the app's only destructive action and the only place friction
 is the point. A sheet, a list of what goes and what stays, a backup box ticked by

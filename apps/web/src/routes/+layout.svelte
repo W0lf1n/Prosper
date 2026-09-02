@@ -1,11 +1,50 @@
 <script lang="ts">
 	import '$lib/styles/app.css';
+	import { liveQuery } from 'dexie';
+	import { db } from '$lib/db/schema';
+	import { homeCurrency } from '$lib/domain/accounts';
+	import type { Account } from '$lib/domain/types';
 	import Scenery from '$lib/ui/Scenery.svelte';
 	import Toaster from '$lib/ui/Toaster.svelte';
 	import { shell } from '$lib/ui/shell.svelte';
+	import { applyCurrencyTint, currencyTint, syncThemeColor } from '$lib/ui/tint';
 	import { initSync, watchTriggers } from '$lib/sync/status.svelte';
+	import type { LayoutProps } from './$types';
 
-	let { children } = $props();
+	let { children, data }: LayoutProps = $props();
+
+	/**
+	 * The room takes the colour of the currency being written (Q50).
+	 *
+	 * Subscribed by hand and assigned into `$state`, because this is the one
+	 * component that lives outside every route's scroll region — the place
+	 * the `$store` auto-subscription is not to be trusted (`CLAUDE.md`). The
+	 * active account comes from the layout load, so an account switch
+	 * anywhere re-runs this and the ground follows it on every screen.
+	 */
+	let accounts = $state<Account[]>([]);
+	$effect(
+		() =>
+			liveQuery(() => db().accounts.toArray()).subscribe((rows) => (accounts = rows as Account[]))
+				.unsubscribe
+	);
+
+	const tint = $derived.by(() => {
+		const active = accounts.find((a) => a.id === data.accountId);
+		return currencyTint(active?.currency, homeCurrency(accounts));
+	});
+
+	$effect(() => {
+		applyCurrencyTint(tint);
+	});
+
+	/* The status bar reads the resolved ground, which moves with the system
+	   theme even when nothing else does. */
+	$effect(() => {
+		const media = matchMedia('(prefers-color-scheme: dark)');
+		media.addEventListener('change', syncThemeColor);
+		return () => media.removeEventListener('change', syncThemeColor);
+	});
 
 	/**
 	 * Sync takes up position once, here, and then gets on with it in the

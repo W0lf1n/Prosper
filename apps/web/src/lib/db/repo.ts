@@ -7,7 +7,15 @@
  *   3. Mutations pass through `enqueue()`, the seam the P2 outbox plugs into.
  */
 
-import { homeCurrency, inCurrency } from '$lib/domain/accounts';
+import {
+	EXCHANGE_CATEGORY_ID,
+	EXCHANGE_CATEGORY_NAME,
+	availableCurrencies,
+	homeCurrency,
+	inCurrency,
+	pocketsOf,
+	validatePocket
+} from '$lib/domain/accounts';
 import { monthKey, nowIso, startOfMonth, today } from '$lib/domain/datetime';
 import { goalStatus, validateGoal, validateGoalShape } from '$lib/domain/goals';
 import { DEFAULT_REMINDER_DAYS } from '$lib/domain/holdings';
@@ -22,6 +30,7 @@ import { ADJUSTMENT_PAYEE, reconcileDelta } from '$lib/domain/reconcile';
 import { MAX_SHARES, isOpenShare, sharesOf } from '$lib/domain/receivables';
 import { ZERO, abs, neg, type Minor } from '$lib/domain/money';
 import type {
+	AccountPocket,
 	Account,
 	Category,
 	DayMark,
@@ -189,6 +198,7 @@ export async function ensureSeeded(): Promise<SeedResult> {
 		openingBalance: ZERO,
 		openingDate: today(),
 		currency: 'CZK',
+		pockets: [],
 		isArchived: false,
 		sortOrder: 0,
 		updatedAt,
@@ -457,11 +467,73 @@ export async function updateAccount(
 	await enqueue('account', next.id, next);
 }
 
+/**
+ * Money from elsewhere joins the account — Q50.
+ *
+ * The koruny on a Revolut card do not get an account of their own; they are
+ * part of the CZK account and this is how they get in. A pocket is opening
+ * money with a name on it, and it is written the way the opening balance is:
+ * a field on the account row, stamped and queued as one change.
+ */
+export async function addPocket(
+	accountId: string,
+	input: { name: string; amount: Minor }
+): Promise<AccountPocket | undefined> {
+	const database = db();
+	const existing = await database.accounts.get(accountId);
+	if (!existing || existing.isDeleted) return undefined;
+	if (validatePocket(input).length > 0) return undefined;
+
+	const pocket: AccountPocket = { id: uuidv7(), name: input.name.trim(), amount: input.amount };
+	const next: Account = {
+		...existing,
+		pockets: [...pocketsOf(existing), pocket],
+		...(await stamp())
+	};
+	await database.accounts.put(next);
+	await enqueue('account', next.id, next);
+	return pocket;
+}
+
+/** The pocket was a mistake, or the money left for good. Either way the
+    balance stops counting it — a pocket is a stated figure, not a row, so
+    there is nothing to tombstone. */
+export async function removePocket(accountId: string, pocketId: string): Promise<void> {
+	const database = db();
+	const existing = await database.accounts.get(accountId);
+	if (!existing || existing.isDeleted) return;
+
+	const next: Account = {
+		...existing,
+		pockets: pocketsOf(existing).filter((p) => p.id !== pocketId),
+		...(await stamp())
+	};
+	await database.accounts.put(next);
+	await enqueue('account', next.id, next);
+}
+
+/**
+ * Thrown by `createAccount` for a currency a live account already holds —
+ * one account per currency (Q50). The form never offers such a currency; the
+ * guard exists because a rule that lives only in a form is not a rule.
+ */
+export class CurrencyTakenError extends Error {
+	constructor(public readonly currency: string) {
+		super(`An account in ${currency} already exists`);
+		this.name = 'CurrencyTakenError';
+	}
+}
+
 export async function createAccount(
 	input: Pick<Account, 'name' | 'kind'> &
 		Partial<Pick<Account, 'currency' | 'openingBalance' | 'openingDate'>>
 ): Promise<Account> {
 	const database = db();
+	const currency = input.currency ?? 'CZK';
+	if (!availableCurrencies(await database.accounts.toArray()).includes(currency)) {
+		throw new CurrencyTakenError(currency);
+	}
+
 	const { updatedAt, deviceId } = await stamp();
 	const account: Account = {
 		id: uuidv7(),
@@ -469,10 +541,11 @@ export async function createAccount(
 		kind: input.kind,
 		openingBalance: input.openingBalance ?? ZERO,
 		openingDate: input.openingDate ?? today(),
+		pockets: [],
 		// Chosen once, at the counter. There is deliberately no way to change it
 		// later — an account with rows in it cannot switch currency without
 		// silently redenominating its whole history (Q49).
-		currency: input.currency ?? 'CZK',
+		currency,
 		isArchived: false,
 		sortOrder: await database.accounts.count(),
 		updatedAt,
@@ -494,6 +567,9 @@ export interface NewTransfer {
 	/** What lands, positive magnitude, in the target account's currency. The
 	    pair of amounts *is* the exchange rate; nothing else records one (Q49). */
 	amountIn: Minor;
+	/** The bucket the outgoing leg is spent from — DOVOLENÁ, LIFESTYLE, the
+	    mortgage's. The incoming leg lands in SMĚNA on its own. */
+	categoryId: string;
 	date?: string;
 	note?: string | null;
 }
@@ -504,18 +580,57 @@ export interface Transfer {
 }
 
 /**
+ * The income bucket every exchange lands in, created the first time it is
+ * needed. A constant id rather than `uuidv7()`: two paired devices that each
+ * write their first exchange before a sync produce the same row, and the
+ * merge collapses them instead of leaving two SMĚNA buckets. An archived one
+ * is still used — the leg needs a bucket and the person can un-archive it.
+ */
+export async function ensureExchangeCategory(): Promise<Category> {
+	const database = db();
+	const existing = await database.categories.get(EXCHANGE_CATEGORY_ID);
+	if (existing && !existing.isDeleted) return existing;
+
+	const { updatedAt, deviceId } = await stamp();
+	const category: Category = {
+		id: EXCHANGE_CATEGORY_ID,
+		parentId: null,
+		name: EXCHANGE_CATEGORY_NAME,
+		/* The same axis value PŘÍJEM carries: income rows never enter the split,
+		   so the type is a formality the schema requires. */
+		spendType: 'save',
+		monthlyCap: null,
+		sortOrder: await database.categories.count(),
+		isArchived: false,
+		isIncome: true,
+		updatedAt,
+		deviceId,
+		isDeleted: false
+	};
+	await database.categories.put(category);
+	await enqueue('category', category.id, category);
+	return category;
+}
+
+/**
  * Move money between two accounts — §6.1: two rows, mutually referencing
- * `transferPairId`, never one row and never a magic category.
+ * `transferPairId`, never one row.
  *
  * Both legs commit together or not at all: one leg alone would be a phantom
- * expense on one account and a phantom windfall on the other. Every summary
- * excludes transfer legs (`domain/accounts.ts` → `isTransfer`); only the
- * balances see them, because the balances are what actually moved.
+ * expense on one account and a phantom windfall on the other. Since
+ * 2026-09-02 the legs *count* the way they read — with one account per
+ * currency every transfer is an exchange, and the koruna month should show
+ * the holiday it paid for: the outgoing leg is an expense from the chosen
+ * bucket, the incoming leg is income in SMĚNA. The balances see both, as
+ * they always did.
  */
 export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 	const database = db();
 	if (input.fromAccountId === input.toAccountId) {
 		throw new Error('Převod potřebuje dva různé účty.');
+	}
+	if (!input.categoryId) {
+		throw new Error('Převod potřebuje kategorii, ze které odchází.');
 	}
 	const [from, to] = await Promise.all([
 		database.accounts.get(input.fromAccountId),
@@ -526,6 +641,7 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 	// Resolved before the transaction — `enqueue` reads `meta` on its first
 	// call and `meta` is not one of the tables below (the importBackup trap).
 	await refreshSyncEnabled();
+	const exchange = await ensureExchangeCategory();
 
 	const { updatedAt, deviceId } = await stamp();
 	const date = input.date ?? today();
@@ -533,7 +649,6 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 
 	const base = {
 		date,
-		categoryId: null,
 		note,
 		source: 'manual' as const,
 		isCleared: false,
@@ -551,6 +666,7 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 		id: uuidv7(),
 		accountId: from.id,
 		amount: neg(abs(input.amountOut)),
+		categoryId: input.categoryId,
 		payee: `Převod → ${to.name}`,
 		transferPairId: '' // filled below, once the other id exists
 	};
@@ -559,6 +675,7 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 		id: uuidv7(),
 		accountId: to.id,
 		amount: abs(input.amountIn),
+		categoryId: exchange.id,
 		payee: `Převod ← ${from.name}`,
 		transferPairId: outLeg.id
 	};
@@ -1507,6 +1624,7 @@ export async function resetLedger(): Promise<ResetResult> {
 					...account,
 					openingBalance: ZERO,
 					openingDate: today(),
+					pockets: [],
 					...stamped
 				};
 				await database.accounts.put(next);

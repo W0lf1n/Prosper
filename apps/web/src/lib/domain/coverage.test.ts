@@ -44,10 +44,21 @@ describe('monthCoverage', () => {
 		expect(result.percent).toBe(33);
 	});
 
-	it('a transfer day is still a quiet day — moving money is not spending it (Q49)', () => {
+	it('the day koruny were exchanged is a spending day — the outgoing leg is an expense', () => {
 		const result = monthCoverage({
 			month: '2026-08',
 			txns: [txn('2026-08-01', { transferPairId: 'pair' })],
+			today: '2026-08-02'
+		});
+
+		expect(result.spending).toBe(1);
+		expect(result.quiet).toBe(1);
+	});
+
+	it('the euros arriving do not make a day expensive', () => {
+		const result = monthCoverage({
+			month: '2026-08',
+			txns: [txn('2026-08-01', { transferPairId: 'pair', amount: minor(100_00) })],
 			today: '2026-08-02'
 		});
 

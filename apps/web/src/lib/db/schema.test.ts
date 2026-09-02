@@ -460,3 +460,45 @@ describe('v7 → v8 — which goal is na očích', () => {
 		upgraded.close();
 	});
 });
+
+describe('v11 → v12 — Account.pockets', () => {
+	it('backfills an empty list on every account, and keeps one that already exists', async () => {
+		const name = `mig-pockets-${Date.now()}`;
+		const old = await openAtVersion(name, 11);
+		await old.table('accounts').bulkPut([
+			{
+				id: 'acc-kb',
+				name: 'Běžný účet',
+				kind: 'checking',
+				openingBalance: 20_000_00,
+				openingDate: '2026-01-01',
+				currency: 'CZK',
+				isArchived: false,
+				sortOrder: 0,
+				...SYNCED
+			},
+			{
+				id: 'acc-odd',
+				name: 'Z novější zálohy',
+				kind: 'checking',
+				openingBalance: 0,
+				openingDate: '2026-01-01',
+				currency: 'EUR',
+				isArchived: false,
+				sortOrder: 1,
+				pockets: [{ id: 'p1', name: 'Revolut', amount: 5_000_00 }],
+				...SYNCED
+			}
+		]);
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const kb = await upgraded.accounts.get('acc-kb');
+		const odd = await upgraded.accounts.get('acc-odd');
+
+		// An absent field is not an empty list — every reader would need a guard.
+		expect(kb?.pockets).toEqual([]);
+		expect(odd?.pockets).toEqual([{ id: 'p1', name: 'Revolut', amount: 5_000_00 }]);
+		upgraded.close();
+	});
+});

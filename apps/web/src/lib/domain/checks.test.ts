@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EXCHANGE_CATEGORY_ID } from './accounts';
 import { checkDraft, summariseMonth, type CheckContext, type Draft } from './checks';
 import { minor } from './money';
 import type { Category, Txn } from './types';
@@ -190,27 +191,85 @@ describe('duplicates', () => {
 	});
 });
 
-describe('transfers stay out of the measurements (Q49)', () => {
-	it('a transfer leg is neither outflow, income, a bucket, nor an uncategorised row', () => {
+describe('an exchange counts the way it reads (2026-09-02, reversing part of Q49)', () => {
+	const exchange = category('SMĚNA', { id: EXCHANGE_CATEGORY_ID, isIncome: true });
+	const withExchange = [...CATEGORIES, exchange];
+
+	it('the outgoing leg is an expense from its bucket, on the koruna account', () => {
 		const out = txn('2026-08-10', -2470_00, {
 			transferPairId: 'leg-in',
-			payee: 'Převod → Revolut'
+			payee: 'Převod → Revolut',
+			categoryId: 'cat-lifestyle'
 		});
-		const inc = txn('2026-08-10', 2470_00, { transferPairId: out.id, payee: 'Převod ← KB' });
 		const lunch = txn('2026-08-11', -249_00, { categoryId: 'cat-jídlo' });
 
 		const summary = summariseMonth({
 			month: '2026-08',
-			txns: [out, inc, lunch],
-			categories: CATEGORIES,
+			txns: [out, lunch],
+			categories: withExchange,
 			today: '2026-08-30'
 		});
 
-		expect(summary.outflow).toBe(-249_00);
+		expect(summary.outflow).toBe(-2719_00);
 		expect(summary.income).toBe(0);
-		expect(summary.buckets).toHaveLength(1);
-		// The uncategorised nag must not fire on rows that cannot have a bucket.
+		expect(summary.buckets.map((b) => b.category?.name)).toEqual(['LIFESTYLE', 'JÍDLO']);
 		expect(summary.findings.find((f) => f.rule === 'uncategorised')).toBeUndefined();
+	});
+
+	it('the incoming leg is income in SMĚNA, on the euro account', () => {
+		const inc = txn('2026-08-10', 100_00, {
+			transferPairId: 'leg-out',
+			payee: 'Převod ← KB',
+			categoryId: exchange.id
+		});
+		const beer = txn('2026-08-12', -4_50, { categoryId: 'cat-jídlo' });
+
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [inc, beer],
+			categories: withExchange,
+			today: '2026-08-30'
+		});
+
+		expect(summary.income).toBe(100_00);
+		expect(summary.outflow).toBe(-4_50);
+		expect(summary.net).toBe(95_50);
+		// Arrived, not earned: the split may not claim a tenth of exchanged euros.
+		expect(summary.earned).toBe(0);
+	});
+
+	it('keeps salary in the split baseline while an exchange stays out of it', () => {
+		const salary = txn('2026-08-01', 50_000_00, { categoryId: 'cat-příjem' });
+		const back = txn('2026-08-28', 500_00, {
+			transferPairId: 'leg-out',
+			payee: 'Převod ← Revolut',
+			categoryId: exchange.id
+		});
+
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [salary, back],
+			categories: withExchange,
+			today: '2026-08-30'
+		});
+
+		expect(summary.income).toBe(50_500_00);
+		expect(summary.earned).toBe(50_000_00);
+	});
+
+	it('a leg written before buckets existed is nagged like any other bare row', () => {
+		// Legs from before 2026-09-02 carry no bucket; the tape lets them be filed.
+		const legacy = txn('2026-08-10', -2470_00, { transferPairId: 'leg-in' });
+
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [legacy],
+			categories: withExchange,
+			today: '2026-08-30'
+		});
+
+		expect(summary.outflow).toBe(-2470_00);
+		expect(summary.findings.find((f) => f.rule === 'uncategorised')).toBeDefined();
 	});
 });
 

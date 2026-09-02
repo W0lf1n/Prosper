@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
-	import { confirmScheduled, createTxn, deleteTxn, skipScheduled } from '$lib/db/repo';
+	import {
+		confirmScheduled,
+		createTxn,
+		deleteTxn,
+		setActiveAccountId,
+		skipScheduled
+	} from '$lib/db/repo';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		EMPTY,
 		display,
@@ -23,8 +30,8 @@
 		sub,
 		type Minor
 	} from '$lib/domain/money';
-	import { homeCurrency } from '$lib/domain/accounts';
-	import { categoryRanking, recentPayees } from '$lib/domain/ledger';
+	import { homeCurrency, liveAccounts } from '$lib/domain/accounts';
+	import { categoryRanking, suggestPayees } from '$lib/domain/ledger';
 	import { checkDraft, summariseMonth, type Finding } from '$lib/domain/checks';
 	import { dueGroups, type DueGroup } from '$lib/domain/recurring';
 	import { readHoldings, wealthTotal } from '$lib/domain/holdings';
@@ -67,13 +74,20 @@
 
 	const allCategories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
 
-	const allTxns = liveQuery(async () =>
-		data.accountId
-			? (await db().txns.where('accountId').equals(data.accountId).toArray()).filter(
-					(t) => !t.isDeleted
-				)
-			: []
-	);
+	/**
+	 * The whole ledger, and the active account's slice of it derived on top.
+	 *
+	 * This used to be a per-account query, and it was the trap `CLAUDE.md`
+	 * records: a `liveQuery` closing over `data.accountId` re-runs on Dexie
+	 * writes, not on `data` changes. Every other screen mounts fresh after
+	 * navigation and never noticed — but the account switch now lives on this
+	 * very screen (Q50), and a keyed query would have left every figure
+	 * showing the old account until the next save. A table-wide list filtered
+	 * in a `$derived` follows the switch by construction.
+	 */
+	const allTxns = liveQuery(() => db().txns.toArray());
+	const liveRows = $derived((($allTxns ?? []) as Txn[]).filter((t) => !t.isDeleted));
+	const accountTxns = $derived(liveRows.filter((t) => t.accountId === data.accountId));
 
 	const allGoals = liveQuery(async () =>
 		(await db().goals.toArray()).filter((g: Goal) => !g.isDeleted)
@@ -95,7 +109,7 @@
 	 * ones. Either way it never reaches the primary column — the amount and the
 	 * keypad own that.
 	 */
-	const streak = $derived(quietStreak({ txns: ($allTxns ?? []) as Txn[], today: today() }));
+	const streak = $derived(quietStreak({ txns: accountTxns, today: today() }));
 
 	const allHoldings = liveQuery(() => db().holdings.orderBy('sortOrder').toArray());
 	const allValuations = liveQuery(() => db().valuations.toArray());
@@ -191,7 +205,7 @@
 	/** Most-used first: what is one tap away is decided by habit, not by history. */
 	const rankedCategories = $derived.by(() => {
 		const byId = new Map(directionCategories.map((c: Category) => [c.id, c]));
-		return categoryRanking($allTxns ?? [], [...byId.keys()])
+		return categoryRanking(accountTxns, [...byId.keys()])
 			.map((id) => byId.get(id)!)
 			.filter(Boolean);
 	});
@@ -200,7 +214,7 @@
 	const summary = $derived(
 		summariseMonth({
 			month: monthKey(today()),
-			txns: $allTxns ?? [],
+			txns: accountTxns,
 			categories: liveCategories,
 			today: today()
 		})
@@ -217,7 +231,7 @@
 		return (($allGoals ?? []) as Goal[]).map((goal) =>
 			goalStatus({
 				goal,
-				txns: $allTxns ?? [],
+				txns: accountTxns,
 				categories: liveCategories,
 				target: written.find((t) => t.goalId === goal.id && t.month === month) ?? null,
 				month,
@@ -234,7 +248,12 @@
 	 */
 	const primaryGoal = $derived(currency === home ? pickPrimary(goalStatuses) : null);
 
-	const payees = $derived(recentPayees($allTxns ?? [], 12));
+	/**
+	 * What the payee field offers: the ledger's own history, searched — every
+	 * account, because a payee is a payee wherever the card was — and nothing
+	 * at all until the third character. `suggestPayees` owns both rules.
+	 */
+	const payees = $derived(suggestPayees(liveRows, payee));
 
 	const isToday = $derived(date === today());
 	/** A bucket is mandatory: an uncategorised row is a hole in next month's report. */
@@ -243,7 +262,7 @@
 
 	/** Newest first — the duplicate check only looks a few days back. */
 	const recent = $derived(
-		[...($allTxns ?? [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 60)
+		[...accountTxns].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 60)
 	);
 
 	/**
@@ -397,6 +416,48 @@
 		if (fix.kind === 'mark-one-off') isOneOff = true;
 		checksExpanded = false;
 	}
+
+	// ── the account ─────────────────────────────────────────────────────────
+	const accountRows = $derived(liveAccounts(($allAccounts ?? []) as Account[]));
+
+	/** The account one tap away: the next in configured order, wrapping. */
+	const nextAccount = $derived.by(() => {
+		if (accountRows.length < 2) return null;
+		const at = accountRows.findIndex((a) => a.id === data.accountId);
+		return accountRows[(at + 1) % accountRows.length] ?? null;
+	});
+
+	let switching = false;
+
+	/**
+	 * One tap, the next account — Kč, €, Kč. The coin's gesture, at Petr's
+	 * ask, rather than a sheet: with one account per currency the glyph *is*
+	 * the account, and the list of them is short enough to walk round.
+	 *
+	 * Sticky, like the date: it holds until it is changed. A per-row choice
+	 * that reset after every save would cost a tap on every one of thirty
+	 * holiday rows, and the account the keypad writes to is exactly what
+	 * "active" has always meant — so this is the same meta write Settings
+	 * makes, and the layout hands the new account to every route.
+	 *
+	 * The half-typed amount survives: the digits are the digits, and only the
+	 * glyph beside them changes meaning. A second tap while the first is
+	 * still landing is dropped rather than queued — the glyph shows where
+	 * the keypad writes, and a queue would let it lie for a beat.
+	 */
+	async function cycleAccount() {
+		const next = nextAccount;
+		if (!next || switching) return;
+		switching = true;
+		try {
+			await setActiveAccountId(next.id);
+			await invalidateAll();
+		} finally {
+			switching = false;
+		}
+		navigator.vibrate?.(8);
+		toast.show(`Zapisuje se na „${next.name}“ · ${currencySymbol(next.currency)}`);
+	}
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -517,7 +578,30 @@
 				<span class="visually-hidden">{direction === 'out' ? 'Výdaj' : 'Příjem'}</span
 				>{#key display(amount)}<span class="display__digits">{display(amount)}</span>{/key}
 			</output>
-			<span class="display__currency">{currencySymbol(currency)}</span>
+			{#if accountRows.length > 1}
+				<!--
+				  With one account per currency the glyph *is* the account (Q50),
+				  so it is also the control that changes it — no row of chips, no
+				  height taken from the number. It cycles like the coin flips: one
+				  tap, the next currency, round and round. The glyph rolls in from
+				  below on every change, keyed on the currency so the roll runs
+				  once per switch and never on a re-render — the same recipe the
+				  digits use to land. With a single account it is the plain glyph
+				  it always was.
+				-->
+				<button
+					type="button"
+					class="display__currency display__currency--cycle"
+					onclick={cycleAccount}
+					aria-label={`Účet ${activeAccount?.name ?? ''} (${currencySymbol(currency)}) — přepnout na ${nextAccount?.name ?? ''}`}
+				>
+					<span class="cycle__well" aria-hidden="true">
+						{#key currency}<span class="cycle__glyph">{currencySymbol(currency)}</span>{/key}
+					</span>
+				</button>
+			{:else}
+				<span class="display__currency">{currencySymbol(currency)}</span>
+			{/if}
 		</div>
 
 		<!--
@@ -1625,6 +1709,81 @@
 
 	.date-custom {
 		margin-top: var(--space-3);
+	}
+
+	/**
+	 * ── the account, as the glyph ───────────────────────────────────────
+	 *
+	 * A slab rather than a bare glyph, because a bare glyph is what it was
+	 * when it could not be pressed — the coin's recipe at the coin's other
+	 * side: hairline, lit top edge, `--radius-sm` rather than the pill (the
+	 * pill is reserved for the action, and this is a setting). Centred on the
+	 * number like the coin, not on its baseline: the well clips the roll, and
+	 * a clipped box has no baseline worth aligning to. The hit area is
+	 * borrowed from the pool's empty air around it, like every small control
+	 * here.
+	 */
+	.display__currency--cycle {
+		position: relative;
+		display: grid;
+		place-items: center;
+		align-self: center;
+		min-width: 2.7em;
+		height: 1.9em;
+		padding-inline: 0.55em;
+		border: 1px solid var(--hairline-2);
+		border-radius: var(--radius-sm);
+		background: var(--surface-2);
+		color: var(--ink-2);
+		box-shadow: var(--edge-strong);
+		transition:
+			background var(--dur-fast) var(--ease-out),
+			border-color var(--dur-fast) var(--ease-out),
+			transform var(--dur-press) var(--ease-out);
+	}
+
+	.display__currency--cycle::after {
+		content: '';
+		position: absolute;
+		inset: -8px -6px;
+	}
+
+	.display__currency--cycle:active {
+		transform: scale(0.95);
+		background: var(--surface-3);
+	}
+
+	@media (hover: hover) {
+		.display__currency--cycle:hover {
+			border-color: var(--ink-3);
+		}
+	}
+
+	/* The well the glyph rolls through. Clipped, so the incoming glyph rises
+	   out of the slab's floor rather than appearing beneath it. */
+	.cycle__well {
+		display: grid;
+		place-items: center;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	/* One roll per switch: `{#key}` remounts the glyph on the currency, so the
+	   keyframe runs on a change and never on a re-render — as the digits do. */
+	.cycle__glyph {
+		display: block;
+		animation: roll var(--dur-base) var(--ease-settle);
+	}
+
+	@keyframes roll {
+		from {
+			opacity: 0;
+			transform: translateY(85%);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
 	}
 
 	/**

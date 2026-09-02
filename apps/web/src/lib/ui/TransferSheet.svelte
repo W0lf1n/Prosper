@@ -1,20 +1,26 @@
 <script lang="ts">
 	/**
-	 * Moving money between two accounts — Q49.
+	 * Moving money between two accounts — Q49, and since 2026-09-02 an exchange.
 	 *
 	 * Two rows, never one (§6.1): what leaves one account and what lands on the
 	 * other. Inside one currency that is a single amount asked once; across
 	 * currencies both sides are asked, because the pair *is* the exchange rate
 	 * — 2 470 Kč out, 100 € in — and no rate is ever fetched or stored.
 	 *
+	 * With one account per currency (Q50) every transfer crosses a currency, so
+	 * the two legs count the way they read: what leaves is an expense from a
+	 * bucket chosen here, what arrives is income in SMĚNA. The koruna month
+	 * shows the holiday it paid for; the euro month shows what arrived.
+	 *
 	 * A form, not the keypad: a transfer is a rare, deliberate act and has no
 	 * claim on the five-second path. That is why it lives on /tape and in
 	 * Settings and nowhere near the entry screen.
 	 */
-	import { liveAccounts, validateTransfer } from '$lib/domain/accounts';
+	import { lastExchangeCategoryId, liveAccounts, validateTransfer } from '$lib/domain/accounts';
+	import { categoryRanking } from '$lib/domain/ledger';
 	import { currencySymbol, parseAmount, type Minor } from '$lib/domain/money';
 	import { today } from '$lib/domain/datetime';
-	import type { Account } from '$lib/domain/types';
+	import type { Account, Category, Txn } from '$lib/domain/types';
 
 	import Sheet from './Sheet.svelte';
 
@@ -23,24 +29,43 @@
 		toAccountId: string;
 		amountOut: Minor;
 		amountIn: Minor;
+		/** The bucket the outgoing leg is spent from. */
+		categoryId: string;
 		date: string;
 	}
 
 	interface Props {
 		open: boolean;
 		accounts: Account[];
+		/** Every category; the sheet keeps the live spending ones. */
+		categories: Category[];
+		/** Past transfer legs, so the bucket opens on the last one used and the
+		    rest rank by habit. Any rows will do — the legs are picked out. */
+		exchanges: Txn[];
 		/** Which account the "from" select opens on — the screen's own. */
 		defaultFromId: string | null;
 		onsave: (input: TransferInput) => Promise<void>;
 		onclose: () => void;
 	}
 
-	let { open, accounts, defaultFromId, onsave, onclose }: Props = $props();
+	let { open, accounts, categories, exchanges, defaultFromId, onsave, onclose }: Props = $props();
 
 	const live = $derived(liveAccounts(accounts));
 
+	/** Spending buckets, most-used-for-exchanges first — the keypad's own
+	    ranking, run over the outgoing legs alone. */
+	const buckets = $derived.by(() => {
+		const spending = categories.filter((c) => !c.isDeleted && !c.isArchived && !c.isIncome);
+		const byId = new Map(spending.map((c) => [c.id, c]));
+		const legs = exchanges.filter((t) => !t.isDeleted && t.transferPairId !== null && t.amount < 0);
+		return categoryRanking(legs, [...byId.keys()])
+			.map((id) => byId.get(id)!)
+			.filter(Boolean);
+	});
+
 	let fromId = $state('');
 	let toId = $state('');
+	let categoryId = $state('');
 	let outText = $state('');
 	let inText = $state('');
 	let date = $state(today());
@@ -57,6 +82,7 @@
 		seeded = true;
 		fromId = defaultFromId ?? live[0]?.id ?? '';
 		toId = live.find((a) => a.id !== fromId)?.id ?? '';
+		categoryId = lastExchangeCategoryId(exchanges) ?? buckets[0]?.id ?? '';
 		outText = '';
 		inText = '';
 		date = today();
@@ -82,7 +108,8 @@
 			from,
 			to,
 			amountOut: amountOut ?? 0,
-			amountIn: amountIn ?? 0
+			amountIn: amountIn ?? 0,
+			categoryId: categoryId || null
 		});
 		if (problems.includes('same-account')) {
 			error = 'Vyber dva různé účty.';
@@ -96,6 +123,10 @@
 			error = 'Kolik dorazí? Částka není číslo.';
 			return;
 		}
+		if (problems.includes('category')) {
+			error = 'Do jaké kategorie ten výdaj patří? Vyber ji.';
+			return;
+		}
 
 		error = '';
 		await onsave({
@@ -103,6 +134,7 @@
 			toAccountId: to.id,
 			amountOut: amountOut!,
 			amountIn: amountIn!,
+			categoryId,
 			date
 		});
 	}
@@ -129,6 +161,27 @@
 				</select>
 			</label>
 		</div>
+
+		<!-- The koruny leave as an expense, and an expense has a bucket — the
+		     holiday's, the mortgage's. It is asked the way every expense is
+		     asked, by its bucket, not "from" one: nothing leaves a category. A
+		     select rather than the keypad's chip rail: the rail opens a sheet
+		     of its own for search, and a sheet inside a sheet is one modal too
+		     many. -->
+		<label class="field">
+			<span class="field__label">Kategorie výdaje</span>
+			<select class="field__input" bind:value={categoryId}>
+				{#if !categoryId}
+					<option value="">za co to je…</option>
+				{/if}
+				{#each buckets as bucket (bucket.id)}
+					<option value={bucket.id}>{bucket.name}</option>
+				{/each}
+			</select>
+			<span class="field__hint">
+				Odchozí částka je výdaj jako každý jiný — dovolená, lifestyle, hypotéka.
+			</span>
+		</label>
 
 		<div class="pair">
 			<label class="field">
@@ -173,11 +226,12 @@
 			<p class="field__hint">
 				Obě částky zadáváš ty — kurz je v nich, app žádný nestahuje ani si ho nepamatuje.
 			</p>
-		{:else}
-			<p class="field__hint">
-				Převod není výdaj ani příjem — v přehledech měsíce se neukáže, jen pohne zůstatky.
-			</p>
 		{/if}
+
+		<p class="field__hint">
+			Co odejde, se zapíše jako výdaj ve zvolené kategorii; co dorazí, jako příjem ve SMĚNA. Každý
+			účet to vidí ve své měně a dohromady se nesčítají.
+		</p>
 
 		{#if error}
 			<p class="error-text">{error}</p>

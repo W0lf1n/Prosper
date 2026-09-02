@@ -48,12 +48,13 @@ export interface Coverage {
 	quietDays: IsoDate[];
 }
 
-/** Every date that carries an outflow. Income does not make a day expensive,
-    and neither does a transfer (Q49) — moving money is not spending it. */
+/** Every date that carries an outflow. Income does not make a day expensive.
+    An exchange's outgoing leg does, since 2026-09-02: koruny left for the
+    holiday wallet, and that is the day they were spent. */
 function spendingDays(txns: readonly Txn[]): Set<IsoDate> {
 	const days = new Set<IsoDate>();
 	for (const txn of txns) {
-		if (txn.isDeleted || txn.transferPairId !== null) continue;
+		if (txn.isDeleted) continue;
 		if (txn.amount < 0) days.add(txn.date);
 	}
 	return days;

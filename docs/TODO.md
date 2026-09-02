@@ -1,6 +1,6 @@
 # TODO — what is left
 
-**Revised:** 2026-08-30
+**Revised:** 2026-09-02
 **Audience:** Petr (decisions), Claude Code (implementation)
 
 > The only file in `docs/` that carries a backlog. Everything else describes the
@@ -13,16 +13,21 @@
 
 ---
 
-## State, 2026-08-30
+## State, 2026-09-02
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 425 pass, 21 files              |
-| `pnpm check`               | 0 errors, 0 warnings, 416 files |
-| `pnpm lint`                | passes                          |
-| `pnpm budget`              | 88.6 kB of 150 kB brotli        |
+| `pnpm test`                | 450 pass, 22 files              |
+| `pnpm check`               | 0 errors, 0 warnings, 418 files |
+| `pnpm lint`                | eslint passes; see the note     |
+| `pnpm budget`              | 90.0 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v11** · **6**                 |
+| Schema · backup format     | **v12** · **6**                 |
+
+**Note on `pnpm lint`:** on a checkout made with `core.autocrlf=true` every
+file has CRLF endings and Prettier's check fails on all of them, touched or
+not. The formatting itself is clean (`prettier --check --end-of-line auto`
+passes); either check out with LF or run Prettier with `--end-of-line auto`.
 
 P0, P1, P2 (sync) and P5 (reporting) ship, along with targeting, investments,
 recurring payments, no-spend days and the streak, reconciliation, and draining
@@ -61,6 +66,23 @@ v11): the switcher in Settings, transfers on `/tape`, per-currency `/mesic`
 and `/jmeni`, and goals measured in the home currency across every account.
 Amounts in different currencies are never summed and no exchange rate is ever
 fetched or stored.
+
+**Three changes landed on 2026-09-02, all asked for out of the first days
+with two accounts** (`DECISIONS.md`, the 2026-09-02 pass): **one account per
+currency** (Q50, schema **v12**) — the add form offers only free currencies,
+and koruny on another card join the CZK account as a named *pocket* rather
+than a second account; the **account switch on the keypad**, on the currency
+glyph beside the amount, sticky like the date; the **ground takes the colour
+of a foreign currency** on every screen, automatically, dark staying black;
+and the **payee list became a search** of the whole history that waits for
+three characters. The per-currency reading across several same-currency
+accounts, argued in the first challenge, was not built — with one account
+per currency it is the per-account reading. Later the same day **an
+exchange started counting the way it reads**: the koruna leg of a transfer
+is an expense from a bucket chosen in the sheet, the euro leg is income in a
+`SMĚNA` bucket created on first use, reversing the part of Q49 that kept
+transfer legs out of every measurement (`DECISIONS.md`, "An exchange counts
+the way it reads").
 
 **The 2026-08-29 design audit landed as colours and hints only** (`DECISIONS.md`,
 the audit section): debt recoloured copper, the meter/ring denominator made
