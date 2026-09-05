@@ -2293,3 +2293,88 @@ already say how far each class is from its mark.
 2026-08-29 audit held small text to; the handoff specifies it and it is used for
 running balances and the tab bar's inactive labels. Left as specified, and
 recorded here so the next audit knows it was a decision rather than a drift.
+
+---
+
+## The 2026-09-05 security audit — a row is checked at the two doors that skip `repo.ts`
+
+A whole-repository pass: the API, the two nginx configs, compose, `backup.sh`,
+the client's sync layer and every `{@html}`; the live API probed in SQLite mode
+for authentication, the pairing limiter, payload validation and the merge
+rule; and the built app driven through every screen, a hostile payee, crafted
+backup files and a corrupt row arriving from the server. Nothing exploitable
+was found. The design held everywhere it was pushed. One defect did not, and
+it was not a security defect in the usual sense.
+
+### Q57 — A row that skips `repo.ts` skips the type system, so it is checked at the door · answered 2026-09-05
+
+**The assumption that turned out wrong:** that a row is well-formed because it
+is in the database. Every write made *in* the app goes through `repo.ts`, and
+TypeScript has said what a `Txn` is by the time the keypad produces one. Two
+doors skip that: `importBackup` and `applyRemotePage`. Both trusted the file.
+A backup carrying one transaction with `amount: -1000.5` — or a server row
+with `"abc"` — made `money.ts` throw inside every live query, and Domů, Výpis
+and Přehled each showed a ledger of zeros and "bez výdaje" while the sync card
+said "v pořádku". Import also queued the row for the server on the way in,
+which is how one file would have done it to every device. Reset recovered it,
+because the screens filter tombstones before they compute.
+
+**The answer:** `domain/rows.ts` — `checkRow(entity, row)`, pure, one shape per
+entity, applied at both doors. It checks what the domain computes with: the
+four sync fields, every amount as a safe integer, every date as a real
+calendar date, the arrays the accessors walk, and the type of every field a
+screen branches on. It does **not** check enum membership and does not reject
+fields it has never heard of — a row from a newer build is still a row, and
+that is evolution rather than corruption. The older shapes pass too, because
+`sharesOf()`, `scheduleSharesOf()` and `pocketsOf()` already read them; a v1
+backup restores exactly as it did. A refused row is skipped, counted and
+named on the console (`txn: amount: not a whole number of minor units`), the
+rest of the page or file still merges, and the pull cursor moves past it —
+the server keeps the row, this device declines it. Settings says "Poškozené
+řádky vynechány: 3" after an import that had any.
+
+What this does not do: repair a bad row already sitting in a device's
+IndexedDB from before the guard. None is known to exist; the remedy if one
+turns up is Začít znovu, which tombstones it, or an import that overrules it.
+
+### The hardening that rode along
+
+Each was low on its own and cheap enough to do while the audit was open:
+
+- **HSTS.** `Strict-Transport-Security: max-age=31536000` in `headers.conf`,
+  beside the three headers already there, so it rides through the host's
+  proxy and survives certbot rewriting the host's file. No `includeSubDomains`
+  — the domain's other names are not this app's to promise for.
+- **A global window on pairing.** Per-address limiting was the whole fence, and
+  a caller with ten thousand addresses is the one thing it cannot slow — the
+  "thirty-four years" in `.env.example` assumed exactly that caller. The
+  endpoint as a whole now answers twenty attempts an hour from everywhere
+  (`PairAttemptsPerHour`, `Program.cs`), and `app.conf` adds a twenty-a-minute
+  leaky bucket keyed on the server name one layer out. The cost is that a
+  stranger who spends the twenty blocks pairing for an hour; the log names
+  them, and pairing can wait.
+- **Backups are `0600`.** `backup.sh` ran under cron's umask, which is `022`,
+  and wrote the ledger world-readable. It now sets `umask 077` and re-applies
+  `0700` to the directory.
+- **A device name is cut to the column.** Pairing stored `deviceName.Trim()`
+  into a 120-character column with no check. SQLite took 300 characters
+  without a word; Postgres would have answered 500. `Device.NameMaxLength`
+  now names the width once, and `DeviceAuth.Fit` trims, defaults and cuts to
+  it without splitting a surrogate pair.
+- **The seed no longer echoes the pull.** `seedOutbox` queued every row in
+  every table — including the ones `pair()` had just pulled, which the server
+  answered "superseded" one round trip at a time, for the whole ledger, on
+  every device that ever joined. `pair()` now takes `ledgerKeys()` before the
+  pull and seeds only those. A snapshot rather than a `deviceId` test, because
+  a restored backup carries whichever phone wrote it and is still this
+  device's to push.
+- **Out of every index, on Petr's ask.** `static/robots.txt` disallows
+  everything for `*` and again by name for the crawlers whose operators
+  publish an opt-out token — some of those (Google-Extended,
+  Applebot-Extended) are controls rather than user agents and mean nothing
+  unless addressed. `app.html` carries `<meta name="robots" content="noindex,
+  nofollow, noarchive, nosnippet, noimageindex">`, and `headers.conf` sends
+  `X-Robots-Tag` with the same plus `noai, noimageai` on every response, the
+  API's JSON and the static files included. Three layers because they answer
+  three different questions — whether to ask, what to do with a page that
+  was fetched anyway, and what to do with a response that is not a page.

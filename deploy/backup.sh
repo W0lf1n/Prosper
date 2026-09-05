@@ -18,6 +18,12 @@
 # dash — which is `/bin/sh` on Debian — does not have it.
 set -euo pipefail
 
+# The dump is the whole ledger in plain text. Nothing on the box but root has
+# any business reading it, so every file this writes is created 0600 and the
+# directory 0700 — set here rather than left to cron's umask, which is 022 and
+# would make the backup the one world-readable copy of everything.
+umask 077
+
 # Where this script lives, so cron does not need a working directory.
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -28,6 +34,8 @@ STAMP="$(date +%Y-%m-%d)"
 FILE="$DEST/prosper-$STAMP.sql.gz"
 
 mkdir -p "$DEST"
+# A directory that already existed was created under the old umask.
+chmod 700 "$DEST"
 
 # `-T` because cron has no TTY and `exec` allocates one by default — which is
 # how this works by hand and fails at 03:17 every night. `-f` as well as

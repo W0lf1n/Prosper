@@ -42,6 +42,37 @@ public sealed class DeviceAuthTests : IDisposable
     }
 
     [Fact]
+    public async Task Pairing_cuts_a_name_to_the_column()
+    {
+        var result = await _auth.PairAsync(new string('n', 300));
+
+        var stored = await _db.Devices.SingleAsync(d => d.Id == result.DeviceId);
+        Assert.Equal(Device.NameMaxLength, stored.Name.Length);
+    }
+
+    [Theory]
+    [InlineData("  Telefon  ", "Telefon")]
+    [InlineData("", "Zařízení")]
+    [InlineData("   ", "Zařízení")]
+    [InlineData(null, "Zařízení")]
+    public void A_name_is_trimmed_and_defaulted(string? given, string expected)
+    {
+        Assert.Equal(expected, DeviceAuth.Fit(given));
+    }
+
+    [Fact]
+    public void The_cut_never_splits_an_emoji()
+    {
+        // 119 plain characters, then a two-unit emoji straddling the edge.
+        var name = new string('n', Device.NameMaxLength - 1) + "\U0001F4B0" + "tail";
+
+        var fitted = DeviceAuth.Fit(name);
+
+        Assert.Equal(Device.NameMaxLength - 1, fitted.Length);
+        Assert.False(char.IsHighSurrogate(fitted[^1]));
+    }
+
+    [Fact]
     public async Task A_token_resolves_to_its_device()
     {
         var paired = await _auth.PairAsync("Telefon");

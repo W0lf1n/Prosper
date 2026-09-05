@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-09-05 · schema v13 · 479 web tests · 50 API tests
+**Last revised:** 2026-09-06 · schema v13 · 508 web tests · 56 API tests
 
 ---
 
@@ -128,6 +128,7 @@ The runbook is `docs/DEPLOYMENT.md`.
 | `reconcile.ts`    | The ledger against a bank statement                             |
 | `refile.ts`       | Draining a bucket — the month's rows, and where they belong     |
 | `reset.ts`        | Starting over — the phrase typed to unlock the wipe              |
+| `rows.ts`         | What a row must look like before it may be written — the guard at the backup and sync doors |
 | `xlsx.ts`         | A spreadsheet, hand-rolled, no dependency                       |
 
 ---
@@ -240,6 +241,16 @@ can bring back a row without them.
 
 **Dexie must not be constructed during SSR/prerender.** `db()` is lazy for
 exactly that reason. `ssr = false`, `prerender = true` in `routes/+layout.ts`.
+
+**A row that skips `repo.ts` skips the type system.** A backup being restored
+and a page arriving from the server are the two doors that do, and both used
+to trust the file: one transaction with `amount: -1000.5` made `money.ts`
+throw inside every live query, and every screen showed a ledger of zeros under
+a sync card that said "v pořádku". `domain/rows.ts` → `checkRow()` now stands
+at both doors — amounts as safe integers, dates as real dates, the arrays the
+accessors walk — and a refused row is skipped, counted and named on the
+console. It checks types, never enum membership, and never rejects a field it
+has not heard of: a row from a newer build is still a row.
 
 **A `liveQuery` closure re-runs on Dexie writes, not on `data` changes.** Every
 per-account query closes over `data.accountId`, and that is fine on every

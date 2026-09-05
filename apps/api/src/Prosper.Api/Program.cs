@@ -52,9 +52,37 @@ builder.Services.AddScoped<DeviceAuth>();
 // person actually doing it.
 const string PairPolicy = "pair";
 
+/// <summary>
+/// Attempts an hour on the pairing endpoint as a whole, from everywhere.
+///
+/// The per-address window below is what makes one caller slow. This is what
+/// makes ten thousand of them slow together — a guess spread across many
+/// addresses is the one attack per-address counting does not touch, and the
+/// arithmetic in <c>deploy/.env.example</c> ("thirty-four years") assumed it.
+/// Twenty is more pairing than a household does in a year, and it turns twelve
+/// digits into a number of years from any number of addresses.
+///
+/// The cost is the obvious one: a stranger who spends the twenty keeps you
+/// from pairing for the rest of the hour, and can go on doing it. That is the
+/// fence holding against exactly the thing it is for; the container's access
+/// log names the address, and pairing is a thing that can wait an hour.
+/// </summary>
+const int PairAttemptsPerHour = 20;
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
+        http.Request.Path.Equals(new PathString("/api/v1/pair"), StringComparison.OrdinalIgnoreCase)
+            ? RateLimitPartition.GetFixedWindowLimiter("pair-everyone", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = PairAttemptsPerHour,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0
+            })
+            // Every other route is fenced by its bearer token, not by a clock.
+            : RateLimitPartition.GetNoLimiter("open"));
 
     options.AddPolicy(PairPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
         ClientAddress.PartitionKey(

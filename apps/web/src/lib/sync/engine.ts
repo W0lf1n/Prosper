@@ -29,6 +29,7 @@ import {
 
 import { db } from '$lib/db/schema';
 import { adoptRemoteLedger, getDeviceId, getMeta, setMeta } from '$lib/db/repo';
+import { checkRow } from '$lib/domain/rows';
 import type { OutboxEntry } from '$lib/domain/types';
 
 const META_CURSOR = 'syncCursor';
@@ -306,7 +307,29 @@ export async function pushOnce(settings: SyncSettings): Promise<PushOutcome> {
 export interface PullOutcome {
 	received: number;
 	applied: number;
+	/** Rows the server sent that `checkRow` would not let in. Logged, never stored. */
+	skipped: number;
 	cursor: number;
+}
+
+/**
+ * Why an incoming row may not be written, or null.
+ *
+ * The server checked the envelope — entity, id, updatedAt, deviceId, a payload
+ * that is an object and not too big. Nobody had checked the row *inside* it.
+ * One `amount: "abc"` from a device running an older build, or from a database
+ * restored by hand, made `money.ts` throw inside every live query and every
+ * screen showed a ledger of zeros. `domain/rows.ts` is the check; this adds
+ * the one thing only the envelope can say — that the row is the row it claims
+ * to be, because `bulkPut` keys on the payload's own `id`.
+ */
+function refusal(row: SyncRow): string | null {
+	const problem = checkRow(row.entity, row.payload);
+	if (problem) return problem;
+	if (!isDayMark(row.entity) && (row.payload as { id: string }).id !== row.id) {
+		return 'payload id does not match the envelope';
+	}
+	return null;
 }
 
 /**
@@ -325,22 +348,32 @@ export interface PullOutcome {
  * `bulkGet`, the merge decided in memory, and one `bulkPut` per table, inside a
  * single transaction: the same decision for every row, one commit for the page.
  */
-async function applyRemotePage(rows: SyncRow[]): Promise<number> {
-	if (rows.length === 0) return 0;
+async function applyRemotePage(rows: SyncRow[]): Promise<{ applied: number; skipped: number }> {
+	if (rows.length === 0) return { applied: 0, skipped: 0 };
 
 	const database = db();
+	let skipped = 0;
 
 	// Grouped by table, because `bulkGet`/`bulkPut` are per table and the merge
 	// needs the existing row that shares the incoming one's key.
 	const byTable = new Map<string, SyncRow[]>();
 	for (const row of rows) {
+		// A row that would not survive the domain does not get in. The cursor
+		// still moves past it — the server keeps it, this device declines it,
+		// and the console says which one and why.
+		const problem = refusal(row);
+		if (problem) {
+			console.warn('[sync] skipped', `${row.entity}:${row.id}`, problem);
+			skipped += 1;
+			continue;
+		}
 		const name = TABLES[row.entity];
 		if (!name) continue;
 		const group = byTable.get(name);
 		if (group) group.push(row);
 		else byTable.set(name, [row]);
 	}
-	if (byTable.size === 0) return 0;
+	if (byTable.size === 0) return { applied: 0, skipped };
 
 	let applied = 0;
 
@@ -399,11 +432,11 @@ async function applyRemotePage(rows: SyncRow[]): Promise<number> {
 		}
 	});
 
-	return applied;
+	return { applied, skipped };
 }
 
 export async function pullOnce(settings: SyncSettings): Promise<PullOutcome> {
-	const outcome: PullOutcome = { received: 0, applied: 0, cursor: await readCursor() };
+	const outcome: PullOutcome = { received: 0, applied: 0, skipped: 0, cursor: await readCursor() };
 
 	for (;;) {
 		const response = await request<PullResponse>(
@@ -412,7 +445,9 @@ export async function pullOnce(settings: SyncSettings): Promise<PullOutcome> {
 		);
 
 		outcome.received += response.changes.length;
-		outcome.applied += await applyRemotePage(response.changes);
+		const page = await applyRemotePage(response.changes);
+		outcome.applied += page.applied;
+		outcome.skipped += page.skipped;
 
 		outcome.cursor = response.cursor;
 		// The cursor is persisted per page, not per cycle: a connection that dies

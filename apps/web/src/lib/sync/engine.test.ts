@@ -19,6 +19,7 @@ import {
 	ensureSeeded,
 	getActiveAccountId,
 	getDeviceId,
+	ledgerKeys,
 	refreshSyncEnabled,
 	seedOutbox,
 	setMeta
@@ -175,38 +176,39 @@ describe('pushOnce — duplicates', () => {
 	});
 });
 
-describe('pullOnce', () => {
-	function remote(id: string, payee: string, updatedAt: string): SyncRow {
-		return {
-			entity: 'txn',
+/** A transaction as another device would push it — the pre-v9 shape, on purpose. */
+function remote(id: string, payee: string, updatedAt: string): SyncRow {
+	return {
+		entity: 'txn',
+		id,
+		updatedAt,
+		deviceId: 'other',
+		isDeleted: false,
+		payload: {
 			id,
+			accountId,
+			date: '2026-08-20',
+			amount: -55000,
+			categoryId: null,
+			payee,
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			createdAt: updatedAt,
+			isOneOff: false,
+			owedAmount: null,
+			owedBy: null,
+			settledByTxnId: null,
+			scheduleId: null,
 			updatedAt,
 			deviceId: 'other',
-			isDeleted: false,
-			payload: {
-				id,
-				accountId,
-				date: '2026-08-20',
-				amount: -55000,
-				categoryId: null,
-				payee,
-				note: null,
-				transferPairId: null,
-				source: 'manual',
-				isCleared: false,
-				createdAt: updatedAt,
-				isOneOff: false,
-				owedAmount: null,
-				owedBy: null,
-				settledByTxnId: null,
-				scheduleId: null,
-				updatedAt,
-				deviceId: 'other',
-				isDeleted: false
-			}
-		};
-	}
+			isDeleted: false
+		}
+	};
+}
 
+describe('pullOnce', () => {
 	it('writes an incoming row into its own table', async () => {
 		responses = [
 			() =>
@@ -222,6 +224,43 @@ describe('pullOnce', () => {
 		expect(outcome.applied).toBe(1);
 		expect((await db.txns.get('r1'))?.payee).toBe('Večeře');
 		expect(await readCursor()).toBe(7);
+	});
+
+	/**
+	 * The row that blanked every screen in the 2026-09-05 audit: the server
+	 * checks the envelope, and nobody had checked the row inside it.
+	 */
+	it('declines a row the domain could not compute with, and keeps the rest', async () => {
+		const good = remote('r1', 'Večeře', '2026-08-20T10:00:00.000Z');
+		const bad = remote('r2', 'Poškozený', '2026-08-20T10:00:00.000Z');
+		bad.payload = { ...(bad.payload as object), amount: 'abc' };
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		responses = [() => json({ changes: [bad, good], cursor: 9, hasMore: false })];
+
+		const outcome = await pullOnce(SETTINGS);
+
+		expect(outcome.applied).toBe(1);
+		expect(outcome.skipped).toBe(1);
+		expect(await db.txns.get('r2')).toBeUndefined();
+		expect((await db.txns.get('r1'))?.payee).toBe('Večeře');
+		// The cursor moves past it: the server keeps the row, this device does not.
+		expect(await readCursor()).toBe(9);
+		expect(warn).toHaveBeenCalledWith('[sync] skipped', 'txn:r2', expect.stringMatching(/amount/));
+		warn.mockRestore();
+	});
+
+	it('declines a payload whose id is not the envelope’s — bulkPut keys on the payload', async () => {
+		const row = remote('r1', 'Večeře', '2026-08-20T10:00:00.000Z');
+		row.payload = { ...(row.payload as object), id: 'somebody-else' };
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		responses = [() => json({ changes: [row], cursor: 3, hasMore: false })];
+
+		const outcome = await pullOnce(SETTINGS);
+
+		expect(outcome.skipped).toBe(1);
+		expect(await db.txns.get('r1')).toBeUndefined();
+		expect(await db.txns.get('somebody-else')).toBeUndefined();
+		warn.mockRestore();
 	});
 
 	it('does not re-enqueue what it just pulled — that would be a sync loop', async () => {
@@ -346,6 +385,52 @@ describe('a whole cycle', () => {
 		await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
 
 		expect(await seedOutbox()).toBe(0);
+	});
+
+	/**
+	 * Pairing pulls before it seeds, so by the time the backfill runs the
+	 * ledger holds the other device's rows too. Sending those back is a round
+	 * trip per row that ends in "superseded" — for the whole ledger, on every
+	 * device that ever joins.
+	 */
+	it('backfills what was here before the pull, and nothing that came down in it', async () => {
+		await db.outbox.clear();
+		const mine = await createTxn({ accountId, amount: -24900 as Minor, payee: 'Můj' });
+		await db.outbox.clear();
+		const local = await ledgerKeys();
+
+		responses = [
+			() =>
+				json({
+					changes: [remote('theirs', 'Jejich', '2026-08-20T10:00:00.000Z')],
+					cursor: 1,
+					hasMore: false
+				})
+		];
+		await pullOnce(SETTINGS);
+		await db.outbox.clear();
+
+		await seedOutbox(local);
+
+		const queued = (await db.outbox.toArray()).map((e) => e.entityId);
+		expect(queued).toContain(mine.id);
+		expect(queued).toContain(accountId);
+		expect(queued).not.toContain('theirs');
+	});
+
+	/**
+	 * A restored backup carries whichever phone wrote it. It is still this
+	 * device's to push — which is why the line is a snapshot, not a `deviceId`.
+	 */
+	it('still backfills a row another device wrote, if it was here first', async () => {
+		await db.outbox.clear();
+		const other = remote('restored', 'Ze zálohy', '2026-08-20T10:00:00.000Z');
+		await db.txns.put(other.payload as never);
+		const local = await ledgerKeys();
+
+		await seedOutbox(local);
+
+		expect((await db.outbox.toArray()).map((e) => e.entityId)).toContain('restored');
 	});
 });
 

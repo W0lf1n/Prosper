@@ -139,7 +139,7 @@ screens keep Já lit. `/mesic` and `/platby` are `+page.ts` redirects into
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-three files, **479
+Vitest, node environment, `requireAssertions: true`. Twenty-four files, **508
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -200,6 +200,13 @@ cleared browser profile on an unpaired device. `importBackup` implements the sam
 last-write-wins merge the sync layer uses, and refuses a file written by a newer
 build rather than merging it with the unknown tables dropped.
 
+Both `importBackup` and `applyRemotePage` run every row through
+`domain/rows.ts` → `checkRow()` before writing it — they are the two doors
+that skip the type system, and one corrupt amount through either blanked
+every screen (DECISIONS, Q57). A refused row is skipped, counted (`skipped` on
+the result) and named on the console; the rest of the file or page still
+merges, and the pull cursor moves past it.
+
 `meta` holds device preferences, not ledger data: the device id, the active
 account and the folded months. (`profileName` was written by one build on
 2026-09-05 and read by nothing since — Q55.)
@@ -223,6 +230,11 @@ Three things about it that are not obvious:
   foreground, back online, after a write (debounced ten seconds, through
   `setOutboxListener`), and the manual button. `IDLE_POLL_MS` is only the safety
   net under them, for what another device pushed while this one sat open.
+- **`pair()` snapshots `ledgerKeys()` before its first pull** and passes the
+  set to `seedOutbox`, so the backfill sends what was here and not what just
+  came down — the server would only answer "superseded", once per row, for
+  the whole ledger. A snapshot rather than a `deviceId` test, because a
+  restored backup is this device's to push whichever phone wrote it.
 - **The server address defaults to `location.origin`**, because the deployment
   serves the client from the API's own origin (`deploy/`, `DEPLOYMENT.md`).
   `pair()` asks `/api/v1/health` first, so a wrong address fails with a sentence

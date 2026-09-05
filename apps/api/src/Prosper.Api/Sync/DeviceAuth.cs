@@ -53,7 +53,7 @@ public sealed class DeviceAuth(AppDbContext db)
         var device = new Device
         {
             Id = Guid.NewGuid().ToString("N"),
-            Name = string.IsNullOrWhiteSpace(deviceName) ? "Zařízení" : deviceName.Trim(),
+            Name = Fit(deviceName),
             TokenHash = Hash(token),
             PairedAt = DateTimeOffset.UtcNow
         };
@@ -93,4 +93,24 @@ public sealed class DeviceAuth(AppDbContext db)
 
     /// <summary>How stale <see cref="Device.LastSeenAt"/> is allowed to get.</summary>
     private static readonly TimeSpan LastSeenPrecision = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// Trimmed, defaulted, and cut to <see cref="Device.NameMaxLength"/>.
+    ///
+    /// The name is free text typed on a phone and stored in a column of a
+    /// fixed width. A cut is quieter than a 500 for a row nobody reads but the
+    /// person who typed it. The cut never lands between the two halves of a
+    /// surrogate pair — an emoji at the edge is dropped whole rather than left
+    /// as a lone half that Postgres cannot encode.
+    /// </summary>
+    internal static string Fit(string? deviceName)
+    {
+        var name = deviceName?.Trim() ?? string.Empty;
+        if (name.Length == 0) return "Zařízení";
+        if (name.Length <= Device.NameMaxLength) return name;
+
+        var cut = Device.NameMaxLength;
+        if (char.IsHighSurrogate(name[cut - 1])) cut -= 1;
+        return name[..cut];
+    }
 }

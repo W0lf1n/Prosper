@@ -17,7 +17,7 @@
  */
 
 import type { HealthResponse, PairRequest, PairResponse } from '@prosper/contracts';
-import { adoptRemoteLedger, seedOutbox } from '$lib/db/repo';
+import { adoptRemoteLedger, ledgerKeys, seedOutbox } from '$lib/db/repo';
 import { pullOnce, readSettings } from './engine';
 import { configure } from './status.svelte';
 
@@ -107,23 +107,30 @@ export async function pair({ baseUrl, code, deviceName }: PairInput): Promise<vo
 	const { token } = (await response.json()) as PairResponse;
 	if (!token) throw new Error('Server nevrátil token.');
 
-	// The order of these three is the whole of pairing, and none of them move.
+	// The order of these four is the whole of pairing, and none of them move.
 	//
-	//   1. Store the settings, which is what makes `enqueue` live. Any write
+	//   1. Note what is here. After the pull the ledger is a mix of this
+	//      device's rows and the server's, and only a list taken now can tell
+	//      them apart — a `deviceId` cannot, because a restored backup carries
+	//      whichever phone wrote it and is still this device's to push.
+	//   2. Store the settings, which is what makes `enqueue` live. Any write
 	//      from here on is queued rather than lost.
-	//   2. Pull before pushing anything. A device joining an existing ledger has
+	//   3. Pull before pushing anything. A device joining an existing ledger has
 	//      to see it before it can decide whether its own seed is redundant —
 	//      and `adoptRemoteLedger` cannot make that call against a database that
 	//      has not heard of the other device yet.
-	//   3. Only then backfill, so what goes up is this device's real rows plus
-	//      the tombstones for the seed it just gave up.
+	//   4. Only then backfill, so what goes up is this device's real rows plus
+	//      the tombstones for the seed it just gave up — and nothing that came
+	//      down in step 3, which the server would only answer "superseded".
+	const local = await ledgerKeys();
+
 	await configure({ baseUrl: trimmed, token });
 
 	const settings = await readSettings();
 	if (settings) await pullOnce(settings);
 
 	await adoptRemoteLedger();
-	await seedOutbox();
+	await seedOutbox(local);
 }
 
 export async function unpair(): Promise<void> {

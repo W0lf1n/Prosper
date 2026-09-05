@@ -222,6 +222,10 @@ sudo /srv/prosper/deploy/backup.sh
 And restore from it once, on purpose, into a throwaway database. A dump nobody
 has restored is a hypothesis. The command is at the bottom of `backup.sh`.
 
+The dumps are created `0600` under a `0700` directory — the script sets its own
+umask, and re-applies the mode to a directory that already existed — because a
+dump is the whole ledger in plain text and root is the only reader it has.
+
 ---
 
 ## The sync database
@@ -495,6 +499,14 @@ means nginx is still seeing the host's proxy rather than the caller — everybod
 shares one bucket, and one stranger hammering the endpoint keeps your phone from
 pairing.
 
+There is a third fence over both, and it is meant to catch everybody at once:
+the endpoint as a whole answers twenty attempts an hour, from everywhere
+(`PairAttemptsPerHour` in `Program.cs`, with a twenty-a-minute leaky bucket in
+`app.conf` one layer out). A caller with many addresses is what the per-address
+fences cannot slow, and this is the fence for that. The cost is the obvious
+one: a stranger who spends the twenty keeps you from pairing for the rest of
+the hour. The same log names the address; pairing is a thing that can wait.
+
 **No install prompt on the phone.** The service worker only registers over
 `https://` or `localhost`. Check the certificate first; everything else is a
 distraction.
@@ -520,6 +532,15 @@ being evicted.
 - **No full CSP.** The theme is applied by an inline script before first paint,
   so `script-src` would need a hash kept in step by hand — and a policy that
   drifts is a policy that gets switched off. `frame-ancestors`,
-  `X-Content-Type-Options` and `Referrer-Policy` are set; they never drift.
+  `X-Content-Type-Options`, `Referrer-Policy` and `Strict-Transport-Security`
+  are set; they never drift. HSTS lives in the container's `headers.conf`
+  rather than the host's file, because certbot rewrites that one and the
+  header rides through the proxy untouched.
+- **No index, no snippet, no training set.** `static/robots.txt` disallows
+  everything and names the AI crawlers that publish an opt-out token of their
+  own; `app.html` carries `<meta name="robots" content="noindex, …">` for
+  whatever fetched the shell anyway; and `headers.conf` sends `X-Robots-Tag`
+  on every response, the API's JSON included. One person's ledger has no
+  audience, and a crawler that reached it would only ever see the shell.
 - **No monitoring, no metrics, no alerting.** If sync stops, Settings says so on
   the screen of the person who cares.

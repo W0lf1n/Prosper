@@ -8,7 +8,7 @@
  */
 
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EXCHANGE_CATEGORY_ID } from '$lib/domain/accounts';
 import { monthKey, today } from '$lib/domain/datetime';
@@ -31,9 +31,11 @@ import {
 	importBackup,
 	pinGoal,
 	recordValuation,
+	refreshSyncEnabled,
 	resetLedger,
 	restoreTxn,
 	setCollapsedMonths,
+	setMeta,
 	settleReceivable,
 	unsettleReceivable,
 	updateAccount,
@@ -144,6 +146,89 @@ describe('importBackup — the version guard', () => {
 		} as unknown as Backup;
 
 		await expect(importBackup(old)).resolves.toMatchObject({ txns: 0 });
+	});
+});
+
+/**
+ * The file is the one input nobody typed on this keypad. In the 2026-09-05
+ * audit a single transaction with `amount: -1000.5` made every screen show a
+ * ledger of zeros — and the row was queued for the server on its way in, so
+ * one file would have done it to every device.
+ */
+describe('importBackup — the row guard', () => {
+	it('skips a row the domain could not compute with, and merges the rest', async () => {
+		// Paired, so the outbox is live and "nothing refused is queued" can be asserted.
+		await setMeta('syncBaseUrl', 'https://example.test');
+		await refreshSyncEnabled();
+		await createTxn({ accountId, amount: -24900 as Minor, payee: 'Vzor' });
+		const backup = await exportBackup();
+		backup.txns = [
+			{ ...backup.txns[0], id: 'bad-float', amount: -1000.5 as Minor },
+			{ ...backup.txns[0], id: 'bad-string', amount: 'abc' as unknown as Minor },
+			{ ...backup.txns[0], id: 'bad-date', date: '2026-13-45' },
+			{ ...backup.txns[0], id: 'fine', payee: 'Zdravý' }
+		].map((row) => ({
+			...row,
+			updatedAt: '2099-01-01T00:00:00.000Z',
+			deviceId: 'other'
+		})) as typeof backup.txns;
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+		const result = await importBackup(backup);
+
+		expect(result.txns).toBe(1);
+		expect(result.skipped).toBe(3);
+		expect((await db.txns.get('fine'))?.payee).toBe('Zdravý');
+		expect(await db.txns.get('bad-float')).toBeUndefined();
+		expect(await db.txns.get('bad-string')).toBeUndefined();
+		expect(await db.txns.get('bad-date')).toBeUndefined();
+		// Nothing refused reaches the server either.
+		const queued = (await db.outbox.toArray()).map((e) => e.entityId);
+		expect(queued).toContain('fine');
+		expect(queued).not.toContain('bad-float');
+		expect(warn).toHaveBeenCalledWith(
+			'[import] skipped 3 rows',
+			expect.arrayContaining([expect.stringMatching(/^txn: amount/)])
+		);
+		warn.mockRestore();
+	});
+
+	it('checks every table, not only the transactions', async () => {
+		const backup = await exportBackup();
+		backup.accounts = backup.accounts.map((a) => ({
+			...a,
+			id: 'bad-account',
+			openingBalance: 12.5 as Minor
+		}));
+		backup.categories = backup.categories.map((c, i) => ({
+			...c,
+			id: `cat-${i}`,
+			name: i === 0 ? (['x'] as unknown as string) : c.name
+		}));
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+		const result = await importBackup(backup);
+
+		expect(result.accounts).toBe(0);
+		expect(result.categories).toBe(backup.categories.length - 1);
+		expect(result.skipped).toBe(2);
+		expect(await db.accounts.get('bad-account')).toBeUndefined();
+		warn.mockRestore();
+	});
+
+	it('treats a table that is not a list as empty rather than throwing', async () => {
+		const backup = { ...(await exportBackup()), txns: 'nope' as unknown as never };
+
+		await expect(importBackup(backup)).resolves.toMatchObject({ txns: 0, skipped: 0 });
+	});
+
+	it('reports nothing skipped on a clean file', async () => {
+		await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
+
+		const result = await importBackup(await exportBackup());
+
+		expect(result.skipped).toBe(0);
+		expect(result.txns).toBe(1);
 	});
 });
 

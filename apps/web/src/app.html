@@ -13,6 +13,13 @@
 			has left.
 		-->
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<!--
+			One person's ledger: nothing here is for a search index, a snippet, a
+			cache or a training corpus. `robots.txt` keeps crawlers from asking;
+			this is for anything that fetched the shell anyway, and nginx says the
+			same in `X-Robots-Tag` for every response including the API's.
+		-->
+		<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
 		<meta name="color-scheme" content="light dark" />
 		<meta name="theme-color" content="#f4f4f4" media="(prefers-color-scheme: light)" />
 		<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />

@@ -37,7 +37,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.Property(e => e.Id).HasMaxLength(64);
-            entity.Property(e => e.Name).HasMaxLength(120);
+            entity.Property(e => e.Name).HasMaxLength(Device.NameMaxLength);
             entity.Property(e => e.TokenHash).HasMaxLength(88);
         });
 

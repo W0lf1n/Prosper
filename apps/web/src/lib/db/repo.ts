@@ -28,6 +28,7 @@ import {
 import { newDeviceId, uuidv7 } from '$lib/domain/ids';
 import { ADJUSTMENT_PAYEE, reconcileDelta } from '$lib/domain/reconcile';
 import { MAX_SHARES, isOpenShare, sharesOf } from '$lib/domain/receivables';
+import { checkRow } from '$lib/domain/rows';
 import { ZERO, abs, neg, type Minor } from '$lib/domain/money';
 import type {
 	AccountPocket,
@@ -1378,12 +1379,22 @@ export async function contributeToGoal(input: {
  * outbox already holds anything, and pairing writes the base URL before calling
  * it, so `enqueue` is live by then and ordinary writes are not lost either.
  */
-export async function seedOutbox(): Promise<number> {
+export async function seedOutbox(local?: ReadonlySet<string>): Promise<number> {
 	const database = db();
 	if ((await database.outbox.count()) > 0) return 0;
 
+	// Only what was here before the pull. A row that arrived from the server
+	// during pairing is one the server already holds; sending it back is a
+	// round trip that ends in "superseded" — once per row, for the whole ledger,
+	// on every device that ever joins. `ledgerKeys()` taken before the pull is
+	// the line between the two, and it is a snapshot rather than a `deviceId`
+	// test because a restored backup is this device's to push whichever phone
+	// wrote it.
+	const mine = (entity: SyncedEntity, id: string) =>
+		local === undefined || local.has(key(entity, id));
+
 	const queue = async (entity: SyncedEntity, rows: { id: string }[]) => {
-		for (const row of rows) await enqueue(entity, row.id, row);
+		for (const row of rows) if (mine(entity, row.id)) await enqueue(entity, row.id, row);
 	};
 
 	await queue('account', await database.accounts.toArray());
@@ -1398,10 +1409,45 @@ export async function seedOutbox(): Promise<number> {
 
 	// Day marks are keyed by their date rather than an id.
 	for (const mark of await database.dayMarks.toArray()) {
-		await enqueue('dayMark', mark.date, mark);
+		if (mine('dayMark', mark.date)) await enqueue('dayMark', mark.date, mark);
 	}
 
 	return database.outbox.count();
+}
+
+/** `entity:id` — the one string a row is known by across tables. */
+function key(entity: SyncedEntity, id: string): string {
+	return `${entity}:${id}`;
+}
+
+/**
+ * Every row this device holds, as keys, without reading the rows.
+ *
+ * Taken by `pair()` before the first pull, so `seedOutbox` can tell what was
+ * here from what just arrived. Primary keys only — a few thousand strings
+ * rather than a few thousand objects, for a question that is only about
+ * identity.
+ */
+export async function ledgerKeys(): Promise<Set<string>> {
+	const database = db();
+	const keys = new Set<string>();
+
+	const collect = async (entity: SyncedEntity, ids: Promise<unknown[]>) => {
+		for (const id of await ids) keys.add(key(entity, String(id)));
+	};
+
+	await collect('account', database.accounts.toCollection().primaryKeys());
+	await collect('category', database.categories.toCollection().primaryKeys());
+	await collect('txn', database.txns.toCollection().primaryKeys());
+	await collect('goal', database.goals.toCollection().primaryKeys());
+	await collect('monthTarget', database.monthTargets.toCollection().primaryKeys());
+	await collect('holding', database.holdings.toCollection().primaryKeys());
+	await collect('valuation', database.valuations.toCollection().primaryKeys());
+	await collect('schedule', database.schedules.toCollection().primaryKeys());
+	await collect('reconciliation', database.reconciliations.toCollection().primaryKeys());
+	await collect('dayMark', database.dayMarks.toCollection().primaryKeys());
+
+	return keys;
 }
 
 /**
@@ -1734,6 +1780,8 @@ export interface ImportResult {
 	accounts: number;
 	categories: number;
 	txns: number;
+	/** Rows the file carried that `checkRow` turned away. Logged, never written. */
+	skipped: number;
 }
 
 /**
@@ -1746,6 +1794,14 @@ export interface ImportResult {
  *
  * An *older* backup is fine: a table it does not carry is a table that was
  * empty when it was written.
+ *
+ * Every row is checked before it is written (`domain/rows.ts`). The file is
+ * the one input nobody typed on this keypad — hand-edited, half-written by a
+ * dying phone, or from a build that had a bug — and one transaction with
+ * `amount: -1000.5` in it made every screen show a ledger of zeros. A row that
+ * fails is skipped, counted, and named on the console; the rest of the file
+ * still merges. A bad row on the way *in* would also have been queued for the
+ * server, which is how one file breaks every device.
  */
 export async function importBackup(backup: Backup): Promise<ImportResult> {
 	if (backup?.format !== 'finance-backup') {
@@ -1761,6 +1817,36 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 			`Záloha je z novější verze aplikace (${version} > ${BACKUP_VERSION}). ` +
 				'Aktualizuj aplikaci a zkus to znovu.'
 		);
+	}
+
+	// Sifted before the transaction so a refusal is a console line, never an
+	// abort halfway through a merge. A table that is not a list — missing from
+	// an older file, or mangled — is a table with nothing in it.
+	const refused: string[] = [];
+	const admit = <T>(entity: SyncedEntity, rows: unknown): T[] => {
+		if (!Array.isArray(rows)) return [];
+		const kept: T[] = [];
+		for (const row of rows) {
+			const problem = checkRow(entity, row);
+			if (problem) refused.push(`${entity}: ${problem}`);
+			else kept.push(row as T);
+		}
+		return kept;
+	};
+
+	const accounts = admit<Account>('account', backup.accounts);
+	const categories = admit<Category>('category', backup.categories);
+	const txns = admit<Txn>('txn', backup.txns);
+	const goals = admit<Goal>('goal', backup.goals);
+	const monthTargets = admit<MonthTarget>('monthTarget', backup.monthTargets);
+	const holdings = admit<Holding>('holding', backup.holdings);
+	const valuations = admit<Valuation>('valuation', backup.valuations);
+	const schedules = admit<Schedule>('schedule', backup.schedules);
+	const reconciliations = admit<Reconciliation>('reconciliation', backup.reconciliations);
+	const dayMarks = admit<DayMark>('dayMark', backup.dayMarks);
+
+	if (refused.length > 0) {
+		console.warn(`[import] skipped ${refused.length} rows`, refused.slice(0, 20));
 	}
 
 	const database = db();
@@ -1792,59 +1878,59 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 		async () => {
 			await mergeRows(
 				'account',
-				backup.accounts ?? [],
+				accounts,
 				(id) => database.accounts.get(id),
 				(row) => database.accounts.put(row)
 			);
 			await mergeRows(
 				'category',
-				backup.categories ?? [],
+				categories,
 				(id) => database.categories.get(id),
 				(row) => database.categories.put(row)
 			);
 			await mergeRows(
 				'txn',
-				backup.txns ?? [],
+				txns,
 				(id) => database.txns.get(id),
 				(row) => database.txns.put(row)
 			);
 			await mergeRows(
 				'goal',
-				backup.goals ?? [],
+				goals,
 				(id) => database.goals.get(id),
 				(row) => database.goals.put(row)
 			);
 			await mergeRows(
 				'monthTarget',
-				backup.monthTargets ?? [],
+				monthTargets,
 				(id) => database.monthTargets.get(id),
 				(row) => database.monthTargets.put(row)
 			);
 			await mergeRows(
 				'holding',
-				backup.holdings ?? [],
+				holdings,
 				(id) => database.holdings.get(id),
 				(row) => database.holdings.put(row)
 			);
 			await mergeRows(
 				'valuation',
-				backup.valuations ?? [],
+				valuations,
 				(id) => database.valuations.get(id),
 				(row) => database.valuations.put(row)
 			);
 			await mergeRows(
 				'schedule',
-				backup.schedules ?? [],
+				schedules,
 				(id) => database.schedules.get(id),
 				(row) => database.schedules.put(row)
 			);
 			await mergeRows(
 				'reconciliation',
-				backup.reconciliations ?? [],
+				reconciliations,
 				(id) => database.reconciliations.get(id),
 				(row) => database.reconciliations.put(row)
 			);
-			for (const mark of backup.dayMarks ?? []) {
+			for (const mark of dayMarks) {
 				await database.dayMarks.put(mark);
 				await enqueue('dayMark', mark.date, mark);
 			}
@@ -1852,9 +1938,10 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 	);
 
 	return {
-		accounts: backup.accounts?.length ?? 0,
-		categories: backup.categories?.length ?? 0,
-		txns: backup.txns?.length ?? 0
+		accounts: accounts.length,
+		categories: categories.length,
+		txns: txns.length,
+		skipped: refused.length
 	};
 }
 

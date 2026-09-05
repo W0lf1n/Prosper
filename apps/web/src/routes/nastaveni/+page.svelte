@@ -433,7 +433,11 @@
 		try {
 			const parsed = JSON.parse(await file.text()) as Backup;
 			const result = await importBackup(parsed);
-			toast.show(`Načteno ${result.txns} záznamů`);
+			toast.show(
+				result.skipped > 0
+					? `Načteno ${counted(result.txns, RECORDS)}. Poškozené řádky vynechány: ${result.skipped}.`
+					: `Načteno ${counted(result.txns, RECORDS)}`
+			);
 		} catch (error) {
 			toast.show(error instanceof Error ? error.message : 'Zálohu se nepodařilo načíst');
 		} finally {
