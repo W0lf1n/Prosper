@@ -113,15 +113,15 @@ the bottom of the phone, and the bar's centre disc is how you get back there.
 
 ## Routes
 
-| Route       | Screen                                                                   |
-| ----------- | ------------------------------------------------------------------------ |
-| `/`         | Entry. The launch route, and the one protected hardest                   |
-| `/tape`     | The ledger — reverse chronological, running balance, every day of it     |
-| `/mesic`    | The month — totals, Kontrola, Dluží mi, the split, buckets ranked        |
-| `/platby`   | Pravidelné platby — what goes out, what comes in, the year net of shares |
-| `/cil`      | The goal — the why, this month's figure, the record of months            |
-| `/jmeni`    | Holdings and the `celkem` total — and the only place one is edited       |
-| `/settings` | Account, categories, theme, sync, backup, and `Začít znovu`              |
+| Route        | Screen                                                                   |
+| ------------ | ------------------------------------------------------------------------ |
+| `/`          | Entry. The launch route, and the one protected hardest                   |
+| `/tape`      | The ledger — reverse chronological, running balance, every day of it     |
+| `/mesic`     | The month — totals, Kontrola, Dluží mi, the split, buckets ranked        |
+| `/platby`    | Pravidelné platby — what goes out, what comes in, the year net of shares |
+| `/cil`       | The goal — the why, this month's figure, the record of months            |
+| `/jmeni`     | Holdings and the `celkem` total — and the only place one is edited       |
+| `/nastaveni` | Account, categories, theme, sync, backup, and `Začít znovu`              |
 
 Six of the seven are in the tab bar — everything but `/`, three each side of the
 record disc. That is the bar's ceiling: seven cells on a 320 px phone give each
@@ -133,7 +133,7 @@ in the header slab.
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-two files, **450
+Vitest, node environment, `requireAssertions: true`. Twenty-two files, **467
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 

@@ -42,6 +42,21 @@ export const HOLDING_KINDS = ['investment', 'savings', 'cash', 'crypto'] as cons
 export const DEFAULT_REMINDER_DAYS = 30;
 
 /**
+ * The cadences offered as one tap. Any other number of days is typed in — a
+ * statement that lands every two months is real, and three chips should not
+ * decide it cannot be said.
+ */
+export const REMINDER_PRESETS = [7, 30, 90] as const;
+
+/** The longest cadence a holding may declare. A year: past that it is not a
+    reminder any more, it is a holding nobody intends to look at. */
+export const MAX_REMINDER_DAYS = 366;
+
+export function isValidReminderDays(days: number): boolean {
+	return Number.isInteger(days) && days >= 1 && days <= MAX_REMINDER_DAYS;
+}
+
+/**
  * A reading past twice its own cadence is not late any more, it is abandoned —
  * and the screen says so in a different colour.
  */
@@ -63,6 +78,13 @@ export interface HoldingReading {
 	 */
 	isStale: boolean;
 	isOverdue: boolean;
+	/**
+	 * Days until the reminder falls due — zero on the day, negative once it has
+	 * passed, and by how much. Null when the holding has never been valued:
+	 * there is no reading for a reminder to count from, and the row says that
+	 * instead of a number.
+	 */
+	dueInDays: number | null;
 	/** The reading before `latest` — what the change is measured against. */
 	previous: Valuation | null;
 	/** `latest - previous`. Null when there is nothing to compare to. */
@@ -149,6 +171,7 @@ export function readHolding({ holding, valuations, today }: ReadHoldingInput): H
 		ageDays,
 		isStale: ageDays === null || ageDays > cadence,
 		isOverdue: ageDays === null || ageDays > cadence * OVERDUE_FACTOR,
+		dueInDays: ageDays === null ? null : cadence - ageDays,
 		previous,
 		change,
 		changePercent:
@@ -230,6 +253,25 @@ export function valuationWarning(next: Minor, previous: Valuation | null): strin
 	return move > 0
 		? `To je o ${move} % víc než minule. Sedí to?`
 		: `To je o ${Math.abs(move)} % míň než minule. Sedí to?`;
+}
+
+// ── the reminder, on the row ────────────────────────────────────────────────
+
+/**
+ * What the row says under its value about the reminder it carries.
+ *
+ * The cadence used to be visible only inside the edit sheet, so a holding
+ * given "30 dní" looked, on the screen it lives on, exactly like one given
+ * nothing. Now every row counts down to its own reminder and, once past it,
+ * counts up — the same number the finding is raised from, printed where the
+ * value is.
+ */
+export function reminderLine(reading: HoldingReading): string {
+	const { dueInDays } = reading;
+	if (dueInDays === null) return 'zatím bez hodnoty';
+	if (dueInDays > 0) return `připomínka za ${counted(dueInDays, DAYS)}`;
+	if (dueInDays === 0) return 'připomínka dnes';
+	return `${counted(-dueInDays, DAYS)} po připomínce`;
 }
 
 // ── the reminder, as a finding ──────────────────────────────────────────────

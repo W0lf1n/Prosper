@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-09-02 · schema v12 · 450 web tests · 50 API tests
+**Last revised:** 2026-09-05 · schema v12 · 467 web tests · 50 API tests
 
 ---
 
@@ -87,7 +87,7 @@ apps/web/src/
 ├─ lib/styles/     tokens.css (the only place colours exist), app.css, fonts.
 │                  app.css also owns the shared primitives: slab, card, meter,
 │                  tile, btn, field. One definition each, no per-route copies.
-├─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /settings
+├─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /nastaveni
 └─ service-worker.ts
 ```
 

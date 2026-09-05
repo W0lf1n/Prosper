@@ -135,10 +135,21 @@ at rather than a thing to do.
 
 ## Recording a value
 
-The app already has an interaction for typing a number quickly, and this reuses
-it rather than inventing a second one: a `Sheet` containing the `Keypad`, the
-same `amount-input` state machine, and a date row identical to the entry
-screen's (`ui/ValuationSheet.svelte`).
+**The first value goes in with the name** (since 2026-09-05, Q51). The
+new-holding sheet carries a plain decimal field — _Hodnota teď_ — under the
+name, the same phone-keyboard field the opening balance in Settings uses, and
+saving writes the holding and today's reading in one go. It used to hand over
+to the keypad for the number, and a sheet about an investment with nowhere on
+it to type what the investment is worth read as an app that could not record
+one. The field is only on a new holding: editing one never shows it, because a
+value has its own sheet with the previous reading beside it, and a number
+changed in passing while fixing a typo is precisely the reading nobody meant to
+write. Left blank, the keypad still follows.
+
+**Every value after the first** reuses the interaction the app already has for
+typing a number quickly, rather than inventing a second one: a `Sheet`
+containing the `Keypad`, the same `amount-input` state machine, and a date row
+identical to the entry screen's (`ui/ValuationSheet.svelte`).
 
 The previous reading stays on screen while typing, with the delta computed live.
 It is the cheapest available guard against a fat-fingered zero, and it is the
@@ -199,14 +210,20 @@ staleValuation → Finding {
 }
 ```
 
-It surfaces in exactly three places, and deliberately not a fourth:
+It surfaces in exactly four places, and deliberately not a fifth:
 
-| Where                        | How                                                |
-| ---------------------------- | -------------------------------------------------- |
-| `/mesic` findings list       | A row among the month's other findings, with a fix |
-| `/jmeni`, on the holding     | The age turns amber, the fix button appears        |
-| `/` slab header, on the icon | A flag dot. No text, no count, no interruption     |
-| ~~`/` checks strip~~         | **No.** That strip belongs to the row being typed  |
+| Where                        | How                                                                  |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `/jmeni`, above the list     | The _Připomínky_ slab: every finding in full, _Zapsat hodnotu_ opens the keypad |
+| `/jmeni`, on the holding     | The row counts down to its reminder, and past it counts up, in amber |
+| `/mesic` findings list       | A row among the month's other findings, with a fix                   |
+| `/` slab header, on the icon | A flag dot. No text, no count, no interruption                       |
+| ~~`/` checks strip~~         | **No.** That strip belongs to the row being typed                    |
+
+The first two arrived on 2026-09-05 (Q51). Until then the cadence was a fact
+visible only inside the edit sheet, so a holding given _30 dní_ looked, on the
+screen it lives on, exactly like one given nothing — and a reminder nobody can
+see is not one.
 
 The last line is the one worth defending. The entry screen's job is a
 five-second transaction; a nag about a pension statement while a number is
@@ -215,7 +232,9 @@ half-typed is precisely the friction that killed the spreadsheet.
 **Cadence is per holding** (`reminderDays`, default 30). A pension statement
 arrives quarterly and a crypto wallet can be read in ten seconds — one global
 interval would nag hardest about the thing that cannot be answered, and a
-reminder that cannot be acted on gets trained away.
+reminder that cannot be acted on gets trained away. Three presets — 7, 30, 90
+— and _jinak_, any whole number of days up to a year (`REMINDER_PRESETS`,
+`MAX_REMINDER_DAYS`, `isValidReminderDays` in `domain/holdings.ts`).
 
 ### What is left, and why it is blocked
 

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+	MAX_REMINDER_DAYS,
+	REMINDER_PRESETS,
 	contributionOf,
 	currentValuation,
+	isValidReminderDays,
 	readHolding,
 	readHoldings,
+	reminderLine,
 	staleValuationFindings,
 	valuationWarning,
 	wealthTotal
@@ -175,6 +179,80 @@ describe('readHolding', () => {
 			});
 			expect(reading.isStale).toBe(false);
 		});
+	});
+
+	describe('the countdown to the reminder', () => {
+		const at = (date: string) =>
+			readHolding({ holding: h, valuations: [valuation('v', 'h', date, 1_000_00)], today: TODAY });
+
+		it('counts down from the cadence on the day a value is written', () => {
+			expect(at(TODAY).dueInDays).toBe(30);
+		});
+
+		it('reaches zero exactly at the cadence, while the reading is still fresh', () => {
+			const reading = at('2026-07-26');
+			expect(reading.dueInDays).toBe(0);
+			expect(reading.isStale).toBe(false);
+		});
+
+		it('goes negative once the reminder has passed, by the days since', () => {
+			const reading = at('2026-06-25'); // 61 days against 30
+			expect(reading.dueInDays).toBe(-31);
+			expect(reading.isStale).toBe(true);
+		});
+
+		it('has nothing to count from when the holding has never been valued', () => {
+			expect(readHolding({ holding: h, valuations: [], today: TODAY }).dueInDays).toBeNull();
+		});
+	});
+});
+
+describe('reminderLine', () => {
+	const h = holding('h', { reminderDays: 30 });
+	const at = (date: string) =>
+		readHolding({ holding: h, valuations: [valuation('v', 'h', date, 1_000_00)], today: TODAY });
+
+	it('says the reminder is set, and when, on a fresh reading', () => {
+		expect(reminderLine(at(TODAY))).toBe('připomínka za 30 dní');
+		expect(reminderLine(at('2026-08-24'))).toBe('připomínka za 29 dní');
+		expect(reminderLine(at('2026-07-27'))).toBe('připomínka za 1 den');
+	});
+
+	it('names the day itself', () => {
+		expect(reminderLine(at('2026-07-26'))).toBe('připomínka dnes');
+	});
+
+	it('counts the days past the reminder, with the Czech plural', () => {
+		expect(reminderLine(at('2026-07-25'))).toBe('1 den po připomínce');
+		expect(reminderLine(at('2026-07-23'))).toBe('3 dny po připomínce');
+		expect(reminderLine(at('2026-06-25'))).toBe('31 dní po připomínce');
+	});
+
+	it('has nothing to count down to without a value', () => {
+		expect(reminderLine(readHolding({ holding: h, valuations: [], today: TODAY }))).toBe(
+			'zatím bez hodnoty'
+		);
+	});
+});
+
+describe('the cadence a holding may declare', () => {
+	it('offers three presets, and the default is one of them', () => {
+		expect(REMINDER_PRESETS).toEqual([7, 30, 90]);
+		expect(REMINDER_PRESETS).toContain(30);
+	});
+
+	it('accepts any whole number of days up to a year', () => {
+		expect(isValidReminderDays(1)).toBe(true);
+		expect(isValidReminderDays(60)).toBe(true);
+		expect(isValidReminderDays(MAX_REMINDER_DAYS)).toBe(true);
+	});
+
+	it('refuses zero, fractions, and anything past a year', () => {
+		expect(isValidReminderDays(0)).toBe(false);
+		expect(isValidReminderDays(-7)).toBe(false);
+		expect(isValidReminderDays(30.5)).toBe(false);
+		expect(isValidReminderDays(MAX_REMINDER_DAYS + 1)).toBe(false);
+		expect(isValidReminderDays(Number.NaN)).toBe(false);
 	});
 });
 

@@ -200,7 +200,7 @@
 					     sheet is a dead end — the rail holds only the search chip and the
 					     save button asks for a category nobody can pick. -->
 					<li class="picker__empty">
-						Žádná kategorie. <a href={resolve('/settings')}>Založ první v Nastavení.</a>
+						Žádná kategorie. <a href={resolve('/nastaveni')}>Založ první v Nastavení.</a>
 					</li>
 				{:else}
 					<li class="picker__empty">Nic takového tu není.</li>

@@ -2024,3 +2024,120 @@ recipe the digits already use to land. The order is the accounts' own
 dropped rather than queued, so the glyph never shows an account the keypad
 is not yet writing to. Persistence is unchanged: the same meta write
 Settings makes, sticky like the date, the half-typed amount surviving.
+
+---
+
+## The 2026-09-05 pass — the value goes in with the name, and Settings gets a Czech address
+
+Two things Petr asked for after using the app, both defects of shape rather
+than of code: the feature existed and could not be found, or the figure existed
+and could not be read. Built on the 2026-08-30 tree and rebased over the
+2026-09-02 pass, which is why the account breakdown below speaks of pockets:
+it was first written for two accounts in one currency, and Q50 had already
+decided that is not how koruny held elsewhere are kept.
+
+### Q51 — A holding is added with its value, and the reminder is on the screen · answered 2026-09-05
+
+**Asked:** _"What I need is to put there the value of my investments — an
+investing account I am not sending any money to, 100 000 Kč. This record I am
+not able to put inside the app. I want to put it there and set up a reminder
+for 30 days, so I can update the value if I want to."_
+
+**What was actually wrong.** The flow existed and worked — `+`, a sheet, a
+second sheet with the keypad — and it still read as "cannot record it", for
+two reasons that are one reason. The new-holding sheet asked for a name, a
+kind, a cadence and a bucket, and had **nowhere on it to type what the holding
+is worth**; the number came on a second sheet that appeared only after saving,
+and a sheet about an investment with no amount field is, to anyone looking at
+it, an app that does not take amounts. And the reminder, once set, was
+**invisible**: the cadence lived inside the edit sheet and nowhere else, so a
+holding given _30 dní_ looked on `/jmeni` exactly like one given nothing, and
+the only places the reminder ever surfaced were a dot on another screen and a
+row under Kontrola on a third.
+
+**Answered, three ways:**
+
+1. **The first value is typed on the same sheet as the name.** _Hodnota teď_ —
+   a plain decimal field, the phone keyboard, the same pattern as the opening
+   balance in Settings — sits directly under _Název_. Saving writes the holding
+   and today's reading together (`createHolding` then `recordValuation`, two
+   repo calls composed on the screen; the repo did not change). The
+   "two keyboards fighting" argument that kept the keypad off this sheet still
+   holds, and is why the field is a text input rather than the `Keypad`. Left
+   blank, the keypad follows exactly as before, and the button says so:
+   _Přidat a zapsat hodnotu_. Editing an existing holding never shows the field
+   — a value has its own sheet with the previous reading and the delta, and a
+   number changed in passing while fixing a typo is the reading nobody meant
+   to write.
+2. **The cadence is any number of days.** Three presets (7 · 30 · 90) and
+   _jinak_ with a numeric field, validated by `isValidReminderDays` — a whole
+   number from 1 to `MAX_REMINDER_DAYS` (366, a year; past that it is not a
+   reminder, it is a holding nobody intends to look at). The presets moved from
+   the sheet into `domain/holdings.ts` as `REMINDER_PRESETS`, so there is one
+   list.
+3. **The reminder is on the screen it is about.** `HoldingReading` gained
+   `dueInDays` — cadence minus age, zero on the day, negative past it — and
+   `reminderLine()` prints it on every row: _připomínka za 12 dní_,
+   _připomínka dnes_, _17 dní po připomínce_. Above the list, a _Připomínky_
+   slab renders `staleValuationFindings` in full, each with _Zapsat hodnotu_
+   opening the keypad on that holding — the same findings `/mesic` lists and
+   `/` reduces to a dot, raised here because here the fix is a tap and not a
+   navigation. It renders nothing while every reading is current.
+
+**Copy that changed with it.** The empty state now says the reminder exists
+(_"app ti pak po zvolené době připomene…"_); the bucket select's blank option
+reads _— nic tam neposílám —_, and its hint says that is the right answer for
+an account nothing is sent to — which was Petr's exact case, and the old
+_nepřiřazeno_ did not say so.
+
+**Not changed:** the `ValuationSheet` for every value after the first; the
+Web Push plan (still behind R3); `Holding.currency`; the tab bar, which gets
+no dot — the entry screen's icon already carries one, and a second badge on
+the navigation is a change to a control Petr has drawn the line at.
+
+### Q52 — `/settings` became `/nastaveni`, and the account list shows what each balance is made of · answered 2026-09-05
+
+**Asked:** rename the route, and — since koruny held elsewhere are folded
+into the one CZK account — show what that sum is made of: _"Total 20 000 Kč —
+Běžný účet 15 000 Kč — Revolut 5 000 Kč. And also for other currencies."_
+
+**The rename.** The directory moved (`git mv`, history intact) and the four
+links to it — the tab bar, the entry screen's corner glyph, the category
+picker's escape line, the goal form's hint — go through `resolve()`, so a
+stale link fails the build rather than the tap. The screen was always
+called Nastavení; only the address was English, which was the one word in the
+URL bar that was not in the app's language. No redirect from the old address:
+the app is a static shell whose start URL is `/`, the service worker precaches
+whatever routes the build has, and nothing outside the app links to a screen.
+Historical mentions of `/settings` in this file stay as written — they record
+what the screen was called when the decision was made.
+
+**The breakdown.** `balancesByCurrency(accounts, txns)` in `domain/ledger.ts`
+— every live account, grouped by `groupByCurrency`, each broken into
+**lines**: the account's own line and one line per pocket (Q50), with the
+group's total above them. It is the shape `/jmeni` was computing inline for
+its _Na účtu_ figures and now imports instead, so the two screens cannot
+disagree about what is on the accounts.
+
+**The account's own line carries every row.** A pocket is opening money — a
+named amount that joined the account from elsewhere, never restated — so
+nothing spent afterwards is attributed back to the card it came from: the
+Revolut line stays at the 5 000 Kč it was written with, and _Běžný účet_
+moves with the ledger. The alternative, splitting each row across the parts
+by some ratio, would be a figure nobody could check, and a number you cannot
+check is worse than a blank. The hint under the list says which line moves.
+
+**What the card prints.** One group per currency: a header with the code and,
+above two or more lines, _celkem_ and the sum; then the account with its own
+balance, marked _zapisuje se sem_ when it is the active one and carrying
+_Přepnout_ otherwise (the switcher Q49 put here, kept beside the keypad's
+because this is also where accounts are added and archived); then each pocket,
+stepped in and labelled _peníze jinde_. A group of one line gets no total —
+the same number printed twice on adjacent lines reads as a bug, not as a
+breakdown — and a single account in a single currency with no pockets gets no
+header at all, which keeps the common case as quiet as it was. Nothing is ever
+added across groups, per Q49.
+
+**Also folded in:** the settings card's record count was its own `liveQuery`
+over `txns`; it is now the length of the same live list the balances are read
+off, one query instead of two.

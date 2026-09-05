@@ -190,7 +190,7 @@ balance that Q39 deliberately left out of v1.
 | `routes/+layout.ts`            | The launch catch-up                                                        |
 | `ui/DueStrip.svelte`           | The strip and its sheet                                                    |
 | `ui/ScheduleSheet.svelte`      | Declaring and editing one                                                  |
-| `routes/settings/+page.svelte` | The list, the modes, the annual total                                      |
+| `routes/platby/+page.svelte`   | The list, the modes, the annual total                                      |
 
 The v5 migration restates `txns` in full, because Dexie replaces the whole
 declaration for a table it is given and every existing index has to be repeated

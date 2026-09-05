@@ -1,26 +1,44 @@
 <script lang="ts">
 	/**
-	 * A holding — a name, what sort of thing it is, how often it is worth asking
-	 * about, and which bucket feeds it.
+	 * A holding — a name, what it is worth today, what sort of thing it is, how
+	 * often it is worth asking about, and which bucket feeds it.
 	 *
-	 * No keypad here, deliberately: the field that matters is the name, and a
-	 * sheet that puts a number pad under a text input is a sheet with two
-	 * keyboards fighting over the bottom of the screen. The first value is typed
-	 * straight afterwards, in the sheet that is built for it.
+	 * The value is asked here, on the first sheet, for a new holding. It was not
+	 * until 2026-09-05: the sheet took the name and the cadence and handed over
+	 * to the keypad for the number, and the number was the whole reason the
+	 * sheet had been opened. A sheet about an investment with nowhere to type
+	 * what it is worth reads as an app that cannot record it. So the amount is
+	 * a plain decimal field under the name — the phone keyboard, like the
+	 * opening balance in Settings — and no second keyboard fights it. Left
+	 * blank, the keypad still follows, so a holding whose statement is not to
+	 * hand is not refused.
+	 *
+	 * Editing an existing holding never shows the field: a value has its own
+	 * sheet with the previous reading and the delta beside it, and a number
+	 * changed in passing while fixing a typo is exactly the reading nobody
+	 * meant to write.
 	 *
 	 * The cadence is per holding rather than global (`docs/INVESTMENTS.md` I5): a
 	 * pension statement lands quarterly and a wallet can be read in ten seconds,
 	 * and one interval for both would nag hardest about the thing that cannot be
-	 * answered.
+	 * answered. Three presets, and any other number of days typed.
 	 *
 	 * The bucket and the start date only appear together, because neither means
 	 * anything without the other: the bucket says where contributions come from
 	 * and the date says from when, and a bucket with no date would open the
 	 * holding already funded by everything that ever went through it.
 	 */
-	import { HOLDING_KINDS, KIND_LABEL } from '$lib/domain/holdings';
+	import {
+		DEFAULT_REMINDER_DAYS,
+		HOLDING_KINDS,
+		KIND_LABEL,
+		MAX_REMINDER_DAYS,
+		REMINDER_PRESETS,
+		isValidReminderDays
+	} from '$lib/domain/holdings';
 	import { DAYS, plural } from '$lib/domain/czech';
 	import { startOfMonth, today } from '$lib/domain/datetime';
+	import { currencySymbol, parseAmount, type Minor } from '$lib/domain/money';
 	import type { Category, Holding } from '$lib/domain/types';
 	import Sheet from './Sheet.svelte';
 
@@ -30,6 +48,11 @@
 		reminderDays: number;
 		categoryId: string | null;
 		startDate: string;
+		/**
+		 * The first reading, typed in the same breath as the name. Only asked
+		 * for a new holding; null when left blank, and then the keypad follows.
+		 */
+		value: Minor | null;
 	}
 
 	interface Props {
@@ -52,15 +75,21 @@
 		onclose
 	}: Props = $props();
 
-	const CADENCES = [7, 30, 90] as const;
 	const NONE = '';
 
+	const isPreset = (days: number) => (REMINDER_PRESETS as readonly number[]).includes(days);
+
 	let name = $state('');
+	let valueText = $state('');
 	let kind = $state<Holding['kind']>('investment');
-	let reminderDays = $state(30);
+	let reminderDays = $state<number>(DEFAULT_REMINDER_DAYS);
+	/** The fourth chip: a number of days the presets do not cover. */
+	let customCadence = $state(false);
+	let customDays = $state('');
 	let categoryId = $state<string>(NONE);
 	let startDate = $state(startOfMonth(today()));
 	let confirmingArchive = $state(false);
+	let error = $state('');
 
 	/* Re-seed whenever the sheet opens onto a different row (or onto none). */
 	let loaded = $state<string | null | undefined>(undefined);
@@ -73,23 +102,63 @@
 		if (id === loaded) return;
 		loaded = id;
 		name = holding?.name ?? '';
+		valueText = '';
 		kind = holding?.kind ?? 'investment';
-		reminderDays = holding?.reminderDays ?? 30;
+		const cadence = holding?.reminderDays ?? DEFAULT_REMINDER_DAYS;
+		reminderDays = cadence;
+		customCadence = !isPreset(cadence);
+		customDays = customCadence ? String(cadence) : '';
 		categoryId = holding?.categoryId ?? NONE;
 		startDate = holding?.startDate ?? startOfMonth(today());
 		confirmingArchive = false;
+		error = '';
 	});
 
 	const trimmed = $derived(name.trim());
+	const hasValue = $derived(valueText.trim() !== '');
+
+	function choosePreset(days: number) {
+		customCadence = false;
+		reminderDays = days;
+	}
+
+	function chooseCustom() {
+		customCadence = true;
+		error = '';
+	}
+
+	/** What the button says: the one missing thing, or what pressing it does. */
+	const action = $derived(
+		!trimmed ? 'Napiš název' : holding ? 'Uložit' : hasValue ? 'Přidat' : 'Přidat a zapsat hodnotu'
+	);
 
 	async function commit() {
 		if (!trimmed) return;
+
+		const days = customCadence ? Number(customDays.trim()) : reminderDays;
+		if (!isValidReminderDays(days)) {
+			error = `Počet dní musí být celé číslo od 1 do ${MAX_REMINDER_DAYS}.`;
+			return;
+		}
+
+		let value: Minor | null = null;
+		if (!holding && hasValue) {
+			const parsed = parseAmount(valueText);
+			if (!parsed.ok || parsed.value < 0) {
+				error = 'Hodnota není částka.';
+				return;
+			}
+			value = parsed.value;
+		}
+
+		error = '';
 		await onsave({
 			name: trimmed,
 			kind,
-			reminderDays,
+			reminderDays: days,
 			categoryId: categoryId || null,
-			startDate
+			startDate,
+			value
 		});
 	}
 </script>
@@ -101,11 +170,32 @@
 			<input
 				class="field__input"
 				bind:value={name}
-				placeholder="Penzijko, ETF, spořicí účet"
+				placeholder="Investiční účet, penzijko, ETF"
 				autocomplete="off"
-				enterkeyhint="done"
+				enterkeyhint="next"
 			/>
 		</label>
+
+		{#if !holding}
+			<label class="field">
+				<span class="field__label">Hodnota teď</span>
+				<span class="amount">
+					<input
+						class="field__input field__input--mono"
+						bind:value={valueText}
+						inputmode="decimal"
+						placeholder="100 000"
+						autocomplete="off"
+						enterkeyhint="done"
+					/>
+					<span class="amount__unit">{currencySymbol()}</span>
+				</span>
+				<span class="field__hint">
+					Kolik to má dneska hodnotu — opiš z výpisu. Když ji zatím neznáš, nech prázdné a zapíšeš
+					ji hned potom na klávesnici.
+				</span>
+			</label>
+		{/if}
 
 		<fieldset class="group">
 			<legend class="field__label">Co to je</legend>
@@ -128,21 +218,49 @@
 		<fieldset class="group">
 			<legend class="field__label">Připomenout po</legend>
 			<div class="options">
-				{#each CADENCES as option (option)}
+				{#each REMINDER_PRESETS as option (option)}
 					<button
 						type="button"
 						class="option option--plain"
-						class:option--on={reminderDays === option}
-						aria-pressed={reminderDays === option}
-						onclick={() => (reminderDays = option)}
+						class:option--on={!customCadence && reminderDays === option}
+						aria-pressed={!customCadence && reminderDays === option}
+						onclick={() => choosePreset(option)}
 					>
 						{option}
 						{plural(option, DAYS)}
 					</button>
 				{/each}
+				<button
+					type="button"
+					class="option"
+					class:option--on={customCadence}
+					aria-pressed={customCadence}
+					onclick={chooseCustom}
+				>
+					jinak
+				</button>
 			</div>
+
+			{#if customCadence}
+				<label class="field">
+					<span class="field__label">Po kolika dnech</span>
+					<span class="amount">
+						<input
+							class="field__input field__input--mono"
+							bind:value={customDays}
+							inputmode="numeric"
+							placeholder="60"
+							autocomplete="off"
+							enterkeyhint="done"
+						/>
+						<span class="amount__unit">dní</span>
+					</span>
+				</label>
+			{/if}
+
 			<p class="field__hint">
-				Po téhle době ti app řekne, že hodnota je stará. Dá se změnit kdykoliv.
+				Po téhle době ti app na téhle obrazovce a v Měsíci připomene, že je čas hodnotu přepsat. Dá
+				se změnit kdykoliv.
 			</p>
 		</fieldset>
 
@@ -150,7 +268,7 @@
 			<label class="field">
 				<span class="field__label">Kam na to posíláš <span class="optional">nepovinné</span></span>
 				<select class="field__input" bind:value={categoryId}>
-					<option value={NONE}>— nepřiřazeno —</option>
+					<option value={NONE}>— nic tam neposílám —</option>
 					{#each categories as category (category.id)}
 						<option value={category.id}>{category.name}</option>
 					{/each}
@@ -158,7 +276,7 @@
 				<span class="field__hint">
 					{categoryId
 						? 'App z výpisu spočítá, kolik jsi sem vložil, a kolik z hodnoty je růst.'
-						: 'Bez kategorie app neukáže, kolik jsi vložil — jen aktuální hodnotu.'}
+						: 'Bez kategorie app ukáže jen aktuální hodnotu — pro účet, kam nic neposíláš, je to přesně ono.'}
 				</span>
 			</label>
 
@@ -174,8 +292,12 @@
 			{/if}
 		{/if}
 
+		{#if error}
+			<p class="error-text" role="alert">{error}</p>
+		{/if}
+
 		<button type="button" class="btn btn--primary btn--block" disabled={!trimmed} onclick={commit}>
-			{trimmed ? (holding ? 'Uložit' : 'Přidat') : 'Napiš název'}
+			{action}
 		</button>
 
 		{#if onarchive}
@@ -226,8 +348,28 @@
 		gap: var(--space-2);
 	}
 
+	/* The number and its unit on one line: the unit is context, not a control,
+	   so it sits outside the field in the same colour as a hint. */
+	.amount {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.amount .field__input {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.amount__unit {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: var(--text-md);
+		color: var(--ink-3);
+	}
+
 	/* Sized to their own words rather than to a share of the row: four kinds and
-	   three cadences do not divide into the same grid, and forcing them to would
+	   four cadences do not divide into the same grid, and forcing them to would
 	   set "hotovost" and "spoření" at two different widths for no reason. */
 	.option {
 		display: flex;

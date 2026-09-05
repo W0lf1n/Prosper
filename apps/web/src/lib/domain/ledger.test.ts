@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	MIN_PAYEE_QUERY,
 	balanceOf,
+	balancesByCurrency,
 	buildTape,
 	categoryOrder,
 	categoryRanking,
@@ -9,7 +10,7 @@ import {
 	suggestPayees
 } from './ledger';
 import { minor, type Minor } from './money';
-import type { Txn } from './types';
+import type { Account, Txn } from './types';
 
 let counter = 0;
 
@@ -118,6 +119,112 @@ describe('buildTape()', () => {
 describe('balanceOf()', () => {
 	it('is the opening balance plus every movement', () => {
 		expect(balanceOf(OPENING, [txn('2026-08-01', -5000), txn('2026-08-02', 2500)])).toBe(97500);
+	});
+});
+
+describe('balancesByCurrency()', () => {
+	function account(
+		id: string,
+		currency: string,
+		opening: number,
+		patch: Partial<Account> = {}
+	): Account {
+		return {
+			id,
+			name: id,
+			kind: 'checking' as const,
+			openingBalance: minor(opening),
+			openingDate: '2026-01-01',
+			pockets: [],
+			currency,
+			isArchived: false,
+			sortOrder: 0,
+			updatedAt: '2026-08-01T10:00:00.000Z',
+			deviceId: 'dev-1',
+			isDeleted: false,
+			...patch
+		};
+	}
+
+	const kb = account('kb', 'CZK', 10_000_00, { sortOrder: 0 });
+	const revolutCzk = account('rev-czk', 'CZK', 5_000_00, { sortOrder: 1 });
+	const revolutEur = account('rev-eur', 'EUR', 100_00, { sortOrder: 2 });
+
+	it('sums accounts inside a currency and names each half of the sum', () => {
+		const groups = balancesByCurrency(
+			[kb, revolutCzk],
+			[
+				txn('2026-08-01', -2_000_00, { accountId: 'kb' }),
+				txn('2026-08-02', 3_000_00, { accountId: 'rev-czk' })
+			]
+		);
+
+		expect(groups).toHaveLength(1);
+		const [czk] = groups;
+		expect(czk!.code).toBe('CZK');
+		expect(czk!.total).toBe(16_000_00);
+		expect(czk!.lines.map((line) => [line.name, line.amount])).toEqual([
+			['kb', 8_000_00],
+			['rev-czk', 8_000_00]
+		]);
+	});
+
+	it('breaks a balance into the bank account and each pocket on it — Q50', () => {
+		const withPocket = account('kb', 'CZK', 15_000_00, {
+			name: 'Běžný účet',
+			pockets: [{ id: 'p1', name: 'Revolut', amount: minor(5_000_00) }]
+		});
+
+		const untouched = balancesByCurrency([withPocket], []);
+		expect(untouched[0]!.total).toBe(20_000_00);
+
+		// Spending moves the account's own line only: a pocket is opening money,
+		// and nothing spent afterwards is attributed back to the card it came from.
+		const [czk] = balancesByCurrency(
+			[withPocket],
+			[txn('2026-08-01', -2_000_00, { accountId: 'kb' })]
+		);
+		expect(czk!.total).toBe(18_000_00);
+		expect(czk!.lines.map((line) => [line.name, line.amount, line.pocket?.id ?? null])).toEqual([
+			['Běžný účet', 13_000_00, null],
+			['Revolut', 5_000_00, 'p1']
+		]);
+	});
+
+	it('never adds across currencies — a euro account is its own group', () => {
+		const groups = balancesByCurrency(
+			[kb, revolutEur],
+			[txn('2026-08-01', -30_00, { accountId: 'rev-eur' })]
+		);
+
+		expect(groups.map((g) => [g.code, g.total])).toEqual([
+			['CZK', 10_000_00],
+			['EUR', 70_00]
+		]);
+	});
+
+	it('is the opening figure alone for an account with no rows', () => {
+		const [czk] = balancesByCurrency([kb], []);
+		expect(czk!.lines[0]!.amount).toBe(10_000_00);
+	});
+
+	it('ignores soft-deleted rows and archived accounts', () => {
+		const archived = account('old', 'CZK', 99_000_00, { isArchived: true, sortOrder: 9 });
+		const groups = balancesByCurrency(
+			[kb, archived],
+			[
+				txn('2026-08-01', -500_00, { accountId: 'kb', isDeleted: true }),
+				txn('2026-08-01', -500_00, { accountId: 'old' })
+			]
+		);
+
+		expect(groups).toHaveLength(1);
+		expect(groups[0]!.lines.map((line) => line.name)).toEqual(['kb']);
+		expect(groups[0]!.total).toBe(10_000_00);
+	});
+
+	it('is empty when there are no live accounts', () => {
+		expect(balancesByCurrency([], [txn('2026-08-01', -1_00)])).toEqual([]);
 	});
 });
 

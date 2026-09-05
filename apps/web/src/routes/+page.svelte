@@ -523,7 +523,7 @@
 					<a class="icon-link" href={resolve('/platby')} aria-label="Pravidelné platby">
 						<Icon name="repeat" size={20} />
 					</a>
-					<a class="icon-link" href={resolve('/settings')} aria-label="Nastavení">
+					<a class="icon-link" href={resolve('/nastaveni')} aria-label="Nastavení">
 						<Icon name="settings" size={20} />
 					</a>
 				{/snippet}

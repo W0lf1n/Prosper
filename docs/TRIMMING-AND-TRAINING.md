@@ -141,7 +141,7 @@ app has stopped asking.) Not a summary, not a tip. One line:
 Tapping it opens `/` with the keypad focused.
 
 Android is primary (Q16), so Web Push with VAPID works; iOS degrades to nothing,
-which is the agreed position. **Off by default, turned on from `/settings`.** A
+which is the agreed position. **Off by default, turned on from `/nastaveni`.** A
 finance app that nags without being asked gets uninstalled, and this one only
 has to survive one user.
 

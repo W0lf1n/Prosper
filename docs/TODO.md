@@ -1,6 +1,6 @@
 # TODO — what is left
 
-**Revised:** 2026-09-02
+**Revised:** 2026-09-05
 **Audience:** Petr (decisions), Claude Code (implementation)
 
 > The only file in `docs/` that carries a backlog. Everything else describes the
@@ -13,14 +13,14 @@
 
 ---
 
-## State, 2026-09-02
+## State, 2026-09-05
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 450 pass, 22 files              |
+| `pnpm test`                | 467 pass, 22 files              |
 | `pnpm check`               | 0 errors, 0 warnings, 418 files |
 | `pnpm lint`                | eslint passes; see the note     |
-| `pnpm budget`              | 90.0 kB of 150 kB brotli        |
+| `pnpm budget`              | 89.9 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
 | Schema · backup format     | **v12** · **6**                 |
 
@@ -83,6 +83,14 @@ is an expense from a bucket chosen in the sheet, the euro leg is income in a
 `SMĚNA` bucket created on first use, reversing the part of Q49 that kept
 transfer legs out of every measurement (`DECISIONS.md`, "An exchange counts
 the way it reads").
+
+**Two more on 2026-09-05, both out of use** (`DECISIONS.md`, the 2026-09-05
+pass): a holding's first value is typed **on the same sheet as its name**, with
+the reminder cadence beside it (presets or any number of days), and `/jmeni`
+carries a _Připomínky_ slab plus a countdown on every row, so the reminder is
+visible where it is acted on (Q51); and **Settings moved to `/nastaveni`**, its
+account list showing **every balance, grouped by currency, with the total above
+the parts it is made of** — the bank account's own line and each pocket (Q52).
 
 **The 2026-08-29 design audit landed as colours and hints only** (`DECISIONS.md`,
 the audit section): debt recoloured copper, the meter/ring denominator made

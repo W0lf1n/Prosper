@@ -747,7 +747,7 @@
 			{:else}
 				<p class="hint prose">
 					Nemáš žádnou spořicí kategorii. Založ ji v
-					<a href={resolve('/settings')}>nastavení</a> a nastav jí typ „spoření“.
+					<a href={resolve('/nastaveni')}>nastavení</a> a nastav jí typ „spoření“.
 				</p>
 			{/if}
 		</div>

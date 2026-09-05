@@ -18,7 +18,8 @@
 import { ZERO, add, minor, sum, type Minor } from './money';
 import { addDays, daysBetween, monthKey, today as todayIso, type IsoDate } from './datetime';
 import { normalize } from './vocabulary';
-import type { Txn } from './types';
+import { groupByCurrency, pocketsOf } from './accounts';
+import type { Account, AccountPocket, Txn } from './types';
 
 export interface TapeTxn {
 	txn: Txn;
@@ -155,6 +156,75 @@ function maxDate(a: IsoDate, b: IsoDate): IsoDate {
 /** Current balance of an account: opening balance plus every live transaction. */
 export function balanceOf(openingBalance: Minor, txns: readonly Txn[]): Minor {
 	return add(openingBalance, sum(txns.map((t) => t.amount)));
+}
+
+/**
+ * One line of what is on the accounts: an account's own money, or a pocket on
+ * it (Q50). `pocket` is null on the account's own line.
+ */
+export interface BalanceLine {
+	account: Account;
+	pocket: AccountPocket | null;
+	name: string;
+	amount: Minor;
+}
+
+export interface CurrencyBalances {
+	code: string;
+	/** Every line in the group added together — each account's `openingTotal`
+	    plus its rows. Exists per currency and nowhere above it, because there
+	    is no figure across currencies (Q49). */
+	total: Minor;
+	/** The account's own line, then each of its pockets — and the same again
+	    for a currency that, from before Q50, still holds a second account. */
+	lines: BalanceLine[];
+}
+
+/**
+ * Every live account's balance, grouped by currency, broken into the parts
+ * the balance is made of, with each group's total.
+ *
+ * The one shape that answers "what is on the accounts". The CZK account with
+ * 15 000 Kč at the bank and a Revolut pocket of 5 000 Kč is one koruna figure
+ * of 20 000 Kč, and the screen may print both parts under it — which is the
+ * whole reason the parts are returned rather than only the sum: a total that
+ * does not show what it is made of is a number you have to trust rather than
+ * read. `groupByCurrency` decides membership and order, so every screen that
+ * sums per currency agrees on what is in the sum.
+ *
+ * **The account's own line carries every row.** A pocket is opening money
+ * (Q50) — a named amount that joined the account from elsewhere — and nothing
+ * spent afterwards is attributed back to the card it came from, so the pocket
+ * line stays at the figure it was written with and the account's line moves.
+ *
+ * Soft-deleted rows are not rows; archived accounts are not shown, and their
+ * rows belong to them alone, so they never leak into a live account's figure.
+ */
+export function balancesByCurrency(
+	accounts: readonly Account[],
+	txns: readonly Txn[]
+): CurrencyBalances[] {
+	const movement = new Map<string, Minor>();
+	for (const txn of txns) {
+		if (txn.isDeleted) continue;
+		movement.set(txn.accountId, add(movement.get(txn.accountId) ?? ZERO, txn.amount));
+	}
+
+	return [...groupByCurrency(accounts)].map(([code, group]) => {
+		const lines: BalanceLine[] = [];
+		for (const account of group) {
+			lines.push({
+				account,
+				pocket: null,
+				name: account.name,
+				amount: add(account.openingBalance, movement.get(account.id) ?? ZERO)
+			});
+			for (const pocket of pocketsOf(account)) {
+				lines.push({ account, pocket, name: pocket.name, amount: pocket.amount });
+			}
+		}
+		return { code, total: sum(lines.map((line) => line.amount)), lines };
+	});
 }
 
 /**

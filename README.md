@@ -118,7 +118,7 @@ apps/web/src/
 ├─ lib/sync/       Outbox drain, pull, pairing. Never awaited by the UI.
 ├─ lib/ui/         Hand-rolled components. No component library.
 ├─ lib/styles/     tokens.css — the only place colour exists — and app.css.
-└─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /settings
+└─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /nastaveni
 
 apps/api/          ASP.NET Core 10 + EF Core + Postgres 16 — optional sync server
 packages/contracts The sync protocol, shared by both sides

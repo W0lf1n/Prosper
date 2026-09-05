@@ -38,6 +38,7 @@
 	import { summariseMonth } from '$lib/domain/checks';
 	import { RECORDS, counted } from '$lib/domain/czech';
 	import { KIND_LABEL } from '$lib/domain/holdings';
+	import { balancesByCurrency } from '$lib/domain/ledger';
 	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
 	import { sharesOf } from '$lib/domain/receivables';
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
@@ -47,6 +48,7 @@
 	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
+	import Money from '$lib/ui/Money.svelte';
 	import ResetSheet from '$lib/ui/ResetSheet.svelte';
 	import BottomSheet from '$lib/ui/Sheet.svelte';
 	import TransferSheet, { type TransferInput } from '$lib/ui/TransferSheet.svelte';
@@ -81,15 +83,25 @@
 	/**
 	 * Live rows, not every row ever written.
 	 *
-	 * It was `txns.count()`, which includes tombstones — so the figure never
-	 * went down, and after "začít znovu" the card would have reported a
-	 * thousand records against an empty tape. The scan is over one small table
-	 * on a screen nobody opens in a hurry.
+	 * The count was `txns.count()` once, which includes tombstones — so the
+	 * figure never went down, and after "začít znovu" the card would have
+	 * reported a thousand records against an empty tape. The scan is over one
+	 * small table on a screen nobody opens in a hurry, and the rows themselves
+	 * are what the balances below are read off.
 	 */
-	const txnCount = liveQuery(() =>
-		db()
-			.txns.filter((t) => !t.isDeleted)
-			.count()
+	const allTxns = liveQuery(async () =>
+		(await db().txns.toArray()).filter((t: Txn) => !t.isDeleted)
+	);
+	const txnCount = $derived(($allTxns ?? []).length);
+
+	/**
+	 * What is on every account right now, by currency, broken into the bank
+	 * account's own line and each pocket that joined it (Q50) — the figure
+	 * `/mesic`'s "vše" and `/jmeni`'s "Na účtu" print, shown here with the
+	 * parts it is made of (Q52).
+	 */
+	const balances = $derived(
+		balancesByCurrency(($allAccounts ?? []) as Account[], ($allTxns ?? []) as Txn[])
 	);
 
 	const SPEND_TYPES: { value: SpendType; label: string }[] = [
@@ -124,7 +136,7 @@
 	 * screen after "začít znovu" — the wipe removes the rows that closed it.
 	 */
 	let accountOpen = $state<boolean | null>(null);
-	const accountExpanded = $derived(accountOpen ?? ($txnCount ?? 0) === 0);
+	const accountExpanded = $derived(accountOpen ?? txnCount === 0);
 
 	async function saveAccount() {
 		if (!data.accountId) return;
@@ -729,26 +741,66 @@
 			</button>
 		{/if}
 
-		{#if otherAccounts.length > 0}
-			<!-- The rest of the accounts. Tapping one makes it the account the
-			     keypad writes to — the switcher lives here, next to what it
-			     switches (Q49). -->
-			<ul class="accounts">
-				{#each otherAccounts as row (row.id)}
-					<li>
-						<button type="button" class="account-row" onclick={() => switchTo(row)}>
-							<span class="account-row__lines">
-								<span class="account-row__name">{row.name}</span>
-								<span class="account-row__meta">
-									{ACCOUNT_KIND_LABEL[row.kind]} · {currencySymbol(row.currency)}
-								</span>
+		<!--
+		  Every account with what is on it right now, by currency, and under
+		  each one the pockets that joined it (Q50) — above a group of two or
+		  more lines, the figure they make together. That figure is the one
+		  /mesic's "vše" and /jmeni's "Na účtu" print, and this is the only
+		  place it is broken back into its parts (Q52). Tapping an account that
+		  is not the active one makes it the account the keypad writes to — the
+		  switcher lives here as well as on the keypad, because this is also
+		  where an account is added or archived.
+		-->
+		<div class="balances">
+			{#each balances as group (group.code)}
+				<section class="group">
+					{#if group.lines.length > 1 || balances.length > 1}
+						<header class="group__head">
+							<span class="u-label">
+								{group.code}{group.lines.length > 1 ? ' · celkem' : ''}
 							</span>
-							<span class="account-row__go">Přepnout</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+							{#if group.lines.length > 1}
+								<Money value={group.total} code={group.code} colour={false} bold />
+							{/if}
+						</header>
+					{/if}
+					<ul class="accounts">
+						{#each group.lines as line (line.pocket?.id ?? line.account.id)}
+							<li>
+								{#if line.pocket}
+									<div class="account-row account-row--pocket">
+										<span class="account-row__lines">
+											<span class="account-row__name">{line.name}</span>
+											<span class="account-row__meta">peníze jinde</span>
+										</span>
+										<Money value={line.amount} code={group.code} colour={false} />
+									</div>
+								{:else if line.account.id === data.accountId}
+									<div class="account-row account-row--active">
+										<span class="account-row__lines">
+											<span class="account-row__name">{line.name}</span>
+											<span class="account-row__meta">
+												{ACCOUNT_KIND_LABEL[line.account.kind]} · zapisuje se sem
+											</span>
+										</span>
+										<Money value={line.amount} code={group.code} colour={false} />
+									</div>
+								{:else}
+									<button type="button" class="account-row" onclick={() => switchTo(line.account)}>
+										<span class="account-row__lines">
+											<span class="account-row__name">{line.name}</span>
+											<span class="account-row__meta">{ACCOUNT_KIND_LABEL[line.account.kind]}</span>
+										</span>
+										<Money value={line.amount} code={group.code} colour={false} />
+										<span class="account-row__go">Přepnout</span>
+									</button>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/each}
+		</div>
 
 		<div class="row-actions">
 			{#if freeCurrencies.length > 0}
@@ -760,10 +812,10 @@
 		</div>
 
 		<p class="hint prose">
-			Klávesnice zapisuje na účet nahoře; přepnout jde tady, nebo na hlavní obrazovce klepnutím na
+			Klávesnice zapisuje na aktivní účet; přepnout jde tady, nebo na hlavní obrazovce klepnutím na
 			měnu u částky. V každé měně je jeden účet — koruny z jiné banky se k tomu korunovému přidají
-			jako peníze jinde. Druhý účet se hodí na dovolenou v eurech; každý účet počítá ve své měně a
-			dohromady se nesčítají.
+			jako peníze jinde a nahoře je, kolik dělají dohromady. Mezi měnami se nesčítá nic: kurz se
+			nikde nebere.
 		</p>
 	</section>
 
@@ -972,7 +1024,7 @@
 		<dl class="facts">
 			<div>
 				<dt>Záznamů</dt>
-				<dd class="mono">{$txnCount ?? 0}</dd>
+				<dd class="mono">{txnCount}</dd>
 			</div>
 			<div>
 				<dt>Trvalé úložiště</dt>
@@ -1373,7 +1425,30 @@
 		color: var(--signal);
 	}
 
-	/* ── the other accounts, and the sheet that adds one ─────────────────── */
+	/* ── the accounts, by currency, and the sheet that adds one ──────────── */
+
+	.balances {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+
+	.group {
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* The sum sits above its parts, on the same grid as the rows beneath it,
+	   so the figure and the figures it is made of line up in one column. */
+	.group__head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		min-height: var(--touch);
+		padding-inline: var(--space-1);
+		border-bottom: 1px solid var(--hairline);
+	}
 
 	.accounts {
 		list-style: none;
@@ -1408,11 +1483,38 @@
 		}
 	}
 
+	/* The active account is a row like the others, minus the press: it is
+	   where the keypad already writes, and there is nothing to switch to. A
+	   pocket is not a destination at all — it is part of the account above
+	   it, and steps in to say so. */
+	.account-row--active,
+	.account-row--active:active,
+	.account-row--active:hover,
+	.account-row--pocket,
+	.account-row--pocket:active,
+	.account-row--pocket:hover {
+		background: transparent;
+		cursor: default;
+	}
+
+	.account-row--pocket {
+		padding-left: calc(var(--space-3) + var(--space-4));
+	}
+
+	.account-row--pocket .account-row__name {
+		color: var(--ink-2);
+	}
+
 	.account-row__lines {
 		display: flex;
+		flex: 1;
 		flex-direction: column;
 		gap: 2px;
 		min-width: 0;
+	}
+
+	.account-row :global(.money) {
+		flex: none;
 	}
 
 	.account-row__name {

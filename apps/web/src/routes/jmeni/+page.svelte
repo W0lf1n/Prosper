@@ -21,17 +21,19 @@
 	import { liveQuery } from 'dexie';
 	import { db } from '$lib/db/schema';
 	import { archiveHolding, createHolding, recordValuation, updateHolding } from '$lib/db/repo';
-	import { groupByCurrency, homeCurrency, openingTotal } from '$lib/domain/accounts';
+	import { homeCurrency } from '$lib/domain/accounts';
 	import {
 		contributionOf,
 		readHoldings,
+		reminderLine,
+		staleValuationFindings,
 		wealthTotal,
 		type Contribution,
 		type HoldingReading
 	} from '$lib/domain/holdings';
+	import { balancesByCurrency } from '$lib/domain/ledger';
 	import { formatShortDate, today } from '$lib/domain/datetime';
-	import { DAYS, plural } from '$lib/domain/czech';
-	import { ZERO, add, sum, type Minor } from '$lib/domain/money';
+	import { ZERO, formatMoney, type Minor } from '$lib/domain/money';
 	import type { Account, Category, Holding, Txn, Valuation } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Explainer from '$lib/ui/Explainer.svelte';
@@ -60,25 +62,17 @@
 	);
 
 	/**
-	 * Derived, and exact: opening figures plus every row since — per currency,
-	 * because balances in different currencies are never summed (Q49). The home
-	 * currency's cash goes into `celkem` beside the holdings, which are stated
-	 * in it; each other currency is its own line and joins no total.
+	 * Derived, and exact: opening figures (pockets included, Q50) plus every
+	 * row since — per currency, because balances in different currencies are
+	 * never summed (Q49). The home currency's cash goes into `celkem` beside
+	 * the holdings, which are stated in it; each other currency is its own line
+	 * and joins no total. The same `balancesByCurrency` Settings breaks back
+	 * into its parts, so the two screens cannot disagree about "Na účtu".
 	 */
 	const home = $derived(homeCurrency(($allAccounts ?? []) as Account[]));
-	const cashByCurrency = $derived.by(() => {
-		const rows = ($allTxns ?? []) as Txn[];
-		const totals: { code: string; total: Minor }[] = [];
-		for (const [code, group] of groupByCurrency(($allAccounts ?? []) as Account[])) {
-			const opening = sum(group.map(openingTotal));
-			const ids = new Set(group.map((a) => a.id));
-			totals.push({
-				code,
-				total: add(opening, sum(rows.filter((t) => ids.has(t.accountId)).map((t) => t.amount)))
-			});
-		}
-		return totals;
-	});
+	const cashByCurrency = $derived(
+		balancesByCurrency(($allAccounts ?? []) as Account[], ($allTxns ?? []) as Txn[])
+	);
 	const cash = $derived(cashByCurrency.find((c) => c.code === home)?.total ?? ZERO);
 	const foreignCash = $derived(cashByCurrency.filter((c) => c.code !== home));
 
@@ -91,6 +85,17 @@
 	);
 
 	const wealth = $derived(wealthTotal({ cash, readings }));
+
+	/**
+	 * The reminders, on the screen they are about.
+	 *
+	 * The same findings `/mesic` lists under Kontrola and the entry screen
+	 * reduces to a dot — raised here in full, because this is the one screen
+	 * where the fix is a tap away rather than a navigation away. Until
+	 * 2026-09-05 a holding's cadence was a fact you could only see by opening
+	 * its edit sheet, and a reminder nobody can see is not one.
+	 */
+	const due = $derived(staleValuationFindings(readings));
 
 	/**
 	 * What went in, and what it did since — per holding, read off the ledger.
@@ -146,18 +151,34 @@
 		holdingSheetOpen = true;
 	}
 
+	/**
+	 * One sheet, and the holding is on the screen with its value. The amount is
+	 * typed beside the name and written as today's reading the moment the
+	 * holding exists — one tap from "I own this" to a total that includes it.
+	 * Only a blank amount hands over to the keypad, so a holding whose
+	 * statement is not to hand is still not refused.
+	 */
 	async function saveHolding(input: HoldingInput) {
+		const { value, ...fields } = input;
 		if (editingHolding) {
-			await updateHolding(editingHolding.id, input);
+			await updateHolding(editingHolding.id, fields);
 			holdingSheetOpen = false;
 			return;
 		}
 
-		const holding = await createHolding(input);
+		const holding = await createHolding(fields);
 		holdingSheetOpen = false;
-		// Straight into the number: a holding with no value is the empty state
-		// this screen exists to get out of.
-		valuing = holding.id;
+
+		if (value === null) {
+			// Straight into the number: a holding with no value is the empty
+			// state this screen exists to get out of.
+			valuing = holding.id;
+			return;
+		}
+
+		await recordValuation({ holdingId: holding.id, value, date: today() });
+		navigator.vibrate?.(12);
+		toast.show(`„${holding.name}“ · ${formatMoney(value)}`);
 	}
 
 	async function saveValuation(value: number, date: string) {
@@ -182,13 +203,15 @@
 		toast.show(`„${name}“ schováno`);
 	}
 
-	/** "k 3. 6. · 47 dní" — or just "dnes", when there is nothing to explain. */
+	/**
+	 * "k 3. 6. · připomínka za 12 dní" — the day the number was true, and the
+	 * reminder it is counting towards. Past the reminder the same line counts
+	 * the other way: "k 3. 6. · 17 dní po připomínce".
+	 */
 	function ageLine(reading: HoldingReading): string {
-		if (reading.asOf === null) return 'zatím bez hodnoty';
-		if (reading.ageDays === 0) return 'dnes';
-		const when = `k ${formatShortDate(reading.asOf)}`;
-		if (!reading.isStale) return when;
-		return `${when} · ${reading.ageDays} ${plural(reading.ageDays!, DAYS)}`;
+		if (reading.asOf === null) return reminderLine(reading);
+		const when = reading.ageDays === 0 ? 'dnes' : `k ${formatShortDate(reading.asOf)}`;
+		return `${when} · ${reminderLine(reading)}`;
 	}
 </script>
 
@@ -248,14 +271,47 @@
 			<span class="empty__glyph" aria-hidden="true"><Icon name="wealth" size={26} /></span>
 			<p class="empty__lead">Zatím tu nic není.</p>
 			<p class="empty__note prose">
-				Přidej penzijko, ETF nebo spořicí účet a zapiš, kolik má dneska hodnotu. Kolik do toho
-				posíláš se počítá dál v běžných výdajích — sem patří jen to, na kolik to vyrostlo.
+				Přidej investiční účet, penzijko nebo ETF a zapiš, kolik má dneska hodnotu — app ti pak po
+				zvolené době připomene, že je čas ji přepsat. Kolik do toho posíláš se počítá dál v běžných
+				výdajích; sem patří jen aktuální hodnota.
 			</p>
 			<button type="button" class="btn btn--primary" onclick={openNewHolding}>
 				Přidat investici
 			</button>
 		</section>
 	{:else}
+		<!--
+		  What is waiting on a number. Each row is the same finding Kontrola
+		  lists on /mesic, with the fix where it can actually be done: the
+		  button opens the keypad on that holding.
+		-->
+		{#if due.length > 0}
+			<section class="due slab">
+				<h2 class="u-label">Připomínky</h2>
+				<ul class="due__list">
+					{#each due as finding (finding.id)}
+						{@const fix = finding.fix}
+						<li class="due__row">
+							<span class="due__dot" data-severity={finding.severity} aria-hidden="true"></span>
+							<div class="due__text">
+								<p class="due__title">{finding.title}</p>
+								<p class="due__detail">{finding.detail}</p>
+							</div>
+							{#if fix?.kind === 'value-holding'}
+								<button
+									type="button"
+									class="btn due__fix"
+									onclick={() => (valuing = fix.holdingId)}
+								>
+									{fix.label}
+								</button>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
+
 		<ul class="holdings">
 			{#each readings as reading (reading.holding.id)}
 				<li>
@@ -459,6 +515,66 @@
 		height: 5px;
 		border-radius: var(--radius-full);
 		background: var(--flag);
+	}
+
+	/* ── the reminders ───────────────────────────────────────────────────
+	   The same grammar as Kontrola on /mesic — a tone dot, a title, a detail —
+	   with the fix as a real button, because here it does something. */
+
+	.due {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		padding: var(--space-3) var(--space-4);
+		border-color: color-mix(in srgb, var(--flag) 34%, var(--hairline));
+	}
+
+	.due__list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+
+	.due__row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.due__dot {
+		flex: none;
+		width: 6px;
+		height: 6px;
+		border-radius: var(--radius-full);
+		background: var(--ink-3);
+	}
+
+	.due__dot[data-severity='warn'] {
+		background: var(--flag);
+	}
+
+	.due__text {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.due__title {
+		font-size: var(--text-md);
+		font-weight: 600;
+	}
+
+	.due__detail {
+		font-size: var(--text-xs);
+		color: var(--ink-2);
+		line-height: var(--leading-base);
+		text-wrap: pretty;
+	}
+
+	.due__fix {
+		flex: none;
 	}
 
 	/* ── the holdings ────────────────────────────────────────────────────

@@ -540,7 +540,7 @@ KVĚTEN −45 937, ČERVENEC −10 048 — and no screen he looked at ever said 
 ## 8. Screens
 
 Seven. Six of them sit in the tab bar — `/tape`, `/mesic`, `/platby`, `/cil`,
-`/jmeni`, `/settings` — three each side of a record disc that returns to the
+`/jmeni`, `/nastaveni` — three each side of a record disc that returns to the
 entry screen. **The entry screen carries no tab bar**: the keypad owns the bottom
 of the phone and needs every pixel on a short screen, so its four destinations
 live as glyphs in the header slab instead.
@@ -671,9 +671,22 @@ amount.
 
 `celkem`: the ledger balance plus every holding's current value, with the two
 halves named separately underneath. Then one card per holding — its value, the
-day that value was true, and an amber age once the reading is older than that
-holding's own cadence. Tapping one opens the keypad sheet to record a new
-reading.
+day that value was true, and the reminder it is counting towards: _"k 3. 6. ·
+připomínka za 12 dní"_, turning amber and counting the other way once the
+reading is older than that holding's own cadence. Tapping one opens the keypad
+sheet to record a new reading.
+
+**Adding a holding is one sheet** (since 2026-09-05, Q51): the name, what it is
+worth today, what it is, and after how many days to remind — three presets, or
+any number typed. Saving writes the holding and today's reading together, so an
+investment account with 100 000 Kč on it is on the total in one step. Left
+blank, the value is asked on the keypad straight afterwards, and the holding
+shows on the screen as _zatím bez hodnoty_ until it is.
+
+**The reminders are on the screen they are about.** Between the total and the
+list, a _Připomínky_ slab lists every holding past its cadence — the same
+finding Kontrola raises on `/mesic` — with _Zapsat hodnotu_ opening the keypad
+on that holding. It renders nothing while every reading is current.
 
 **Everything about a holding is on this screen**, in two sheets that hand over
 to each other: `ValuationSheet` is the number, and `Upravit investici` inside it
@@ -702,13 +715,26 @@ The confirmation strip is here as well as on the entry screen. There because it
 must not be missed; here because this is the screen somebody opens *to deal
 with* standing orders.
 
-### `/settings`
+### `/nastaveni` — Nastavení
 
 Account name, opening balance and **peníze jinde** (pockets, Q50) · the other
 accounts with **Přepnout**, **Přidat účet** for a currency not yet held, and
 **Převod** · category management (rename, spend type, archive, add) · theme ·
 sync pairing and the last cycle, to the minute · JSON export/import backup,
-storage-persistence status, schema version · **Začít znovu**.
+storage-persistence status, schema version · **Začít znovu**. It was
+`/settings` until 2026-09-05 (Q52); the screen has always been called
+Nastavení, and the address now says so too.
+
+**The account list shows the balances, by currency, and what each one is made
+of.** Every live account with what is on it right now, and under it every
+pocket it holds (Q50) — _CZK · celkem 20 000 Kč_, then _Běžný účet 15 000 Kč_
+and _Revolut · jinde 5 000 Kč_; a euro account is its own group with its own
+figure and joins nothing. The account's own line carries every row, because a
+pocket is opening money and nothing spent afterwards is attributed back to the
+card it came from. That per-currency sum is exactly what `/mesic`'s _vše_ and
+`/jmeni`'s _Na účtu_ print, and this is the one place it is broken back into
+its parts (`balancesByCurrency` in `domain/ledger.ts`). The active account is
+marked _zapisuje se sem_; tapping any other one switches to it.
 
 **The account card is setup, not maintenance.** Three fields typed once, and it
 folds to a single line — name, opening balance, the day it was true, and what
@@ -939,7 +965,7 @@ Prosper/
 │  │  ├─ src/lib/ui/                # hand-rolled components, no UI kit
 │  │  ├─ src/lib/styles/            # tokens.css, app.css, self-hosted fonts
 │  │  ├─ src/routes/                # / · /tape · /mesic · /platby · /cil
-│  │  │                             #   · /jmeni · /settings
+│  │  │                             #   · /jmeni · /nastaveni
 │  │  ├─ src/service-worker.ts      # app shell cache, hand-rolled
 │  │  └─ vite.config.ts             # SvelteKit + adapter + Vitest, all inline
 │  └─ api/                          # ASP.NET Core 10 + EF Core + Postgres 16

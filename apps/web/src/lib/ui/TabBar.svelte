@@ -26,7 +26,7 @@
 	 * so the link checker can see it, and so a renamed route fails the build here
 	 * instead of at the tap.
 	 */
-	type Destination = '/tape' | '/mesic' | '/platby' | '/cil' | '/jmeni' | '/settings';
+	type Destination = '/tape' | '/mesic' | '/platby' | '/cil' | '/jmeni' | '/nastaveni';
 
 	/**
 	 * Six, three each side of the disc — up from four on 2026-08-28, when
@@ -44,7 +44,7 @@
 		{ path: '/platby', label: 'Platby', icon: 'repeat' },
 		{ path: '/cil', label: 'Cíl', icon: 'goal' },
 		{ path: '/jmeni', label: 'Jmění', icon: 'wealth' },
-		{ path: '/settings', label: 'Nastavení', icon: 'settings' }
+		{ path: '/nastaveni', label: 'Nastavení', icon: 'settings' }
 	];
 
 	/** Trailing slashes vary by adapter; compare on the trimmed path. */
