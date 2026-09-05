@@ -100,6 +100,18 @@ export interface Category extends Synced {
 	 * show the right chips for the direction being entered.
 	 */
 	isIncome: boolean;
+	/**
+	 * How the bucket looks — schema v13, the third edition of the design.
+	 *
+	 * `icon` is a name in `Icon.svelte`'s set and `color` a key of the
+	 * `--cat-*` palette in `tokens.css` — names, never values, so the hue
+	 * lives in one file and both themes read it. Rows written by older builds
+	 * may lack both, so nothing reads them directly: `categoryStyle()` in
+	 * `lib/ui/palette.ts` is the accessor, and it falls back by name the way
+	 * the migration did.
+	 */
+	icon: string;
+	color: string;
 }
 
 /**

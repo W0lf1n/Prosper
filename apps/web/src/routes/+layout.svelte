@@ -4,9 +4,7 @@
 	import { db } from '$lib/db/schema';
 	import { homeCurrency } from '$lib/domain/accounts';
 	import type { Account } from '$lib/domain/types';
-	import Scenery from '$lib/ui/Scenery.svelte';
 	import Toaster from '$lib/ui/Toaster.svelte';
-	import { shell } from '$lib/ui/shell.svelte';
 	import { applyCurrencyTint, currencyTint, syncThemeColor } from '$lib/ui/tint';
 	import { initSync, watchTriggers } from '$lib/sync/status.svelte';
 	import type { LayoutProps } from './$types';
@@ -18,9 +16,7 @@
 	 *
 	 * Subscribed by hand and assigned into `$state`, because this is the one
 	 * component that lives outside every route's scroll region — the place
-	 * the `$store` auto-subscription is not to be trusted (`CLAUDE.md`). The
-	 * active account comes from the layout load, so an account switch
-	 * anywhere re-runs this and the ground follows it on every screen.
+	 * the `$store` auto-subscription is not to be trusted (`CLAUDE.md`).
 	 */
 	let accounts = $state<Account[]>([]);
 	$effect(
@@ -49,10 +45,6 @@
 	/**
 	 * Sync takes up position once, here, and then gets on with it in the
 	 * background (§10.6 — it never blocks the UI).
-	 *
-	 * `initSync` is a no-op on a device that has never been paired, which is
-	 * every device until somebody opens Settings and types a code. The triggers
-	 * are the §10.7 set: foreground, and connectivity regained.
 	 */
 	$effect(() => {
 		void initSync();
@@ -63,9 +55,6 @@
 	 * The launch splash lives in `app.html`, on screen from the first paint.
 	 * It plays out in full on every launch — Petr's ask, 2026-08-29 — so the
 	 * dismissal waits for its animations to finish rather than racing them.
-	 * The app is rendered and live underneath the whole time; only the reveal
-	 * waits. Under reduced motion there are no animations to wait for, so the
-	 * still lockup leaves as soon as the app has rendered.
 	 */
 	$effect(() => {
 		const splash = document.getElementById('splash');
@@ -74,8 +63,6 @@
 		let hold: ReturnType<typeof setTimeout> | undefined;
 		let gone: ReturnType<typeof setTimeout> | undefined;
 		void Promise.allSettled(animated.map((a) => a.finished)).then(() => {
-			/* The lockup stands for a beat before it fades — unless there was no
-			   sequence at all (reduced motion), where a hold is just delay. */
 			hold = setTimeout(
 				() => {
 					splash.classList.add('splash-out');
@@ -89,36 +76,22 @@
 			clearTimeout(gone);
 		};
 	});
-
-	/* Only written when a route has measured its own floor; otherwise the
-	   cascade in `app.css` keeps the say. */
-	const lift = $derived(
-		shell.bottomInset === null ? undefined : `--toast-lift: ${shell.bottomInset}`
-	);
 </script>
 
-<div class="app" style={lift}>
+<div class="app">
 	{@render children()}
-	<Scenery />
 	<Toaster />
 </div>
 
 <style>
 	/**
-	 * The frame. A column the height of the *dynamic* viewport: the header and
-	 * the bottom bar are `flex: none`, and every screen owns exactly one scroll
-	 * region inside it. Nothing can push the keypad or the tabs off the phone —
-	 * and nothing that does not fit is silently clipped, because the region it
-	 * lives in scrolls.
+	 * The frame. A column the height of the *dynamic* viewport: the tab bar is
+	 * `flex: none`, and every screen owns exactly one scroll region inside it.
+	 * Nothing can push the keypad or the tabs off the phone, and nothing that
+	 * does not fit is silently clipped, because the region it lives in scrolls.
 	 *
-	 * `dvh` rather than `vh` so the column tracks the collapsing address bar and
-	 * the on-screen keyboard instead of hiding its own bottom edge behind them.
-	 * `vh` first, as the fallback for an engine that does not know `dvh`.
-	 *
-	 * `position: relative` is load-bearing twice over: it lifts the whole app
-	 * above the ground's grain layer, and it is the containing block the toast
-	 * and the save flash are positioned against, which is what keeps both of
-	 * them inside the instrument on a desktop instead of loose in the window.
+	 * `position: relative` is the containing block the toast is positioned
+	 * against, which keeps it inside the phone-shaped column on a desktop.
 	 */
 	.app {
 		position: relative;
@@ -130,21 +103,14 @@
 		overflow: hidden;
 		max-width: 34rem;
 		margin-inline: auto;
-		/* Landscape on a notched phone puts the cutout and the rounded corners on
-		   the long edges. Zero on every other device, so this costs nothing. */
 		padding-left: env(safe-area-inset-left, 0px);
 		padding-right: env(safe-area-inset-right, 0px);
 	}
 
-	/**
-	 * On a desktop the app is still a phone-shaped column, so it says so: an
-	 * edge on both sides turns a stranded strip of UI into a deliberate object
-	 * sitting on the ground.
-	 */
+	/* On a desktop the app is still a phone-shaped column, and it says so. */
 	@media (min-width: 35rem) {
 		.app {
 			border-inline: 1px solid var(--hairline);
-			box-shadow: var(--elev-2);
 		}
 	}
 </style>

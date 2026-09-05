@@ -15,6 +15,8 @@ function category(id: string, name: string, patch: Partial<Category> = {}): Cate
 		sortOrder: 0,
 		isArchived: false,
 		isIncome: false,
+		icon: 'tag',
+		color: 'stone',
 		...SYNCED,
 		...patch
 	};

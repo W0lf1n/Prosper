@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+html,body{margin:0;padding:0;background:#e9e9ee;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#494fdf;text-decoration:none}a:hover{color:#3a40c4}
+button{font-family:inherit;cursor:pointer}
+input{font-family:inherit}
+.pz{--bg:#f4f4f4;--card:#fff;--ink:#191c1f;--mute:#505a63;--stone:#8d969e;--line:#e2e2e7;--soft:#f0f0f2;--well:#f4f4f4;--pill:#191c1f;--pill-ink:#fff;--accent:#494fdf;--in:#00a87e;--warn:#ec7e00;--danger:#e23b4a}
+.pz[data-theme="dark"]{--bg:#000;--card:#16181a;--ink:#fff;--mute:rgba(255,255,255,.72);--stone:rgba(255,255,255,.5);--line:rgba(255,255,255,.12);--soft:rgba(255,255,255,.08);--well:#0a0a0a;--pill:#fff;--pill-ink:#000;--in:#19c48f}
+.pz ::-webkit-scrollbar{display:none}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px;box-sizing:border-box">
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ 393 }}" height="{{ 852 }}" dark="{{ isDark }}" hint-size="393px,852px">
+<div class="pz" data-theme="{{ themeAttr }}" style="height:100%;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:15px;letter-spacing:.1px;position:relative;font-variant-numeric:tabular-nums">
+
+<!-- ═══════════ DOMŮ ═══════════ -->
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Domů" style="flex:1;overflow:auto;padding:62px 16px 120px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;height:48px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px">PB</div>
+      <span style="font-size:15px;color:var(--mute)">Srpen 2026</span>
+    </div>
+    <button onClick="{{ goNastaveni }}" aria-label="Nastavení" style="width:40px;height:40px;border-radius:50%;border:0;background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 7.6h4.4M13.2 7.6h7M3.8 16.4h7.4M16.2 16.4h4"></path><circle cx="10.7" cy="7.6" r="2.2"></circle><circle cx="13.7" cy="16.4" r="2.2"></circle></svg></button>
+  </div>
+
+  <div style="padding:16px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:6px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Zůstatek měsíce</span>
+    <span style="font-size:44px;font-weight:600;letter-spacing:-1.3px;line-height:1">{{ monthNetText }}</span>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <span style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:9999px;background:var(--card);font-size:13px;font-weight:600;color:var(--in)">↑ 59 400,00</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:9999px;background:var(--card);font-size:13px;font-weight:600;color:var(--mute)">↓ 55 384,50</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px">
+    <button onClick="{{ goRecord }}" style="flex:1;height:48px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:15px;font-weight:600;letter-spacing:.24px">Zapsat</button>
+    <button onClick="{{ goTape }}" style="flex:1;height:48px;border:0;border-radius:9999px;background:var(--card);color:var(--ink);font-size:15px;font-weight:600;letter-spacing:.24px">Výpis</button>
+    <button onClick="{{ goMesic }}" style="flex:1;height:48px;border:0;border-radius:9999px;background:var(--card);color:var(--ink);font-size:15px;font-weight:600;letter-spacing:.24px">Měsíc</button>
+  </div>
+
+  <sc-if value="{{ dueOpen }}" hint-placeholder-val="{{ true }}">
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">K potvrzení</span>
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--warn)"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:50%;background:{{ dueColor }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ dueIcon }}</div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+        <span style="font-weight:600">Internet</span>
+        <span style="font-size:13px;color:var(--mute)">BYDLENÍ · 15. srpna</span>
+      </div>
+      <span style="font-weight:600">−640,00 Kč</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onClick="{{ confirmDue }}" style="flex:1;height:40px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:14px;font-weight:600">Potvrdit</button>
+      <button onClick="{{ skipDue }}" style="flex:1;height:40px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Přeskočit</button>
+    </div>
+  </div>
+  </sc-if>
+
+  <button onClick="{{ goCil }}" style="text-align:left;border:0;background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px;color:var(--ink)">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Cíl · Rezerva na půl roku</span>
+      <span style="font-size:12px;font-weight:600;color:var(--in);background:rgba(0,168,126,.12);padding:4px 10px;border-radius:9999px">měsíc splněn</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;width:100%">
+      <span style="font-size:22px;font-weight:600;letter-spacing:-.4px">5 000,00 Kč</span>
+      <span style="font-size:13px;color:var(--mute)">z 5 000,00 Kč tento měsíc</span>
+    </div>
+    <div style="height:6px;border-radius:9999px;background:var(--soft);width:100%;overflow:hidden"><div style="height:100%;width:100%;background:var(--in);border-radius:9999px"></div></div>
+  </button>
+
+  <button onClick="{{ goJmeni }}" style="text-align:left;border:0;background:var(--card);border-radius:20px;padding:16px;display:flex;align-items:center;gap:12px;color:var(--ink)">
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Jmění celkem</span>
+      <span style="font-size:22px;font-weight:600;letter-spacing:-.4px">277 019,50 Kč</span>
+      <span style="font-size:13px;color:var(--mute)">Na účtu 60 369,50 · V investicích 216 650,00</span>
+    </div>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--stone)"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg>
+  </button>
+
+  <div style="background:var(--card);border-radius:20px;padding:8px 16px 4px;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;height:40px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Poslední záznamy</span>
+      <button onClick="{{ goTape }}" style="border:0;background:none;color:var(--accent);font-size:13px;font-weight:600;padding:0">Zobrazit vše</button>
+    </div>
+    <sc-for list="{{ recent }}" as="r" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;gap:12px;min-height:60px">
+        <div style="width:40px;height:40px;border-radius:50%;background:{{ r.color }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ r.icon }}</div>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+          <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.payee }}</span>
+          <span style="font-size:13px;color:var(--mute)">{{ r.sub }}</span>
+        </div>
+        <span style="font-weight:600;color:{{ r.amountColor }}">{{ r.amountText }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<!-- ═══════════ VÝPIS ═══════════ -->
+<sc-if value="{{ isTape }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Výpis" style="flex:1;overflow:auto;padding:62px 16px 120px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+  <h1 style="margin:8px 0 4px;font-size:28px;font-weight:600;letter-spacing:-.5px">Výpis</h1>
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:6px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Běžný účet</span>
+    <span style="font-size:34px;font-weight:600;letter-spacing:-.8px;line-height:1.1">{{ balanceText }}</span>
+    <span style="font-size:13px;color:var(--mute)">aktuální zůstatek</span>
+    <button style="margin-top:10px;border:0;border-top:1px solid var(--line);background:none;padding:14px 0 2px;display:flex;justify-content:space-between;align-items:center;color:var(--ink);font-size:15px">
+      <span style="font-weight:600;color:var(--accent)">Srovnat s bankou</span>
+      <span style="color:var(--mute);font-size:14px">zatím nikdy ›</span>
+    </button>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px 0">
+    <span style="font-size:17px;font-weight:600">Srpen 2026</span>
+    <div style="display:flex;gap:6px">
+      <span style="padding:4px 10px;border-radius:9999px;background:var(--card);font-size:12px;font-weight:600;color:var(--mute)">↓ 55 384,50</span>
+      <span style="padding:4px 10px;border-radius:9999px;background:var(--card);font-size:12px;font-weight:600;color:var(--in)">↑ 59 400,00</span>
+    </div>
+  </div>
+
+  <sc-for list="{{ days }}" as="d" hint-placeholder-count="4">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;justify-content:space-between;padding:4px 4px 0">
+        <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">{{ d.label }}</span>
+        <span style="font-size:13px;color:var(--mute)">{{ d.netText }}</span>
+      </div>
+      <div style="background:var(--card);border-radius:20px;padding:4px 16px">
+        <sc-if value="{{ d.empty }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:12px;min-height:52px;color:var(--mute)">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--in);flex:none"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5.6 12.4 4.4 4.4 8.4-9.6"></path></svg></div>
+            <span style="font-size:15px">bez výdaje</span>
+          </div>
+        </sc-if>
+        <sc-for list="{{ d.rows }}" as="r" hint-placeholder-count="1">
+          <div style="display:flex;align-items:center;gap:12px;min-height:64px">
+            <div style="width:40px;height:40px;border-radius:50%;background:{{ r.color }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ r.icon }}</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+              <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.payee }}</span>
+              <span style="font-size:13px;color:var(--mute)">{{ r.cat }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+              <span style="font-weight:600;color:{{ r.amountColor }}">{{ r.amountText }}</span>
+              <span style="font-size:12px;color:var(--stone)">{{ r.balanceText }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+</div>
+</sc-if>
+
+<!-- ═══════════ ZÁPIS (record) ═══════════ -->
+<sc-if value="{{ isRecord }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Zápis" style="flex:1;display:flex;flex-direction:column;padding:56px 16px 44px;box-sizing:border-box;min-height:0">
+  <div style="display:flex;align-items:center;justify-content:space-between;height:48px">
+    <button onClick="{{ goHome }}" aria-label="Zavřít" style="width:40px;height:40px;border-radius:50%;border:0;background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6.6 6.6 10.8 10.8M17.4 6.6 6.6 17.4"></path></svg></button>
+    <div style="display:flex;background:var(--card);border-radius:9999px;padding:3px">
+      <button onClick="{{ setOut }}" style="height:34px;padding:0 16px;border:0;border-radius:9999px;font-size:14px;font-weight:600;background:{{ outSegBg }};color:{{ outSegInk }}">Výdaj</button>
+      <button onClick="{{ setIn }}" style="height:34px;padding:0 16px;border:0;border-radius:9999px;font-size:14px;font-weight:600;background:{{ inSegBg }};color:{{ inSegInk }}">Příjem</button>
+    </div>
+    <span style="width:40px"></span>
+  </div>
+
+  <div ref="{{ carouselRef }}" onScroll="{{ onCarouselScroll }}" style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x mandatory;margin:8px -16px 0;padding:0 16px;scroll-padding:0 16px">
+    <sc-for list="{{ accounts }}" as="a" hint-placeholder-count="3">
+      <button onClick="{{ a.pick }}" style="flex:none;width:calc(100% - 40px);scroll-snap-align:start;height:64px;border:0;border-radius:16px;background:var(--card);color:var(--ink);display:flex;align-items:center;gap:12px;padding:0 14px;text-align:left">
+        <span style="width:36px;height:36px;border-radius:50%;background:{{ a.color }};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;flex:none">{{ a.unit }}</span>
+        <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:600;font-size:14px">{{ a.name }}</span><span style="font-size:12px;color:var(--mute)">{{ a.code }}</span></span>
+        <span style="font-weight:600;font-size:14px">{{ a.balanceText }}</span>
+      </button>
+    </sc-for>
+  </div>
+  <div style="display:flex;justify-content:center;gap:5px;margin-top:8px">
+    <sc-for list="{{ accounts }}" as="a" hint-placeholder-count="3"><span style="width:6px;height:6px;border-radius:50%;background:{{ a.dot }}"></span></sc-for>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:80px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">{{ dirLabel }}</span>
+    <div style="display:flex;align-items:baseline;gap:6px;color:{{ amountColor }}">
+      <span style="font-size:56px;font-weight:600;letter-spacing:-1.8px;line-height:1">{{ amountText }}</span>
+      <button onClick="{{ nextAccount }}" aria-label="Přepnout měnu" style="border:0;background:var(--card);border-radius:9999px;padding:4px 10px 4px 12px;font-size:20px;font-weight:500;color:var(--mute);display:inline-flex;align-items:center;gap:4px;font-family:inherit">{{ unit }}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 9.5 12 16l6.5-6.5"></path></svg></button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:4px 16px 8px">
+    <sc-for list="{{ recCats }}" as="c" hint-placeholder-count="4">
+      <button onClick="{{ c.pick }}" style="flex:none;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px 0 6px;border-radius:9999px;border:0;background:{{ c.bg }};color:{{ c.ink }};font-size:13px;font-weight:600;letter-spacing:.2px">
+        <span style="width:28px;height:28px;border-radius:50%;background:{{ c.color }};color:#fff;display:flex;align-items:center;justify-content:center;">{{ c.iconSm }}</span>{{ c.name }}
+      </button>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;gap:8px">
+    <button style="flex:none;height:48px;padding:0 16px;border:0;border-radius:12px;background:var(--card);color:var(--ink);font-size:15px;font-weight:600">dnes</button>
+    <input value="{{ payee }}" onChange="{{ setPayee }}" placeholder="komu / za co" style="flex:1;min-width:0;height:48px;border:0;border-radius:12px;background:var(--card);color:var(--ink);font-size:15px;padding:0 16px;outline:none;box-sizing:border-box">
+  </div>
+
+  <sc-if value="{{ isOut }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 4px">
+    <button onClick="{{ toggleOneOff }}" style="display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--mute);font-size:14px;padding:0">
+      <span style="width:40px;height:24px;border-radius:9999px;background:{{ oneOffTrack }};position:relative;transition:background .15s"><span style="position:absolute;top:3px;left:{{ oneOffKnob }};width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span></span>
+      mimořádný výdaj
+    </button>
+    <span style="color:var(--mute);font-size:14px">dluží mi ›</span>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ hasFinding }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:8px 8px 8px 14px;margin-top:4px">
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none"></span>
+    <span style="flex:1;font-size:14px;font-weight:600">{{ findingTitle }}</span>
+    <button onClick="{{ applyFix }}" style="height:32px;padding:0 14px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:13px;font-weight:600">{{ findingFix }}</button>
+  </div>
+  </sc-if>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:12px">
+    <sc-for list="{{ keys }}" as="k" hint-placeholder-count="12">
+      <button onClick="{{ k.press }}" style="height:56px;border:0;border-radius:12px;background:none;color:var(--ink);font-size:26px;font-weight:500;display:flex;align-items:center;justify-content:center" style-active="background:var(--card)">{{ k.label }}</button>
+    </sc-for>
+  </div>
+  <button onClick="{{ save }}" style="height:52px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:16px;font-weight:600;letter-spacing:.24px;opacity:{{ saveOpacity }};margin-top:4px">{{ saveLabel }}</button>
+</div>
+</sc-if>
+
+<!-- ═══════════ PŘEHLED ═══════════ -->
+<sc-if value="{{ isPrehled }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Přehled" style="flex:1;overflow:auto;padding:62px 16px 120px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+    <h1 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.5px">Přehled</h1>
+    <div style="display:flex;align-items:center;gap:2px;background:var(--card);border-radius:9999px;padding:2px">
+      <button aria-label="Předchozí měsíc" style="width:36px;height:36px;border:0;border-radius:50%;background:none;color:var(--ink);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"></path></svg></button>
+      <span style="font-size:14px;font-weight:600;padding:0 4px">srpen 2026</span>
+      <button aria-label="Další měsíc" style="width:36px;height:36px;border:0;border-radius:50%;background:none;color:var(--stone);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></button>
+    </div>
+  </div>
+  <div style="display:flex;background:var(--card);border-radius:9999px;padding:3px">
+    <button onClick="{{ tabMesic }}" style="flex:1;height:38px;border:0;border-radius:9999px;font-size:14px;font-weight:600;background:{{ mesicSegBg }};color:{{ mesicSegInk }}">Měsíc</button>
+    <button onClick="{{ tabPlatby }}" style="flex:1;height:38px;border:0;border-radius:9999px;font-size:14px;font-weight:600;background:{{ platbySegBg }};color:{{ platbySegInk }}">Platby</button>
+  </div>
+
+  <sc-if value="{{ isMesic }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Zůstatek měsíce</span>
+      <span style="font-size:34px;font-weight:600;letter-spacing:-.8px;line-height:1.1;color:var(--in)">{{ monthNetText }}</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        <div style="background:var(--soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--mute)">Přišlo</span><span style="font-weight:600">59 400,00</span></div>
+        <div style="background:var(--soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--mute)">Odešlo</span><span style="font-weight:600">55 384,50</span></div>
+      </div>
+      <p style="margin:4px 0 0;font-size:14px;color:var(--mute);line-height:1.5;text-wrap:pretty">Z toho jednorázově <strong style="color:var(--ink)">8 900,00 Kč</strong>. Běžný chod měsíce vyšel na <strong style="color:var(--ink)">46 484,50 Kč</strong>.</p>
+    </div>
+
+    <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;gap:16px;align-items:center">
+      <svg viewBox="0 0 100 100" width="92" height="92" style="flex:none;transform:rotate(-90deg)"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--soft)" stroke-width="12"></circle><circle cx="50" cy="50" r="40" fill="none" stroke="var(--in)" stroke-width="12" stroke-linecap="round" stroke-dasharray="80.8 170.5"></circle></svg>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Dny bez výdaje</span>
+        <span style="font-size:22px;font-weight:600;letter-spacing:-.4px">9 <span style="font-size:15px;font-weight:400;color:var(--mute)">z 28 dní</span></span>
+        <span style="font-size:13px;color:var(--in);font-weight:600">3 dny v řadě bez výdaje.</span>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border-radius:20px;padding:16px 16px 8px;display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Kontrola</span>
+      <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none;margin-top:6px"></span>
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">„HBO Max" tenhle měsíc chybí</span><span style="font-size:13px;color:var(--mute);line-height:1.45">Platíš to každý měsíc. Zapomnělo se, nebo jsi to zrušil?</span></div>
+      </div>
+      <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none;margin-top:6px"></span>
+        <div style="display:flex;flex-direction:column;gap:6px;flex:1"><span style="font-weight:600">Penzijní spoření — hodnota je 120 dní stará</span><span style="font-size:13px;color:var(--mute);line-height:1.45">Otevři výpis a přepiš, kolik má dneska.</span><button onClick="{{ goJmeni }}" style="align-self:flex-start;height:32px;padding:0 14px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:13px;font-weight:600">Přepsat hodnotu</button></div>
+      </div>
+      <div style="display:flex;gap:12px;padding:12px 0">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--stone);flex:none;margin-top:6px"></span>
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">OSTATNÍ bere 16 % výdajů</span><span style="font-size:13px;color:var(--mute);line-height:1.45">Servis kotle je označený jako mimořádný, zbytek stojí za roztřídění.</span></div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Rozdělení příjmu · 10 / 10 / 10 / 70</span>
+      <div style="display:flex;gap:16px;align-items:center">
+        <div style="position:relative;width:120px;height:120px;flex:none">
+          <svg viewBox="0 0 100 100" width="120" height="120" style="transform:rotate(-90deg)"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--soft)" stroke-width="14"></circle><circle cx="50" cy="50" r="40" fill="none" stroke="#428619" stroke-width="14" stroke-dasharray="21.1 230.2"></circle><circle cx="50" cy="50" r="40" fill="none" stroke="#8d969e" stroke-width="14" stroke-dasharray="213.1 38.2" stroke-dashoffset="-21.1"></circle></svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:22px;font-weight:600;letter-spacing:-.4px">7 %</span><span style="font-size:11px;color:var(--mute)">zbylo</span></div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;font-size:14px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:#494fdf"></span><span style="flex:1">Dávání</span><span style="font-weight:600">0 %</span><span style="font-size:12px;color:var(--danger);width:28px;text-align:right">−10</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:#428619"></span><span style="flex:1">Spoření</span><span style="font-weight:600">8 %</span><span style="font-size:12px;color:var(--danger);width:28px;text-align:right">−2</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:#936d62"></span><span style="flex:1">Dluhy</span><span style="font-weight:600">0 %</span><span style="font-size:12px;color:var(--stone);width:28px;text-align:right">—</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:#8d969e"></span><span style="flex:1">Život</span><span style="font-weight:600">85 %</span><span style="font-size:12px;color:var(--warn);width:28px;text-align:right">+15</span></div>
+        </div>
+      </div>
+      <p style="margin:0;font-size:14px;color:var(--mute);line-height:1.5;text-wrap:pretty">Nejslabší je dávání: z příjmu nešla nikam ani koruna. Zbylo 4 015,50 Kč — to je taky výsledek.</p>
+    </div>
+
+    <div style="background:var(--card);border-radius:20px;padding:16px 16px 6px;display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Kam to šlo</span>
+      <sc-for list="{{ buckets }}" as="b" hint-placeholder-count="5">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0">
+          <div style="width:40px;height:40px;border-radius:50%;background:{{ b.color }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ b.icon }}</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between"><span style="font-weight:600;font-size:14px">{{ b.name }}</span><span style="font-weight:600;font-size:14px">{{ b.total }}</span></div>
+            <div style="height:5px;border-radius:9999px;background:var(--soft);overflow:hidden"><div style="height:100%;border-radius:9999px;background:{{ b.color }};width:{{ b.width }}"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mute)"><span>{{ b.share }}</span><span>{{ b.note }}</span></div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isPlatby }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <sc-if value="{{ dueOpen }}" hint-placeholder-val="{{ true }}">
+    <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">K potvrzení</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:50%;background:{{ dueColor }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ dueIcon }}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Internet</span><span style="font-size:13px;color:var(--mute)">15. · BYDLENÍ</span></div>
+        <span style="font-weight:600">−640,00 Kč</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onClick="{{ confirmDue }}" style="flex:1;height:40px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:14px;font-weight:600">Potvrdit</button>
+        <button onClick="{{ skipDue }}" style="flex:1;height:40px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Přeskočit</button>
+      </div>
+    </div>
+    </sc-if>
+
+    <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Za rok</span>
+      <span style="font-size:34px;font-weight:600;letter-spacing:-.8px;line-height:1.1">232 764,00 Kč</span>
+      <div style="display:flex;flex-direction:column;margin-top:8px;font-size:14px">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)"><span style="color:var(--mute)">Odejde za měsíc</span><span style="font-weight:600">19 397,00</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)"><span style="color:var(--mute)">Ještě odejde tenhle měsíc</span><span style="font-weight:600">640,00</span></div>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border-radius:20px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Odchází</span>
+      <sc-for list="{{ schedules }}" as="s" hint-placeholder-count="5">
+        <div style="display:flex;align-items:center;gap:12px;min-height:64px">
+          <div style="width:40px;height:40px;border-radius:50%;background:{{ s.color }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ s.icon }}</div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+            <span style="font-weight:600">{{ s.name }}</span>
+            <span style="font-size:13px;color:var(--mute)">{{ s.sub }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <span style="font-weight:600">{{ s.amount }}</span>
+            <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:9999px;background:var(--soft);color:var(--mute)">{{ s.mode }}</span>
+          </div>
+        </div>
+      </sc-for>
+      <button style="margin-top:8px;height:48px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:15px;font-weight:600">Přidat platbu</button>
+    </div>
+
+    <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Přichází</span>
+      <p style="margin:0;font-size:14px;color:var(--mute);line-height:1.5;text-wrap:pretty">Sem patří peníze, které chodí každý měsíc samy — druhá polovina hypotéky, nájem, pravidelná vratka.</p>
+      <button style="align-self:flex-start;height:40px;padding:0 20px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Přidat příjem</button>
+    </div>
+  </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ═══════════ JÁ ═══════════ -->
+<sc-if value="{{ isJa }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Já" style="flex:1;overflow:auto;padding:62px 16px 120px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;align-items:center;gap:14px;padding:16px 4px 8px">
+    <div style="width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:20px">PB</div>
+    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:22px;font-weight:600;letter-spacing:-.4px">Petr</span><span style="font-size:13px;color:var(--mute)">Běžný účet · CZK</span></div>
+  </div>
+
+  <button onClick="{{ goCil }}" style="text-align:left;border:0;background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px;color:var(--ink)">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%"><span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Cíl</span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--stone)"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></div>
+    <span style="font-size:20px;font-weight:600;letter-spacing:-.3px">Rezerva na půl roku</span>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;width:100%"><span style="font-weight:600">41 000,00 Kč</span><span style="font-size:13px;color:var(--mute)">z 150 000,00 Kč · 27 %</span></div>
+    <div style="height:6px;border-radius:9999px;background:var(--soft);width:100%;overflow:hidden"><div style="height:100%;width:27%;background:var(--accent);border-radius:9999px"></div></div>
+  </button>
+
+  <button onClick="{{ goJmeni }}" style="text-align:left;border:0;background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:6px;color:var(--ink)">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%"><span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Jmění</span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--stone)"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg></div>
+    <span style="font-size:22px;font-weight:600;letter-spacing:-.4px">277 019,50 Kč</span>
+    <span style="font-size:13px;color:var(--warn);font-weight:600">1 hodnota je stará</span>
+  </button>
+
+  <div style="background:var(--card);border-radius:20px;padding:8px 16px;display:flex;flex-direction:column">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px;padding:8px 0 4px">Nastavení</span>
+    <sc-for list="{{ settingsRows }}" as="s" hint-placeholder-count="5">
+      <button onClick="{{ goNastaveni }}" style="display:flex;align-items:center;gap:12px;min-height:52px;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);text-align:left;padding:0;font-size:15px">
+        <span style="flex:1">{{ s.name }}</span>
+        <span style="font-size:13px;color:var(--mute)">{{ s.detail }}</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--stone)"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg>
+      </button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<!-- ═══════════ CÍL ═══════════ -->
+<sc-if value="{{ isCil }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Cíl" style="flex:1;overflow:auto;padding:56px 16px 120px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;align-items:center;gap:8px;height:48px">
+    <button onClick="{{ goJa }}" aria-label="Zpět" style="width:40px;height:40px;border-radius:50%;border:0;background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"></path></svg></button>
+    <span style="font-size:17px;font-weight:600">Cíl</span>
+  </div>
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span style="font-size:22px;font-weight:600;letter-spacing:-.4px">Rezerva na půl roku</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 10px;border-radius:9999px;background:var(--soft);color:var(--ink);flex:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.9 12S6.6 5.9 12 5.9 21.1 12 21.1 12 17.4 18.1 12 18.1 2.9 12 2.9 12Z"></path><circle cx="12" cy="12" r="2.7"></circle></svg>na očích</span>
+    </div>
+    <p style="margin:0;padding:14px 16px;background:var(--well);border-radius:12px;font-style:italic;font-size:16px;line-height:1.5;color:var(--ink);text-wrap:pretty">Abych mohl kdykoliv odejít z práce, která mě ničí, a nemusel se ptát, jestli si to můžu dovolit.</p>
+    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:34px;font-weight:600;letter-spacing:-.8px;line-height:1.1">41 000,00 Kč</span><span style="font-size:14px;color:var(--mute)">z 150 000,00 Kč</span></div>
+    <div style="height:8px;border-radius:9999px;background:var(--soft);overflow:hidden"><div style="height:100%;width:27%;background:var(--accent);border-radius:9999px"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--mute)"><span style="font-weight:600;color:var(--ink)">27 %</span><span>do 30. června 2027 · 10 měsíců</span></div>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Srpen 2026</span>
+    <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:22px;font-weight:600;letter-spacing:-.4px">5 000,00 Kč</span><span style="font-size:14px;color:var(--mute)">z 5 000,00 Kč</span></div>
+    <div style="height:8px;border-radius:9999px;background:var(--soft);overflow:hidden"><div style="height:100%;width:100%;background:var(--in);border-radius:9999px"></div></div>
+    <span style="font-size:14px;color:var(--in);font-weight:600">Tenhle měsíc máš splněný.</span>
+    <div style="display:flex;gap:8px">
+      <button style="flex:1;height:48px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:15px;font-weight:600">Odložit</button>
+      <button style="flex:1;height:48px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:15px;font-weight:600">Upravit cíl měsíce</button>
+    </div>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px 16px 4px;display:flex;flex-direction:column">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px;padding-bottom:4px">Měsíce</span>
+    <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:12px;min-height:52px;border-top:1px solid var(--line)">
+        <span style="flex:1;font-size:15px">{{ h.month }}</span>
+        <span style="font-weight:600">{{ h.saved }}</span>
+        <span style="font-size:13px;color:var(--mute);width:84px;text-align:right">{{ h.target }}</span>
+        <span style="width:24px;height:24px;border-radius:50%;background:{{ h.markBg }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">{{ h.mark }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;padding:4px 0">
+    <button style="height:40px;padding:0 20px;border:0;border-radius:9999px;background:var(--card);color:var(--ink);font-size:14px;font-weight:600">Upravit cíl</button>
+    <button style="height:40px;padding:0 20px;border:0;border-radius:9999px;background:none;color:var(--danger);font-size:14px;font-weight:600">Smazat</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ═══════════ JMĚNÍ ═══════════ -->
+<sc-if value="{{ isJmeni }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Jmění" style="flex:1;overflow:auto;padding:56px 16px 120px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;align-items:center;gap:8px;height:48px">
+    <button onClick="{{ goJa }}" aria-label="Zpět" style="width:40px;height:40px;border-radius:50%;border:0;background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"></path></svg></button>
+    <span style="font-size:17px;font-weight:600">Jmění</span>
+  </div>
+  <div style="padding:12px 4px 4px;display:flex;flex-direction:column;align-items:center;gap:6px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Celkem</span>
+    <span style="font-size:40px;font-weight:600;letter-spacing:-1.2px;line-height:1">277 019,50 Kč</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--warn);font-weight:600;margin-top:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--warn)"></span>investice k 30. dubna</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="background:var(--card);border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--mute)">Na účtu</span><span style="font-weight:600;font-size:16px">60 369,50</span></div>
+    <div style="background:var(--card);border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--mute)">V investicích</span><span style="font-weight:600;font-size:16px">216 650,00</span></div>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;gap:12px;align-items:flex-start">
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none;margin-top:6px"></span>
+    <div style="display:flex;flex-direction:column;gap:6px;flex:1"><span style="font-weight:600">Penzijní spoření — hodnota je 120 dní stará</span><span style="font-size:13px;color:var(--mute);line-height:1.45">Otevři výpis a přepiš, kolik má dneska.</span><button style="align-self:flex-start;height:36px;padding:0 16px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:13px;font-weight:600">Přepsat hodnotu</button></div>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:4px 16px;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:12px;min-height:72px">
+      <div style="width:40px;height:40px;border-radius:50%;background:#428619;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex:none">ETF</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">ETF portfolio</span><span style="font-size:13px;color:var(--mute)">k 26. srpna · vloženo 118 000</span></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="font-weight:600">132 450,00</span><span style="font-size:12px;color:var(--in);font-weight:600">+14 450 · +12,2 %</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;min-height:72px;border-top:1px solid var(--line)">
+      <div style="width:40px;height:40px;border-radius:50%;background:#b09000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex:none">Pe</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Penzijní spoření</span><span style="font-size:13px;color:var(--warn);font-weight:600">k 30. dubna · 120 dní</span></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="font-weight:600">84 200,00</span><span style="font-size:12px;color:var(--in);font-weight:600">+2 200 · +2,7 %</span></div>
+    </div>
+  </div>
+  <button style="height:48px;border:0;border-radius:9999px;background:var(--card);color:var(--ink);font-size:15px;font-weight:600">Přidat investici</button>
+  <p style="margin:0;padding:0 4px;font-size:13px;color:var(--mute);line-height:1.5;text-wrap:pretty">Růst není příjem a do měsíce nevstupuje. Hodnoty jsou to, co jsi opsal z výpisu — nic se nikam nenačítá.</p>
+</div>
+</sc-if>
+
+<!-- ═══════════ NASTAVENÍ ═══════════ -->
+<sc-if value="{{ isNastaveni }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Nastavení" style="flex:1;overflow:auto;padding:56px 16px 120px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;align-items:center;gap:8px;height:48px">
+    <button onClick="{{ goJa }}" aria-label="Zpět" style="width:40px;height:40px;border-radius:50%;border:0;background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"></path></svg></button>
+    <span style="font-size:17px;font-weight:600">Nastavení</span>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Účty</span>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex:none">Bú</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Běžný účet</span><span style="font-size:13px;color:var(--mute)">běžný · zapisuje se sem</span></div>
+      <span style="font-weight:600">{{ balanceText }}</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button style="flex:1;height:40px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Přidat účet</button>
+      <button style="flex:1;height:40px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Upravit</button>
+    </div>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:4px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Kategorie</span>
+    <sc-for list="{{ allCats }}" as="c" hint-placeholder-count="6">
+      <button onClick="{{ c.edit }}" style="display:flex;align-items:center;gap:12px;min-height:52px;border:0;background:none;padding:0;color:var(--ink);text-align:left;width:100%">
+        <span style="width:34px;height:34px;border-radius:50%;background:{{ c.color }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ c.iconSm }}</span>
+        <span style="flex:1;font-size:15px">{{ c.name }}</span>
+        <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:9999px;background:var(--soft);color:var(--mute)">{{ c.type }}</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--stone)"><path d="M9.5 5.5 16 12l-6.5 6.5"></path></svg>
+      </button>
+    </sc-for>
+    <p style="margin:4px 0 0;font-size:13px;color:var(--mute);line-height:1.5">Ťukni na kategorii a vyber jí ikonu a barvu.</p>
+    <button style="margin-top:8px;height:40px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Nová kategorie</button>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Vzhled</span>
+    <div style="display:flex;background:var(--soft);border-radius:9999px;padding:3px">
+      <button onClick="{{ themeSystem }}" style="flex:1;height:36px;border:0;border-radius:9999px;font-size:14px;font-weight:600;background:{{ segSysBg }};color:{{ segSysInk }}">systém</button>
+      <button onClick="{{ themeLight }}" style="flex:1;height:36px;border:0;border-radius:9999px;font-size:14px;font-weight:600;background:{{ segLightBg }};color:{{ segLightInk }}">světlý</button>
+      <button onClick="{{ themeDark }}" style="flex:1;height:36px;border:0;border-radius:9999px;font-size:14px;font-weight:600;background:{{ segDarkBg }};color:{{ segDarkInk }}">tmavý</button>
+    </div>
+    <p style="margin:0;font-size:13px;color:var(--mute);line-height:1.5">Tmavý na noc, jednou rukou, se zhasnutým světlem.</p>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Synchronizace</span>
+    <p style="margin:0;font-size:14px;color:var(--mute);line-height:1.5;text-wrap:pretty">Zatím jen tenhle prohlížeč. Spáruj zařízení se serverem a záznamy se budou přenášet mezi telefonem a počítačem.</p>
+    <button style="align-self:flex-start;height:44px;padding:0 24px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:14px;font-weight:600">Spárovat</button>
+  </div>
+
+  <div style="background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Data</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button style="height:40px;padding:0 16px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Export zálohy</button>
+      <button style="height:40px;padding:0 16px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Načíst zálohu</button>
+      <button style="height:40px;padding:0 16px;border:0;border-radius:9999px;background:var(--soft);color:var(--ink);font-size:14px;font-weight:600">Export do Excelu</button>
+    </div>
+    <div style="display:flex;flex-direction:column;font-size:14px">
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)"><span style="color:var(--mute)">Záznamů</span><span style="font-weight:600">{{ txnCount }}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)"><span style="color:var(--mute)">Trvalé úložiště</span><span style="font-weight:600;color:var(--in)">zapnuto</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)"><span style="color:var(--mute)">Verze schématu</span><span style="font-weight:600">11</span></div>
+    </div>
+    <button style="height:48px;border:0;border-radius:9999px;background:none;color:var(--danger);font-size:15px;font-weight:600;border:1.5px solid var(--danger)">Začít znovu</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ═══════════ TAB BAR ═══════════ -->
+<sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:6px 8px 30px;display:grid;grid-template-columns:repeat(5,1fr);align-items:end">
+  <button onClick="{{ goHome }}" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ tabHome }};font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.2 12 4.5l8 6.7V19a1 1 0 0 1-1 1h-4.6v-5.6H9.6V20H5a1 1 0 0 1-1-1Z"></path></svg>Domů</button>
+  <button onClick="{{ goTape }}" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ tabTape }};font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.7h11v16.6l-1.83-1.35-1.84 1.35-1.83-1.35-1.84 1.35-1.83-1.35L6.5 20.3Z"></path><path d="M9.7 8.3h4.6M9.7 11.9h4.6"></path></svg>Výpis</button>
+  <button onClick="{{ goRecord }}" aria-label="Zapsat" style="border:0;background:none;display:flex;justify-content:center;padding:0 0 4px"><span style="width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 6.4v11.2M6.4 12h11.2"></path></svg></span></button>
+  <button onClick="{{ goPrehled }}" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ tabPrehled }};font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.4" stroke-dasharray="33.5 13" transform="rotate(-90 12 12)"></circle></svg>Přehled</button>
+  <button onClick="{{ goJa }}" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ tabJa }};font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M4.8 19.6a7.2 7.2 0 0 1 14.4 0"></path></svg>Já</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ editorOpen }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeEditor }}" style="position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:5"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-radius:28px 28px 0 0;padding:10px 16px 44px;display:flex;flex-direction:column;gap:16px;box-shadow:0 -12px 48px rgba(0,0,0,.25)">
+  <span style="width:36px;height:4px;border-radius:9999px;background:var(--line);align-self:center"></span>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span style="width:52px;height:52px;border-radius:50%;background:{{ editColor }};color:#fff;display:flex;align-items:center;justify-content:center;flex:none">{{ editIcon }}</span>
+    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:600">{{ editName }}</span><span style="font-size:13px;color:var(--mute)">Ikona a barva kategorie</span></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Barva</span>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <sc-for list="{{ palette }}" as="p" hint-placeholder-count="10">
+        <button onClick="{{ p.pick }}" aria-label="Barva" style="width:36px;height:36px;border-radius:50%;background:{{ p.color }};border:0;padding:0;box-shadow:{{ p.ring }}"></button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span style="font-size:13px;color:var(--mute);letter-spacing:.24px">Ikona</span>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px">
+      <sc-for list="{{ iconChoices }}" as="i" hint-placeholder-count="32">
+        <button onClick="{{ i.pick }}" style="height:40px;border:0;border-radius:12px;background:{{ i.bg }};color:{{ i.ink }};display:flex;align-items:center;justify-content:center;padding:0">{{ i.el }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <button onClick="{{ closeEditor }}" style="height:48px;border:0;border-radius:9999px;background:var(--pill);color:var(--pill-ink);font-size:15px;font-weight:600;letter-spacing:.24px">Hotovo</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:16px;right:16px;bottom:112px;background:var(--pill);color:var(--pill-ink);border-radius:9999px;padding:14px 20px;font-size:14px;font-weight:600;text-align:center;animation:toastIn .22s cubic-bezier(.16,1,.3,1);box-shadow:0 12px 32px rgba(0,0,0,.18)">{{ toastText }}</div>
+</sc-if>
+
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light' | 'dark'&quot;,&quot;section&quot;:&quot;Vzhled&quot;}}">
+const CATS = [
+  { id: 'potraviny', name: 'POTRAVINY', color: '#00a87e', ini: 'Po', type: 'nutné' },
+  { id: 'jidlo', name: 'JÍDLO', color: '#ec7e00', ini: 'Jí', type: 'chci' },
+  { id: 'bydleni', name: 'BYDLENÍ', color: '#007bc2', ini: 'By', type: 'nutné' },
+  { id: 'lifestyle', name: 'LIFESTYLE', color: '#e61e49', ini: 'Li', type: 'chci' },
+  { id: 'investice', name: 'INVESTICE DO MĚ', color: '#b09000', ini: 'In', type: 'spoření' },
+  { id: 'dary', name: 'DARY', color: '#494fdf', ini: 'Da', type: 'dávání' },
+  { id: 'sporeni', name: 'SPOŘENÍ', color: '#428619', ini: 'Sp', type: 'spoření' },
+  { id: 'projekty', name: 'PROJEKTY', color: '#936d62', ini: 'Pr', type: 'chci' },
+  { id: 'ostatni', name: 'OSTATNÍ', color: '#8d969e', ini: 'Os', type: 'chci' },
+  { id: 'prijem', name: 'PŘÍJEM', color: '#00a87e', ini: 'Př', type: 'příjem', income: true }
+];
+const VOCAB = {
+  jidlo: ['obed', 'svacina', 'vecere', 'snidane', 'kafe', 'kava', 'cafe', 'pivo', 'restaurace', 'bistro', 'mcdonald', 'kfc', 'pizza', 'bageta', 'zmrzlina'],
+  bydleni: ['najem', 'hypo', 'hypoteka', 'plyn', 'elektrina', 'voda', 'internet', 'kotel'],
+  potraviny: ['rohlik', 'nakup', 'potraviny', 'drogerie', 'lidl', 'albert', 'billa', 'kaufland', 'tesco', 'penny', 'globus'],
+  lifestyle: ['netflix', 'spotify', 'hbo', 'icloud', 'predplatne', 'bolt', 'uber', 'taxi']
+};
+const TODAY = '2026-08-28';
+const BALANCE = 6036950;
+const SEED = [
+  { id: 1, date: '2026-08-27', cat: 'lifestyle', payee: 'Bolt', amount: -89000 },
+  { id: 2, date: '2026-08-26', cat: 'jidlo', payee: 'Restaurace', amount: -41000 },
+  { id: 3, date: '2026-08-25', cat: 'potraviny', payee: 'Rohlík.cz', amount: -132000 },
+  { id: 4, date: '2026-08-24', cat: 'ostatni', payee: 'Servis kotle', amount: -890000 },
+  { id: 5, date: '2026-08-22', cat: 'jidlo', payee: 'Kafe s Kerhym', amount: -18500 },
+  { id: 6, date: '2026-08-20', cat: 'bydleni', payee: 'Nájem', amount: -1800000 },
+  { id: 7, date: '2026-08-15', cat: 'prijem', payee: 'Výplata', amount: 5940000 }
+];
+const WD = ['ne', 'po', 'út', 'st', 'čt', 'pá', 'so'];
+const MG = ['ledna', 'února', 'března', 'dubna', 'května', 'června', 'července', 'srpna', 'září', 'října', 'listopadu', 'prosince'];
+const NBSP = '\u00a0';
+function fmt(minor, opts = {}) {
+  const abs = Math.abs(minor);
+  const whole = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+  const dec = (abs % 100).toString().padStart(2, '0');
+  let s = `${whole},${dec}`;
+  if (opts.sign !== 'never') s = (minor < 0 ? '−' : minor > 0 && opts.sign === 'always' ? '+' : '') + s;
+  return opts.code === false ? s : `${s}${NBSP}${opts.unit ?? 'Kč'}`;
+}
+function addDays(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function dayLabel(iso) {
+  if (iso === TODAY) return 'Dnes';
+  if (iso === addDays(TODAY, -1)) return 'Včera';
+  const d = new Date(iso + 'T00:00:00Z');
+  return `${WD[d.getUTCDay()]} ${d.getUTCDate()}. ${MG[d.getUTCMonth()]}`;
+}
+function norm(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+function suggest(payee) {
+  const t = norm(payee);
+  if (!t) return null;
+  for (const [cat, words] of Object.entries(VOCAB)) if (words.some((w) => new RegExp(`(^|[^a-z0-9])${w}`).test(t))) return cat;
+  return null;
+}
+const byId = (id) => CATS.find((c) => c.id === id);
+const DEFAULT_ICON = { potraviny: 'shopping-cart', jidlo: 'utensils', bydleni: 'house', lifestyle: 'sparkles', investice: 'graduation-cap', dary: 'gift', sporeni: 'piggy-bank', projekty: 'hammer', ostatni: 'ellipsis', prijem: 'banknote' };
+const ICONS = ['shopping-cart', 'utensils', 'coffee', 'house', 'zap', 'wifi', 'car', 'bus', 'fuel', 'sparkles', 'shirt', 'gift', 'heart', 'piggy-bank', 'wallet', 'banknote', 'graduation-cap', 'book-open', 'dumbbell', 'stethoscope', 'pill', 'hammer', 'wrench', 'laptop', 'smartphone', 'plane', 'film', 'music', 'dog', 'baby', 'ellipsis', 'tag'];
+const PALETTE = ['#00a87e', '#ec7e00', '#007bc2', '#e61e49', '#b09000', '#494fdf', '#428619', '#936d62', '#8d969e', '#e23b4a'];
+const ACCOUNTS = [
+  { id: 'bezny', name: 'Běžný účet', code: 'CZK', unit: 'Kč', balance: 6036950, color: '#494fdf' },
+  { id: 'eur', name: 'Eurový účet', code: 'EUR', unit: '€', balance: 124000, color: '#00a87e' },
+  { id: 'usd', name: 'Dolarový účet', code: 'USD', unit: '$', balance: 31050, color: '#007bc2' }
+];
+const pascal = (n) => n.split('-').map((p) => p[0].toUpperCase() + p.slice(1)).join('');
+function iconEl(name, size) {
+  const node = window.lucide?.icons?.[pascal(name)];
+  if (!node) return null;
+  const children = Array.isArray(node[0]) ? node : node[2];
+  if (!Array.isArray(children)) return null;
+  return React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', style: { display: 'block' } },
+    children.map(([tag, attrs], i) => React.createElement(tag, { key: i, ...attrs })));
+}
+
+class Component extends DCLogic {
+  state = { screen: 'home', prehledTab: 'mesic', themeChoice: null, txns: SEED, nextId: 100, dueOpen: true,
+    digits: '', dir: 'out', catId: null, payee: '', oneOff: false, toast: null, accountIdx: 0, catStyle: {}, editCat: null };
+  carousel = React.createRef();
+  go = (screen) => () => this.setState({ screen });
+  componentDidMount() {
+    if (!window.lucide) { this._poll = setInterval(() => { if (window.lucide) { clearInterval(this._poll); this.forceUpdate(); } }, 100); }
+  }
+  cat(id) { const c = byId(id); const o = this.state.catStyle[id] ?? {}; return { ...c, color: o.color ?? c.color, icon: o.icon ?? DEFAULT_ICON[id] }; }
+  circle(id, size) { const c = this.cat(id); return iconEl(c.icon, size) ?? c.ini; }
+  scrollToAccount(idx) {
+    const el = this.carousel.current;
+    const n = Math.max(0, Math.min(ACCOUNTS.length - 1, idx));
+    this.syncRail(n);
+    this.setState({ accountIdx: n });
+  }
+  syncRail(idx) {
+    const el = this.carousel.current;
+    if (!el || !el.firstElementChild) return;
+    this._skipScroll = true;
+    clearTimeout(this._skipT);
+    this._skipT = setTimeout(() => { this._skipScroll = false; }, 200);
+    el.scrollLeft = idx * (el.firstElementChild.offsetWidth + 8);
+  }
+  componentDidUpdate(prev) {
+    if (this.state.screen === 'record' && prev.screen !== 'record') this.syncRail(this.state.accountIdx);
+  }
+  onCarouselScroll = (e) => {
+    const el = e.currentTarget;
+    clearTimeout(this._scrollT);
+    this._scrollT = setTimeout(() => {
+      if (this._skipScroll) { this._skipScroll = false; return; }
+      const w = el.firstElementChild?.offsetWidth ?? 1;
+      const idx = Math.round(el.scrollLeft / (w + 8));
+      if (idx !== this.state.accountIdx) this.setState({ accountIdx: idx });
+    }, 80);
+  };
+  toast(text) {
+    clearTimeout(this._t);
+    this.setState({ toast: text });
+    this._t = setTimeout(() => this.setState({ toast: null }), 2600);
+  }
+  componentWillUnmount() { clearTimeout(this._t); clearInterval(this._poll); }
+  press(k) {
+    let d = this.state.digits;
+    if (k === '⌫') d = d.slice(0, -1);
+    else if (k === ',') { if (!d.includes(',')) d = (d || '0') + ','; }
+    else { if (d.includes(',') && d.split(',')[1].length >= 2) return; if (d === '0') d = ''; if (d.replace(',', '').length >= 9) return; d += k; }
+    this.setState({ digits: d });
+  }
+  minor() { const [w, f = ''] = this.state.digits.split(','); return (parseInt(w || '0', 10) * 100) + parseInt((f + '00').slice(0, 2), 10); }
+  finding() {
+    const { payee, catId, dir, oneOff } = this.state;
+    if (dir !== 'out') return null;
+    const s = suggest(payee);
+    if (s && s !== catId) return { title: `Spíš ${byId(s).name}?`, fix: byId(s).name, apply: () => this.setState({ catId: s }) };
+    if (this.minor() >= 500000 && !oneOff) return { title: 'Mimořádný výdaj?', fix: 'Označit', apply: () => this.setState({ oneOff: true }) };
+    return null;
+  }
+  save = () => {
+    const m = this.minor();
+    const cat = byId(this.state.catId);
+    if (!m || !cat) return;
+    const amount = this.state.dir === 'out' ? -m : m;
+    const acc = ACCOUNTS[this.state.accountIdx];
+    const txn = { id: this.state.nextId, date: TODAY, cat: cat.id, payee: this.state.payee.trim(), amount, account: acc.id };
+    this.setState((s) => ({ txns: [txn, ...s.txns], nextId: s.nextId + 1, digits: '', catId: null, payee: '', oneOff: false, screen: 'home' }));
+    this.toast(`${fmt(amount, { unit: acc.unit })} · ${cat.name}${txn.payee ? ' · ' + txn.payee : ''}`);
+  };
+  confirmDue = () => {
+    const txn = { id: this.state.nextId, date: TODAY, cat: 'bydleni', payee: 'Internet', amount: -64000 };
+    this.setState((s) => ({ txns: [txn, ...s.txns], nextId: s.nextId + 1, dueOpen: false }));
+    this.toast('−640,00 Kč · Internet');
+  };
+  skipDue = () => { this.setState({ dueOpen: false }); this.toast('„Internet" tenhle měsíc přeskočeno'); };
+  renderVals() {
+    const s = this.state;
+    const theme = s.themeChoice ?? this.props.theme ?? 'light';
+    const isDark = theme === 'dark';
+    const ink = 'var(--ink)', mute = 'var(--mute)';
+    const all = [...s.txns].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id));
+    const unitOf = (t) => ACCOUNTS.find((a) => a.id === (t.account ?? 'bezny')).unit;
+    const mkRow = (t) => { const c = this.cat(t.cat); return { id: t.id, payee: t.payee || c.name, cat: c.name, sub: `${c.name} · ${dayLabel(t.date)}`, color: c.color, icon: this.circle(t.cat, 18),
+      amountText: fmt(t.amount, { sign: 'always', unit: unitOf(t) }), amountColor: t.amount > 0 ? 'var(--in)' : ink, date: t.date }; };
+    const recentRows = all.slice(0, 3).map(mkRow);
+    const txns = all.filter((t) => (t.account ?? 'bezny') === 'bezny');
+    let bal = BALANCE;
+    const rows = txns.map((t) => { const r = mkRow(t); r.balanceText = fmt(bal, { code: false }); bal -= t.amount; return r; });
+    const acc = ACCOUNTS[s.accountIdx];
+    const edit = s.editCat ? this.cat(s.editCat) : null;
+    const days = [];
+    for (let i = 0; i < 14; i++) {
+      const date = addDays(TODAY, -i);
+      const dr = rows.filter((r) => r.date === date);
+      const net = txns.filter((t) => t.date === date).reduce((a, t) => a + t.amount, 0);
+      days.push({ label: dayLabel(date), rows: dr, empty: dr.length === 0, netText: dr.length ? fmt(net) : '' });
+    }
+    const monthNet = 401550 + s.txns.filter((t) => t.id >= 100).reduce((a, t) => a + t.amount, 0);
+    const finding = this.finding();
+    const m = this.minor();
+    const cat = byId(s.catId);
+    const sel = (on) => ({ bg: on ? 'var(--pill)' : 'var(--card)', ink: on ? 'var(--pill-ink)' : ink });
+    const seg = (on) => ({ bg: on ? 'var(--card)' : 'transparent', ink: on ? ink : mute });
+    const tabC = (id) => (s.screen === id || (id === 'ja' && ['cil', 'jmeni', 'nastaveni'].includes(s.screen)) ? ink : 'var(--stone)');
+    const outS = seg(s.dir === 'out'), inS = seg(s.dir === 'in'), mS = seg(s.prehledTab === 'mesic'), pS = seg(s.prehledTab === 'platby');
+    const tS = seg(s.themeChoice === null), tL = seg(s.themeChoice === 'light'), tD = seg(s.themeChoice === 'dark');
+    const keyLabels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'];
+    return {
+      isDark, themeAttr: isDark ? 'dark' : 'light',
+      isHome: s.screen === 'home', isTape: s.screen === 'tape', isRecord: s.screen === 'record', isPrehled: s.screen === 'prehled', isJa: s.screen === 'ja',
+      isCil: s.screen === 'cil', isJmeni: s.screen === 'jmeni', isNastaveni: s.screen === 'nastaveni', showTabs: s.screen !== 'record',
+      goHome: this.go('home'), goTape: this.go('tape'), goRecord: this.go('record'), goPrehled: this.go('prehled'), goJa: this.go('ja'),
+      goCil: this.go('cil'), goJmeni: this.go('jmeni'), goNastaveni: this.go('nastaveni'),
+      goMesic: () => this.setState({ screen: 'prehled', prehledTab: 'mesic' }),
+      tabMesic: () => this.setState({ prehledTab: 'mesic' }), tabPlatby: () => this.setState({ prehledTab: 'platby' }),
+      isMesic: s.prehledTab === 'mesic', isPlatby: s.prehledTab === 'platby',
+      mesicSegBg: mS.bg, mesicSegInk: mS.ink, platbySegBg: pS.bg, platbySegInk: pS.ink,
+      tabHome: tabC('home'), tabTape: tabC('tape'), tabPrehled: tabC('prehled'), tabJa: tabC('ja'),
+      monthNetText: fmt(monthNet, { sign: 'always' }), balanceText: fmt(BALANCE), txnCount: String(s.txns.length),
+      recent: recentRows, days, dueOpen: s.dueOpen, confirmDue: this.confirmDue, skipDue: this.skipDue,
+      dueColor: this.cat('bydleni').color, dueIcon: this.circle('bydleni', 18),
+      // accounts
+      carouselRef: this.carousel, onCarouselScroll: this.onCarouselScroll, unit: acc.unit,
+      nextAccount: () => this.scrollToAccount((s.accountIdx + 1) % ACCOUNTS.length),
+      accounts: ACCOUNTS.map((a, i) => ({ ...a, balanceText: fmt(a.balance, { unit: a.unit }), dot: i === s.accountIdx ? ink : 'var(--line)', pick: () => this.scrollToAccount(i) })),
+      // category editor
+      editorOpen: !!edit, closeEditor: () => this.setState({ editCat: null }),
+      editName: edit?.name ?? '', editColor: edit?.color ?? '', editIcon: edit ? this.circle(edit.id, 24) : null,
+      palette: PALETTE.map((color) => ({ color, ring: edit?.color === color ? `0 0 0 2px var(--card), 0 0 0 4px ${ink}` : 'none',
+        pick: () => this.setState((st) => ({ catStyle: { ...st.catStyle, [st.editCat]: { ...st.catStyle[st.editCat], color } } })) })),
+      iconChoices: ICONS.map((name) => ({ el: iconEl(name, 20), bg: edit?.icon === name ? 'var(--pill)' : 'var(--soft)', ink: edit?.icon === name ? 'var(--pill-ink)' : ink,
+        pick: () => this.setState((st) => ({ catStyle: { ...st.catStyle, [st.editCat]: { ...st.catStyle[st.editCat], icon: name } } })) })),
+      // record
+      isOut: s.dir === 'out', setOut: () => this.setState({ dir: 'out', catId: null }), setIn: () => this.setState({ dir: 'in', catId: 'prijem' }),
+      outSegBg: outS.bg, outSegInk: outS.ink, inSegBg: inS.bg, inSegInk: inS.ink,
+      dirLabel: s.dir === 'out' ? 'Výdaj' : 'Příjem', amountText: s.digits ? (() => { const [w, f = ''] = s.digits.split(','); return (w || '0').replace(/\B(?=(\d{3})+(?!\d))/g, NBSP) + (s.digits.includes(',') ? ',' + f : ''); })() : '0',
+      amountColor: s.dir === 'in' ? 'var(--in)' : ink,
+      recCats: CATS.filter((c) => (s.dir === 'in' ? c.income : !c.income)).map((c) => ({ ...this.cat(c.id), ...sel(c.id === s.catId), iconSm: this.circle(c.id, 14), pick: () => this.setState({ catId: c.id }) })),
+      payee: s.payee, setPayee: (e) => this.setState({ payee: e.target.value }),
+      oneOffTrack: s.oneOff ? 'var(--accent)' : 'var(--line)', oneOffKnob: s.oneOff ? '19px' : '3px', toggleOneOff: () => this.setState({ oneOff: !s.oneOff }),
+      hasFinding: !!finding, findingTitle: finding?.title ?? '', findingFix: finding?.fix ?? '', applyFix: () => finding?.apply(),
+      keys: keyLabels.map((k) => ({ label: k, press: () => this.press(k) })),
+      save: this.save, saveOpacity: m && cat ? 1 : 0.4, saveLabel: m && !cat ? 'Vyber kategorii' : 'Uložit',
+      // přehled data
+      buckets: [
+        { cat: 'bydleni', total: '24 000,00', width: '100%', share: '43 %', note: '1×' },
+        { cat: 'potraviny', total: '9 860,00', width: '41%', share: '18 %', note: '↑ 12 % oproti obvyklým 8 800' },
+        { cat: 'ostatni', total: '8 900,00', width: '37%', share: '16 %', note: 'z toho 1× 8 900,00' },
+        { cat: 'sporeni', total: '5 000,00', width: '21%', share: '9 %', note: '1×' },
+        { cat: 'jidlo', total: '4 320,00', width: '18%', share: '8 %', note: '↓ 20 % oproti obvyklým 5 400' },
+        { cat: 'lifestyle', total: '3 304,50', width: '14%', share: '6 %', note: '5×' }
+      ].map((b) => ({ ...b, name: this.cat(b.cat).name, color: this.cat(b.cat).color, icon: this.circle(b.cat, 18) })),
+      schedules: [
+        { name: 'Nájem', cat: 'bydleni', sub: '1. · BYDLENÍ', amount: '18 000,00', mode: 'automaticky' },
+        { name: 'Internet', cat: 'bydleni', sub: '15. · BYDLENÍ', amount: '640,00', mode: 'potvrdit' },
+        { name: 'Netflix', cat: 'lifestyle', sub: '12. · LIFESTYLE', amount: '379,00', mode: 'automaticky' },
+        { name: 'HBO Max', cat: 'lifestyle', sub: '8. · LIFESTYLE', amount: '199,00', mode: 'potvrdit' },
+        { name: 'Spotify', cat: 'lifestyle', sub: '20. · LIFESTYLE', amount: '179,00', mode: 'automaticky' }
+      ].map((r) => ({ ...r, color: this.cat(r.cat).color, icon: this.circle(r.cat, 18) })),
+      settingsRows: [
+        { name: 'Účty', detail: 'Běžný účet' }, { name: 'Kategorie', detail: '10' }, { name: 'Vzhled', detail: theme === 'dark' ? 'tmavý' : 'světlý' },
+        { name: 'Synchronizace', detail: 'vypnuto' }, { name: 'Data', detail: `${s.txns.length} záznamů` }
+      ],
+      history: [
+        { month: 'srpen 2026', saved: '5 000,00', target: '/ 5 000,00', mark: '✓', markBg: 'var(--in)' },
+        { month: 'červenec 2026', saved: '5 000,00', target: '/ 5 000,00', mark: '✓', markBg: 'var(--in)' },
+        { month: 'červen 2026', saved: '2 000,00', target: '/ 5 000,00', mark: '✕', markBg: 'var(--danger)' },
+        { month: 'květen 2026', saved: '5 000,00', target: '/ 5 000,00', mark: '✓', markBg: 'var(--in)' }
+      ],
+      allCats: CATS.map((c) => ({ ...this.cat(c.id), iconSm: this.circle(c.id, 16), edit: () => this.setState({ editCat: c.id }) })),
+      themeSystem: () => this.setState({ themeChoice: null }), themeLight: () => this.setState({ themeChoice: 'light' }), themeDark: () => this.setState({ themeChoice: 'dark' }),
+      segSysBg: tS.bg, segSysInk: tS.ink, segLightBg: tL.bg, segLightInk: tL.ink, segDarkBg: tD.bg, segDarkInk: tD.ink,
+      hasToast: !!s.toast, toastText: s.toast ?? ''
+    };
+  }
+}
+</script>
+</body>
+</html>

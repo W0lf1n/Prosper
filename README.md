@@ -118,7 +118,7 @@ apps/web/src/
 ├─ lib/sync/       Outbox drain, pull, pairing. Never awaited by the UI.
 ├─ lib/ui/         Hand-rolled components. No component library.
 ├─ lib/styles/     tokens.css — the only place colour exists — and app.css.
-└─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /nastaveni
+└─ routes/         / · /zapis · /tape · /prehled · /ja · /cil · /jmeni · /nastaveni
 
 apps/api/          ASP.NET Core 10 + EF Core + Postgres 16 — optional sync server
 packages/contracts The sync protocol, shared by both sides
@@ -161,12 +161,12 @@ nginx vhost, the certificate, pairing the second device, and the nightly dump.
 
 ## Design
 
-A system called **graphite instrument**: elevation is luminance rather than
-shadow, money out has no hue, one blue accent for chrome, and IBM Plex Mono for
-every amount — the only typeface the app ships. The full system — the four
-rules, the palette, the type, the mark — is
-**[`docs/DESIGN.md`](docs/DESIGN.md)**, with a gallery of all six screens.
-
+The third edition, since 2026-09-05: a Revolut-inspired layout — a soft-grey
+ground, white cards, one sans (Inter) at three weights, every button a pill,
+every bucket a coloured circle with an icon, and a five-slot bar with a record
+disc in the middle. Money out still has no hue and one cobalt accent is still
+the only chrome. The system is **[`docs/DESIGN.md`](docs/DESIGN.md)**; the
+handoff it was built from is in `docs/redesign/`.
 ---
 
 ## Status
@@ -190,7 +190,7 @@ valuable part, not the code.
 | [`docs/PROJECT-PLAN.md`](docs/PROJECT-PLAN.md)                    | The specification, describing the app **as it stands**. Binding      |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md)                          | Every answered question, every deviation, every rejected alternative |
 | [`docs/TODO.md`](docs/TODO.md)                                    | The only list of unfinished work                                     |
-| [`docs/DESIGN.md`](docs/DESIGN.md)                                | The design system — graphite instrument, second edition              |
+| [`docs/DESIGN.md`](docs/DESIGN.md)                                | The design system — third edition, the Revolut-inspired layout       |
 | [`docs/TRIMMING-AND-TRAINING.md`](docs/TRIMMING-AND-TRAINING.md)  | Laws 3 and 4 — design for what is not built yet                      |
 | [`docs/INVESTMENTS.md`](docs/INVESTMENTS.md)                      | `/jmeni` — the model, and why growth is not income                   |
 | [`docs/RECURRING.md`](docs/RECURRING.md)                          | Declared recurring payments                                          |

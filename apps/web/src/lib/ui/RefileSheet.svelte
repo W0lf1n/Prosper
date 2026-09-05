@@ -145,13 +145,12 @@
 	}
 
 	.lead strong {
-		font-family: var(--font-mono);
 		color: var(--ink);
 	}
 
 	.done {
 		padding: var(--space-4);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-sm);
 		background: var(--in-wash);
 		font-size: var(--text-base);
 		color: var(--ink);
@@ -172,8 +171,8 @@
 		flex-direction: column;
 		gap: var(--space-2);
 		padding: var(--space-3);
-		border-radius: var(--radius-md);
-		background: var(--surface-2);
+		border-radius: var(--radius-sm);
+		background: var(--surface-3);
 	}
 
 	.row__head {
@@ -217,11 +216,11 @@
 	.picker__cancel {
 		min-height: var(--touch);
 		padding-inline: var(--space-3);
-		border: 1px solid var(--hairline);
+		border: 1px solid transparent;
 		border-radius: var(--radius-full);
-		background: var(--raised);
+		background: var(--surface-3);
 		font-size: var(--text-sm);
-		font-weight: 400;
+		font-weight: 600;
 		color: var(--ink-2);
 	}
 

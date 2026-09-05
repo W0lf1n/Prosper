@@ -192,7 +192,7 @@
 		gap: var(--space-2);
 		margin: 0;
 		padding: var(--space-3);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-sm);
 		background: var(--ground-2);
 	}
 
@@ -206,7 +206,6 @@
 	.ledger__key {
 		font-size: var(--text-2xs);
 		font-weight: 600;
-		text-transform: uppercase;
 		letter-spacing: var(--track-label);
 	}
 
@@ -232,9 +231,9 @@
 		gap: var(--space-3);
 		min-height: var(--touch);
 		padding: var(--space-2) var(--space-3);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-md);
-		background: var(--surface-2);
+		border: none;
+		border-radius: var(--radius-sm);
+		background: var(--surface-3);
 		cursor: pointer;
 	}
 

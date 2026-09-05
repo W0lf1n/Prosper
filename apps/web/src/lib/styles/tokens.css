@@ -1,163 +1,147 @@
 /**
- * Design tokens — "graphite instrument", second edition.
+ * Design tokens — third edition, 2026-09-05. Soft-grey ground, white cards,
+ * one proportional sans, pills and circles.
  *
- * Same instrument, calmer machining. The green-grey graphite of v1 is retired
- * for the neutral near-blacks of the DESIGN-apple system: a true-black ground
- * (OLED, lights off), surfaces raised by luminance in micro-steps
- * (#1d1d1f → #252527 → #2a2a2c), hairlines as low-alpha ink rather than
- * painted greys, and shadows withdrawn from cards and buttons entirely —
- * elevation is the surface colour change; shadow survives only where a layer
- * genuinely floats (sheet, toast).
+ * The "graphite instrument" of the first two editions is retired with its
+ * grain, its ambient pool and its monospace money. What replaces it is a
+ * consumer-banking layout: a ground the cards float on by luminance, one
+ * family of type at three weights, every button a pill, every category a
+ * coloured circle with an icon in it. The handoff that specifies it is
+ * `docs/redesign/…/design_handoff_prosper_revolut/README.md`; the reasoning is
+ * in `docs/DECISIONS.md` under the third edition.
  *
- * The colour rules are unchanged:
- *   · SIGNAL (blue, derived from the reference system's Action Blue) is the
- *     chrome accent: primary action, current selection, links, focus ring.
- *     Nothing else. It is never decoration and it is never a data colour.
- *   · Mint (--in) is money coming in, and a money verdict that came out right —
- *     a passed check, a met month, a day that cost nothing. Never chrome; the
- *     boundary against --signal stays sharp. Money going out has no hue at all —
- *     it is the ink. Signal and in are two roles, two hues.
- *   · FLAG (amber) means look at this. DANGER (coral) means destroy or refuse.
- *   · The four split classes stay apart at a glance. --split-left is a ghost,
- *     but a *visible* one — it is the denominator of every meter and ring, and
- *     "where does 100 % end" must be answerable, so it holds ≥ 1.5:1 against
- *     --surface in both themes.
+ * The colour roles keep their names and most of their meaning:
+ *   · SIGNAL (cobalt) is the accent: the record disc, links, the avatar, the
+ *     goal meter, the active toggle. Still never a data colour — the one
+ *     exception is the category palette, which the person picks, and which
+ *     happens to contain the same cobalt under its own name.
+ *   · The PILL is the primary action: ink on the light theme, white on the
+ *     dark one. Two tokens, because a pill inverts between themes and nothing
+ *     else does.
+ *   · --in is money coming in and a verdict that came out right; --flag says
+ *     look at this; --danger says destroy or refuse. Money going out has no
+ *     hue at all — it is the ink.
+ *   · The category palette is theme-independent: the same ten hues under a
+ *     white glyph in both themes, because a category's colour is a name and a
+ *     name does not change with the lights.
  *
- * Data hues are re-tuned, not re-assigned: all four sit near the same oklch
- * lightness and chroma per theme, so no class shouts over another.
- *
- * Weight ladder (enforced in components, not here): 400 / 600 / 700.
- * Weight 500 is deliberately absent.
+ * Weight ladder: 400 / 500 / 600. Inter, self-hosted as a variable face.
  */
 
 :root {
 	color-scheme: light dark;
 
-	/* ═══ light: the daylight counterpart ════════════════════════════════ */
+	/* ═══ light — the default ════════════════════════════════════════════ */
 
-	/* Parchment ground, paper-white slabs. Raised = lighter, same as ever. */
-	--ground: #f5f5f7;
-	--ground-2: #e8e8ec;
+	--ground: #f4f4f4;
+	/* The well: a recessed slab inside a card takes the ground's own colour. */
+	--ground-2: #f4f4f4;
 	--surface: #ffffff;
-	--surface-2: #fafafc;
-	--surface-3: #f2f2f5;
+	/* A card, pressed. Luminance only — nothing scales any more. */
+	--surface-2: #f5f5f7;
+	/* Soft: chips, meter tracks, secondary pills, inputs. */
+	--surface-3: #f0f0f2;
 
-	/* Hairlines are ink at low alpha, so they sit correctly on every surface
-	   instead of being tuned to one. */
-	--hairline: rgb(29 29 31 / 8%);
-	--hairline-2: rgb(29 29 31 / 15%);
+	--hairline: #e2e2e7;
+	--hairline-2: #cfcfd6;
 
 	--raised: var(--surface);
 
-	--ink: #1d1d1f;
-	--ink-2: rgb(29 29 31 / 72%);
-	/* 66 %, not 60: the 11–12 px text this sets (hints, captions, tab labels)
-	   measured 4.29–4.47:1 at 60 % — under the 4.5:1 small-text line on every
-	   light surface. 66 % lands at 5.20–5.40:1 and still ranks clearly under
-	   --ink-2 (6.67:1). */
-	--ink-3: rgb(29 29 31 / 66%);
+	--ink: #191c1f;
+	--ink-2: #505a63;
+	--ink-3: #8d969e;
 
-	/* The one chrome accent — Action Blue. AA as text on every light surface. */
-	--signal: #0066cc;
+	/* The primary pill. Inverts with the theme. */
+	--pill: #191c1f;
+	--pill-ink: #ffffff;
+
+	--signal: #494fdf;
 	--signal-ink: #ffffff;
-	--signal-wash: rgb(0 102 204 / 8%);
-	--signal-edge: rgb(0 102 204 / 20%);
+	--signal-wash: rgb(73 79 223 / 12%);
 
 	/* ── money ─────────────────────────────────────────────────────────── */
-	--out: #1d1d1f;
-	--in: #007850;
-	--flag: #8a6400;
-	--danger: #c93f32;
+	--out: #191c1f;
+	--in: #00a87e;
+	--flag: #ec7e00;
+	--danger: #e23b4a;
 
-	--in-wash: rgb(0 120 80 / 8%);
-	--flag-wash: rgb(138 100 0 / 10%);
-	--danger-wash: rgb(201 63 50 / 9%);
-	--danger-edge: rgb(201 63 50 / 20%);
+	--in-wash: rgb(0 168 126 / 12%);
+	--flag-wash: rgb(236 126 0 / 12%);
+	--danger-wash: rgb(226 59 74 / 10%);
 
-	/* ── the 10/10/10/70 split ─────────────────────────────────────────────
-	   Debt is copper (oklch hue ≈ 45°), not amber: at the old #8f6508 it sat
-	   1.03:1 from --flag and a debt bucket's meter was literally a want
-	   bucket's. Same oklch lightness and chroma as the rest of the bank, a
-	   quarter turn away from both flag (≈ 82°) and danger (≈ 29°).
-	   Left is the visible ghost — see the charter above. */
-	--split-give: #6353c4;
-	--split-save: #007850;
-	--split-debt: #a15733;
-	--split-live: #6e7478;
-	--split-left: #cdcdd3;
+	/* ── the category palette ───────────────────────────────────────────
+	   Ten hues the person picks from. `Category.color` stores the key, never
+	   the value, so the value lives here and only here. The glyph on top is
+	   always white. */
+	--cat-teal: #00a87e;
+	--cat-orange: #ec7e00;
+	--cat-blue: #007bc2;
+	--cat-pink: #e61e49;
+	--cat-yellow: #b09000;
+	--cat-cobalt: #494fdf;
+	--cat-green: #428619;
+	--cat-brown: #936d62;
+	--cat-stone: #8d969e;
+	--cat-red: #e23b4a;
+	--cat-ink: #ffffff;
+	/* The toggle knob: white in both themes, like the glyph on a circle. */
+	--knob: #ffffff;
+
+	/* ── the 10/10/10/70 split ─────────────────────────────────────────── */
+	--split-give: var(--cat-cobalt);
+	--split-save: var(--cat-green);
+	--split-debt: var(--cat-brown);
+	--split-live: var(--cat-stone);
+	/* The denominator of every meter and ring — the soft surface. */
+	--split-left: var(--surface-3);
 
 	/* ── elevation ─────────────────────────────────────────────────────────
-	   Withdrawn from resting surfaces: a card is raised by being lighter, not
-	   by throwing a shadow. --elev-1 is a valid no-op so existing comma lists
-	   (`var(--edge), var(--elev-1)`) keep parsing. Real shadow only where a
-	   layer floats over content. */
-	--elev-1: 0 0 0 0 rgb(0 0 0 / 0%);
-	--elev-2: 0 4px 16px rgb(0 0 0 / 8%);
-	--elev-3: 0 12px 32px rgb(0 0 0 / 12%);
-	--elev-sheet: 0 -10px 40px rgb(0 0 0 / 14%);
+	   No shadow on a resting surface. Only the two layers that float. */
+	--elev-sheet: 0 -12px 48px rgb(0 0 0 / 25%);
+	--elev-toast: 0 12px 32px rgb(0 0 0 / 18%);
+	--overlay: rgb(0 0 0 / 45%);
 
-	/* The lit top edge retires with the shadows — kept as valid no-ops. */
-	--edge: inset 0 1px 0 rgb(255 255 255 / 0%);
-	--edge-strong: inset 0 1px 0 rgb(255 255 255 / 0%);
-
-	/* The pool the amount floats in. Neutral by default now — the hue arrives
-	   only with a direction (--ambient-in / --ambient-out). */
-	--ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(255 255 255 / 55%) 0%,
-		rgb(255 255 255 / 20%) 40%,
-		transparent 72%
-	);
-	--ambient-out: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(201 63 50 / 6%) 0%,
-		rgb(201 63 50 / 2%) 40%,
-		transparent 72%
-	);
-	--ambient-in: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(0 120 80 / 6%) 0%,
-		rgb(0 120 80 / 2%) 40%,
-		transparent 72%
-	);
-
-	/* Quieter tooth. Still there, dialled down. */
-	--grain-opacity: 0.18;
+	/* The tab bar floats over the scrolling page: frosted card, and the one
+	   other shadow in the app, because it genuinely hovers over content. */
+	--glass: rgb(255 255 255 / 72%);
+	--glass-edge: rgb(255 255 255 / 60%);
+	--elev-bar: 0 8px 28px rgb(0 0 0 / 12%);
 
 	/* ═══ theme-independent ══════════════════════════════════════════════ */
 
-	/* ── type ──────────────────────────────────────────────────────────────
-	   Labels are the system stack: real SF Pro on Apple hardware, the platform
-	   sans elsewhere, zero bytes either way. Money stays IBM Plex Mono,
-	   tabular, tight, and is now the only face the app ships — Instrument Sans
-	   left with this edition. */
+	/* ── type ── one family, three weights, tabular figures everywhere. */
 	--font-ui:
-		system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-	--font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+		'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+		sans-serif;
 
-	--text-2xs: 0.6875rem; /* 11 — micro-labels only */
-	--text-xs: 0.75rem; /* 12 */
-	--text-sm: 0.8125rem; /* 13 */
-	--text-md: 0.875rem; /* 14 */
-	--text-base: 1rem; /* 16 — the floor for anything read on a phone */
-	--text-lg: 1.125rem; /* 18 */
-	--text-xl: 1.375rem; /* 22 */
-	--text-2xl: 1.75rem; /* 28 */
-	--text-3xl: 2.125rem; /* 34 */
-	--text-display: clamp(3rem, 14vw, 4.25rem); /* the keypad amount, bigger */
+	--text-2xs: 0.6875rem; /* 11 — tab labels, mode badges */
+	--text-xs: 0.75rem; /* 12 — small pills, running balance, tile labels */
+	--text-sm: 0.8125rem; /* 13 — card labels, row subs, hints */
+	--text-md: 0.875rem; /* 14 — facts rows, segment labels, aside copy */
+	--text-base: 0.9375rem; /* 15 — body, row titles, pills */
+	--text-lg: 1.0625rem; /* 17 — back-header title, month row, sheet title */
+	--text-xl: 1.375rem; /* 22 — card figure */
+	--text-2xl: 1.75rem; /* 28 — screen title */
+	--text-3xl: 2.125rem; /* 34 — big figure in a card */
+	--text-4xl: 2.5rem; /* 40 — the Jmění hero */
+	--text-hero: 2.75rem; /* 44 — the home hero */
+	--text-display: 3.5rem; /* 56 — the record amount */
 
-	/* Apple-tight, not crushed: display tracking eases from -0.045em to the
-	   -0.025em the reference system actually uses at display sizes. */
-	--track-display: -0.025em;
-	--track-tight: -0.02em;
-	--track-label: 0.08em; /* the only place uppercase is allowed */
+	--track-display: -1.8px;
+	--track-hero: -1.3px;
+	--track-4xl: -1.2px;
+	--track-3xl: -0.8px;
+	--track-title: -0.5px;
+	--track-xl: -0.4px;
+	--track-name: -0.3px;
+	--track-body: 0.1px;
+	--track-label: 0.24px;
 
-	--leading-tight: 1.15;
+	--leading-tight: 1.1;
 	--leading-snug: 1.35;
 	--leading-base: 1.5;
-	--leading-loose: 1.6;
 
-	/* ── space ── 4 px base, unchanged. Compression happens in components. */
+	/* ── space ── 4 px base. */
 	--space-1: 0.25rem; /* 4 */
 	--space-2: 0.5rem; /* 8 */
 	--space-3: 0.75rem; /* 12 */
@@ -167,27 +151,22 @@
 	--space-7: 2.5rem; /* 40 */
 	--space-8: 3.5rem; /* 56 */
 
-	/* ── radius ────────────────────────────────────────────────────────────
-	   The reference grammar: 8px utility, 11px capsule, 18px cards, pill for
-	   primary actions — and pill is *reserved* for actions. */
-	--radius-xs: 5px;
-	--radius-sm: 8px;
-	--radius: 11px;
-	--radius-md: 14px;
-	--radius-lg: 18px;
-	--radius-xl: 24px;
+	/* ── radius ── 12 for inputs and cells, 16 for the account card, 20 for
+	   cards, 28 for the sheet, and the pill for every button. */
+	--radius-sm: 12px;
+	--radius-md: 16px;
+	--radius-lg: 20px;
+	--radius-xl: 28px;
 	--radius-full: 9999px;
 
-	/* ── targets ── unchanged; thumbs did not get smaller. */
+	/* ── targets ── */
 	--touch: 44px;
-	--touch-lg: 54px;
-	--control: 24px;
-	--control-gap: calc(var(--touch) - var(--control));
-	--tabbar: 58px;
+	--touch-lg: 48px;
+	--key: 56px;
+	--tabbar: 62px; /* the floating bar's height */
+	--tabbar-lift: var(--space-3); /* how far it stands off the bottom edge */
 
-	/* ── motion ── unchanged, plus the press state contract:
-	   every button presses with transform: scale(0.95) over --dur-press. */
-	--dur-press: 90ms;
+	/* ── motion ── */
 	--dur-fast: 150ms;
 	--dur-base: 220ms;
 	--dur-slow: 360ms;
@@ -198,213 +177,89 @@
 
 	--transition: var(--dur-fast) var(--ease-out);
 
-	/* ── layers ── unchanged. */
+	/* ── layers ── */
 	--z-raised: 1;
 	--z-nav: 20;
 	--z-sticky: 30;
-	--z-scenery: 50;
 	--z-toast: 60;
 }
 
 /**
- * The currency tint — Q50.
+ * The currency tint — Q50, kept through the third edition.
  *
- * The room takes the colour of the currency the keypad writes in. The home
- * currency is the graphite above, untouched; any other currency shifts the
- * *ground* — and only the ground — a few degrees of hue at the same
- * lightness, so every card still floats by luminance and every ink still
- * measures what it measured. The tint is the temperature of the room, never
- * the colour of anything in it: every saturated hue in this file already
- * means something (signal, in, flag, danger, the split), and at this chroma
- * these mean nothing but "not home".
- *
- * Light: oklch 0.972 / 0.018 for the ground and 0.93 / 0.024 for its foot,
- * the neutral pair's own lightness. --ink-3 on them measures 5.2:1 and
- * 4.95:1, within a hundredth of the neutral ground's own figures.
- *
- * Dark: the ground stays true black — the lights-off decision holds — and the
- * tint lives in the gradient's foot (0.17 / 0.022) and in the bloom behind
- * the amount. Both are written into the dark bank's values, so the two dark
- * blocks above stay untouched and still name every dark value once.
+ * The room takes the colour of the currency the keypad writes in: the home
+ * currency is the soft grey above, any other shifts the ground a few degrees
+ * of hue at the same lightness. Only the ground moves — cards, ink and every
+ * data colour are defined against surfaces and measure what they measured.
+ * The dark ground stays black in every currency: the lights-off decision
+ * holds, and the account rail on the record screen says which account it is.
  *
  * The root attribute is set by `lib/ui/tint.ts` from the active account.
- * CZK carries a tint too, for a ledger whose home is not koruny — in
- * practice it is never active.
- */
-
-/*
- * The ground switches, it does not fade. A transition on the body's flat
- * colour sits under the opaque gradient and shows nothing; registering the
- * tokens with `@property` so the gradient itself interpolates left Chromium
- * painting a mid-grey while reporting the start colour, and never arriving.
- * A switch is a deliberate, rare act, and neither fix earns its place.
  */
 :root[data-currency='EUR'] {
-	--ground: #ecf7ff;
-	--ground-2: #dbeaf7;
-	--ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(118 181 233 / 22%) 0%,
-		rgb(118 181 233 / 8%) 40%,
-		transparent 72%
-	);
-	--dark-ground-2: #071018;
-	--dark-ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(118 181 233 / 10%) 0%,
-		rgb(118 181 233 / 3%) 40%,
-		transparent 72%
-	);
+	--ground: #ecf5fc;
+	--ground-2: #ecf5fc;
 }
 
 :root[data-currency='USD'] {
-	--ground: #eff9ef;
-	--ground-2: #deecde;
-	--ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(133 191 134 / 22%) 0%,
-		rgb(133 191 134 / 8%) 40%,
-		transparent 72%
-	);
-	--dark-ground-2: #091209;
-	--dark-ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(133 191 134 / 10%) 0%,
-		rgb(133 191 134 / 3%) 40%,
-		transparent 72%
-	);
+	--ground: #eef7ee;
+	--ground-2: #eef7ee;
 }
 
 :root[data-currency='GBP'] {
-	--ground: #fff1f9;
-	--ground-2: #f5e2eb;
-	--ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(220 148 188 / 22%) 0%,
-		rgb(220 148 188 / 8%) 40%,
-		transparent 72%
-	);
-	--dark-ground-2: #160b12;
-	--dark-ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(220 148 188 / 10%) 0%,
-		rgb(220 148 188 / 3%) 40%,
-		transparent 72%
-	);
+	--ground: #fbf0f6;
+	--ground-2: #fbf0f6;
 }
 
 :root[data-currency='CZK'] {
-	--ground: #fff3ea;
-	--ground-2: #f5e5d8;
-	--ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(221 159 107 / 22%) 0%,
-		rgb(221 159 107 / 8%) 40%,
-		transparent 72%
-	);
-	--dark-ground-2: #160d06;
-	--dark-ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(221 159 107 / 10%) 0%,
-		rgb(221 159 107 / 3%) 40%,
-		transparent 72%
-	);
+	--ground: #fbf3ec;
+	--ground-2: #fbf3ec;
 }
 
 /**
- * Dark — the primary theme. True black ground (this app is used in bed with
- * the lights off, on an OLED), then the reference system's near-black
- * micro-steps as the raised surfaces. Elevation is the luminance step itself;
- * shadows only under the layers that float.
+ * Dark — black ground, near-black cards.
  *
- * It has to be *selected* twice — once for the system preference, once for an
- * explicit choice, so the Settings toggle wins in both directions — and CSS
- * gives no way to put one declaration block behind two selectors when one of
- * them lives inside a media query.
- *
- * So the two selectors are duplicated and **the values are not**. Every dark
- * value is named once, here, and each block below does nothing but point the
- * role at it. Editing a colour is one edit again; the failure where a tweak
- * lands in one block and not the other cannot happen, because there is only
- * one place the number exists.
- *
- * These are inert on their own: nothing reads a `--dark-*` token except the
- * two blocks underneath.
+ * Selected twice — once for the system preference, once for the explicit
+ * choice, so the Settings toggle wins in both directions — and CSS gives no
+ * way to put one declaration block behind two selectors when one of them lives
+ * inside a media query. So the selectors are duplicated and **the values are
+ * not**: every dark value is named once, here, and each block below only
+ * points the role at it.
  */
 :root {
 	--dark-ground: #000000;
-	--dark-ground-2: #0c0c0e;
-	--dark-surface: #1d1d1f;
-	--dark-surface-2: #252527;
-	--dark-surface-3: #2a2a2c;
+	--dark-ground-2: #0a0a0a;
+	--dark-surface: #16181a;
+	--dark-surface-2: #1f2226;
+	--dark-surface-3: rgb(255 255 255 / 8%);
 
-	--dark-hairline: rgb(255 255 255 / 9%);
-	--dark-hairline-2: rgb(255 255 255 / 16%);
+	--dark-hairline: rgb(255 255 255 / 12%);
+	--dark-hairline-2: rgb(255 255 255 / 20%);
 
-	--dark-ink: #f5f5f7;
-	--dark-ink-2: rgb(245 245 247 / 66%);
-	--dark-ink-3: rgb(245 245 247 / 52%);
+	--dark-ink: #ffffff;
+	--dark-ink-2: rgb(255 255 255 / 72%);
+	--dark-ink-3: rgb(255 255 255 / 50%);
 
-	--dark-signal: #409cff;
-	--dark-signal-ink: #06213d;
-	--dark-signal-wash: rgb(64 156 255 / 12%);
-	--dark-signal-edge: rgb(64 156 255 / 28%);
+	--dark-pill: #ffffff;
+	--dark-pill-ink: #000000;
 
-	--dark-out: #f5f5f7;
-	--dark-in: #4ccfa1;
-	--dark-flag: #dfb567;
-	--dark-danger: #ef6f5e;
+	--dark-signal-wash: rgb(73 79 223 / 24%);
 
-	--dark-in-wash: rgb(76 207 161 / 12%);
-	--dark-flag-wash: rgb(223 181 103 / 12%);
-	--dark-danger-wash: rgb(239 111 94 / 12%);
-	--dark-danger-edge: rgb(239 111 94 / 28%);
+	--dark-out: #ffffff;
+	--dark-in: #19c48f;
 
-	--dark-split-give: #a294ec;
-	--dark-split-save: #4ccfa1;
-	--dark-split-debt: #e29674;
-	--dark-split-live: #8b9299;
-	--dark-split-left: #3e3e42;
+	--dark-in-wash: rgb(25 196 143 / 14%);
+	--dark-flag-wash: rgb(236 126 0 / 16%);
+	--dark-danger-wash: rgb(226 59 74 / 16%);
 
-	--dark-elev-1: 0 0 0 0 rgb(0 0 0 / 0%);
-	--dark-elev-2: 0 6px 24px rgb(0 0 0 / 45%);
-	--dark-elev-3: 0 12px 40px rgb(0 0 0 / 55%);
 	--dark-elev-sheet: 0 -12px 48px rgb(0 0 0 / 60%);
-
-	--dark-edge: inset 0 1px 0 rgb(255 255 255 / 5%);
-	--dark-edge-strong: inset 0 1px 0 rgb(255 255 255 / 8%);
-
-	--dark-ambient: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(255 255 255 / 5%) 0%,
-		rgb(255 255 255 / 1.5%) 40%,
-		transparent 72%
-	);
-	--dark-ambient-out: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(239 111 94 / 8%) 0%,
-		rgb(239 111 94 / 2.5%) 40%,
-		transparent 72%
-	);
-	--dark-ambient-in: radial-gradient(
-		78% 46% at 50% 0%,
-		rgb(76 207 161 / 7%) 0%,
-		rgb(76 207 161 / 2.5%) 40%,
-		transparent 72%
-	);
-
-	--dark-grain-opacity: 0.3;
+	--dark-elev-toast: 0 12px 32px rgb(0 0 0 / 50%);
+	--dark-overlay: rgb(0 0 0 / 60%);
+	--dark-glass: rgb(22 24 26 / 72%);
+	--dark-glass-edge: rgb(255 255 255 / 10%);
+	--dark-elev-bar: 0 8px 28px rgb(0 0 0 / 45%);
 }
 
-/**
- * The roles, pointed at the dark values. Written twice because the selectors
- * are two; identical because they are generated from one list by hand and
- * contain no numbers to get wrong.
- *
- * `--raised` resolves against `--surface-3` *on this element*, which is the
- * dark one by the time it is read — that is why it stays a role reference here
- * rather than joining the bank above.
- */
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
 		--ground: var(--dark-ground);
@@ -416,55 +271,35 @@
 		--hairline: var(--dark-hairline);
 		--hairline-2: var(--dark-hairline-2);
 
-		--raised: var(--surface-3);
-
 		--ink: var(--dark-ink);
 		--ink-2: var(--dark-ink-2);
 		--ink-3: var(--dark-ink-3);
 
-		--signal: var(--dark-signal);
-		--signal-ink: var(--dark-signal-ink);
+		--pill: var(--dark-pill);
+		--pill-ink: var(--dark-pill-ink);
+
 		--signal-wash: var(--dark-signal-wash);
-		--signal-edge: var(--dark-signal-edge);
 
 		--out: var(--dark-out);
 		--in: var(--dark-in);
-		--flag: var(--dark-flag);
-		--danger: var(--dark-danger);
 
 		--in-wash: var(--dark-in-wash);
 		--flag-wash: var(--dark-flag-wash);
 		--danger-wash: var(--dark-danger-wash);
-		--danger-edge: var(--dark-danger-edge);
 
-		--split-give: var(--dark-split-give);
-		--split-save: var(--dark-split-save);
-		--split-debt: var(--dark-split-debt);
-		--split-live: var(--dark-split-live);
-		--split-left: var(--dark-split-left);
-
-		--elev-1: var(--dark-elev-1);
-		--elev-2: var(--dark-elev-2);
-		--elev-3: var(--dark-elev-3);
 		--elev-sheet: var(--dark-elev-sheet);
-
-		--edge: var(--dark-edge);
-		--edge-strong: var(--dark-edge-strong);
-
-		--ambient: var(--dark-ambient);
-		--ambient-out: var(--dark-ambient-out);
-		--ambient-in: var(--dark-ambient-in);
-
-		--grain-opacity: var(--dark-grain-opacity);
+		--elev-toast: var(--dark-elev-toast);
+		--overlay: var(--dark-overlay);
+		--glass: var(--dark-glass);
+		--glass-edge: var(--dark-glass-edge);
+		--elev-bar: var(--dark-elev-bar);
 	}
 }
 
 /**
- * An explicit choice has to move `color-scheme` with it, not just the palette.
- * Left at `light dark`, the browser keeps rendering its own surfaces — form
- * controls, scrollbars, the canvas behind the page, the date picker — from the
- * *system* preference, so choosing the light theme on a phone in dark mode
- * produced a light page wearing dark native controls.
+ * An explicit choice moves `color-scheme` with it, or the browser keeps
+ * painting its own surfaces — form controls, the date picker — from the
+ * system preference.
  */
 :root[data-theme='light'] {
 	color-scheme: light;
@@ -482,65 +317,26 @@
 	--hairline: var(--dark-hairline);
 	--hairline-2: var(--dark-hairline-2);
 
-	--raised: var(--surface-3);
-
 	--ink: var(--dark-ink);
 	--ink-2: var(--dark-ink-2);
 	--ink-3: var(--dark-ink-3);
 
-	--signal: var(--dark-signal);
-	--signal-ink: var(--dark-signal-ink);
+	--pill: var(--dark-pill);
+	--pill-ink: var(--dark-pill-ink);
+
 	--signal-wash: var(--dark-signal-wash);
-	--signal-edge: var(--dark-signal-edge);
 
 	--out: var(--dark-out);
 	--in: var(--dark-in);
-	--flag: var(--dark-flag);
-	--danger: var(--dark-danger);
 
 	--in-wash: var(--dark-in-wash);
 	--flag-wash: var(--dark-flag-wash);
 	--danger-wash: var(--dark-danger-wash);
-	--danger-edge: var(--dark-danger-edge);
 
-	--split-give: var(--dark-split-give);
-	--split-save: var(--dark-split-save);
-	--split-debt: var(--dark-split-debt);
-	--split-live: var(--dark-split-live);
-	--split-left: var(--dark-split-left);
-
-	--elev-1: var(--dark-elev-1);
-	--elev-2: var(--dark-elev-2);
-	--elev-3: var(--dark-elev-3);
 	--elev-sheet: var(--dark-elev-sheet);
-
-	--edge: var(--dark-edge);
-	--edge-strong: var(--dark-edge-strong);
-
-	--ambient: var(--dark-ambient);
-	--ambient-out: var(--dark-ambient-out);
-	--ambient-in: var(--dark-ambient-in);
-
-	--grain-opacity: var(--dark-grain-opacity);
-}
-
-/**
- * Compatibility aliases — unchanged mapping, resolves against whichever theme
- * block won.
- */
-:root {
-	--paper: var(--ground);
-	--paper-2: var(--ground-2);
-	--tape: var(--surface);
-	--tape-2: var(--surface-2);
-	--rule: var(--hairline);
-	--rule-strong: var(--hairline-2);
-	--accent: var(--signal);
-	--accent-ink: var(--signal-ink);
-	--out-wash: var(--danger-wash);
-	--shadow-1: var(--elev-1);
-	--shadow-2: var(--elev-2);
-	--shadow-hero: var(--elev-3);
-	--shadow-sheet: var(--elev-sheet);
-	--glow: var(--ambient);
+	--elev-toast: var(--dark-elev-toast);
+	--overlay: var(--dark-overlay);
+	--glass: var(--dark-glass);
+	--glass-edge: var(--dark-glass-edge);
+	--elev-bar: var(--dark-elev-bar);
 }

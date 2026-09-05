@@ -120,7 +120,7 @@
 		  them until the other is typed would only make it harder to spot a typo.
 		-->
 		<div class="known">
-			<span class="known__label u-label">{accountName} podle zápisů</span>
+			<span class="known__label label">{accountName} podle zápisů</span>
 			<Money value={computed} size="xl" bold colour={false} {code} />
 		</div>
 
@@ -227,8 +227,8 @@
 		flex-direction: column;
 		gap: var(--space-1);
 		padding: var(--space-3);
-		border-radius: var(--radius-md);
-		background: var(--surface-2);
+		border-radius: var(--radius-sm);
+		background: var(--surface-3);
 	}
 
 	.known__label {
@@ -240,13 +240,11 @@
 		flex-direction: column;
 		gap: var(--space-2);
 		padding: var(--space-3);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--flag-wash);
+		border-radius: var(--radius-sm);
 		background: var(--flag-wash);
 	}
 
 	.delta[data-state='clean'] {
-		border-color: var(--in-wash);
 		background: var(--in-wash);
 	}
 

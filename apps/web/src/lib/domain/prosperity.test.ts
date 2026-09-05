@@ -14,6 +14,8 @@ function category(name: string, spendType: SpendType): Category {
 		sortOrder: 0,
 		isArchived: false,
 		isIncome: false,
+		icon: 'tag',
+		color: 'stone',
 		updatedAt: '2026-08-01T00:00:00.000Z',
 		deviceId: 'dev-1',
 		isDeleted: false

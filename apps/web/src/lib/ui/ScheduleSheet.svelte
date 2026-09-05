@@ -443,11 +443,11 @@
 	.mode {
 		flex: 1;
 		min-height: var(--touch);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-sm);
-		background: var(--surface-2);
+		border: 1px solid transparent;
+		border-radius: var(--radius-full);
+		background: var(--surface-3);
 		font-size: var(--text-md);
-		font-weight: 400;
+		font-weight: 600;
 		color: var(--ink-2);
 		transition:
 			background var(--dur-fast) var(--ease-out),
@@ -456,9 +456,9 @@
 	}
 
 	.mode--on {
-		background: color-mix(in srgb, var(--signal) 10%, var(--surface));
-		border-color: var(--signal);
-		color: var(--ink);
+		background: var(--pill);
+		border-color: transparent;
+		color: var(--pill-ink);
 		font-weight: 600;
 	}
 
@@ -476,17 +476,15 @@
 	.yearly {
 		padding: var(--space-3);
 		border-radius: var(--radius-sm);
-		background: var(--surface-2);
+		background: var(--surface-3);
 		font-size: var(--text-sm);
 		line-height: var(--leading-snug);
 		color: var(--ink-3);
 	}
 
 	.yearly strong {
-		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
 		font-size: var(--text-md);
-		letter-spacing: var(--track-tight);
 		color: var(--ink);
 	}
 
@@ -507,7 +505,6 @@
 		flex-direction: column;
 		gap: var(--space-2);
 		padding: var(--space-3);
-		border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--hairline));
 		border-radius: var(--radius-sm);
 		background: var(--danger-wash);
 	}

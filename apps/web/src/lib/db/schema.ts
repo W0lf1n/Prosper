@@ -13,6 +13,7 @@
 
 import Dexie, { type EntityTable, type Transaction } from 'dexie';
 import { normalize } from '$lib/domain/vocabulary';
+import { defaultCategoryStyle } from './seed';
 import type {
 	Account,
 	Category,
@@ -351,6 +352,32 @@ export const migrations: Migration[] = [
 				.toCollection()
 				.modify((row: { pockets?: unknown }) => {
 					if (!Array.isArray(row.pockets)) row.pockets = [];
+				});
+		}
+	},
+	{
+		/**
+		 * `Category.icon` / `Category.color` — the coloured circle every bucket
+		 * became in the third edition of the design (2026-09-05).
+		 *
+		 * No index changes, so `categories` is not restated. Backfilled by name
+		 * rather than left absent, for the standing reason (v5, v7, v8, v9, v10,
+		 * v12): an absent field is a guard in every reader for ever. The seed
+		 * knows its own buckets — POTRAVINY gets the cart, JÍDLO the fork — and
+		 * anything else gets the plain tag on stone, which is one tap away from
+		 * being something else in Settings. A bucket that already carries a
+		 * style (a merge from a newer device) is left alone.
+		 */
+		version: 13,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			await tx
+				.table('categories')
+				.toCollection()
+				.modify((row: { name: string; icon?: string; color?: string }) => {
+					const fallback = defaultCategoryStyle(row.name ?? '');
+					if (typeof row.icon !== 'string' || !row.icon) row.icon = fallback.icon;
+					if (typeof row.color !== 'string' || !row.color) row.color = fallback.color;
 				});
 		}
 	}

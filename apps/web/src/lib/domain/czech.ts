@@ -27,3 +27,12 @@ export function counted(count: number, forms: PluralForms): string {
 export const RECORDS: PluralForms = { one: 'záznam', few: 'záznamy', many: 'záznamů' };
 export const DAYS: PluralForms = { one: 'den', few: 'dny', many: 'dní' };
 export const PAYMENTS: PluralForms = { one: 'platba', few: 'platby', many: 'plateb' };
+
+/**
+ * "srpen 2026" → "Srpen 2026". Intl gives Czech month names in lowercase,
+ * which is right mid-sentence and wrong at the head of a card.
+ */
+export function capitalize(text: string): string {
+	if (!text) return text;
+	return text.charAt(0).toLocaleUpperCase('cs') + text.slice(1);
+}

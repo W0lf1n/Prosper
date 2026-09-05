@@ -25,11 +25,6 @@ The layout's `load` runs three things on every launch, in this order:
 storage persistence. Anything that must happen "when the app opens" belongs
 there — there is no server and no background worker to do it anywhere else.
 
-The cast has turned over twice. `closePreviousDay()` sat in the middle until
-2026-08-28, marking yesterday as a zero-spend day, and went with the day mark
-itself; `catchUpGoalTargets()` arrived the same day, writing this month's figure
-for every goal that has not got one.
-
 ---
 
 ## Svelte 5, as used here
@@ -39,8 +34,8 @@ stores except the `liveQuery` observables Dexie hands back.
 
 **Reading a `liveQuery`.** The `$store` auto-subscription works inside the main
 scroll region and is not to be trusted anywhere else — see the root
-`CLAUDE.md`. For a binding in a `<header>`, a `<nav>`, or anything outside
-`<main>`, subscribe by hand and assign into `$state`:
+`CLAUDE.md`. For a binding outside `<main>`, subscribe by hand and assign into
+`$state`:
 
 ```ts
 let rows = $state<Txn[]>([]);
@@ -59,18 +54,22 @@ message that is sometimes wrong.
 Tokens are in `lib/styles/tokens.css` and that is the **only** place a colour is
 defined. A literal hex in a component is a bug.
 
-The system is called _graphite instrument_: a graphite ground, surfaces raised
-by **luminance** rather than by boxes, hairlines only where an edge is
-load-bearing, and exactly one signal colour.
+The third edition (2026-09-05) is a consumer-banking layout in the manner of
+Revolut: a soft-grey ground, white cards raised by luminance alone, one sans
+(Inter, self-hosted, variable 400–600), every button a pill, every bucket a
+coloured circle with an icon in it. `docs/DESIGN.md` is the system; the handoff
+it was built from is `docs/redesign/`.
 
-| Rule                                                                                                                  |
-| --------------------------------------------------------------------------------------------------------------------- |
-| `--signal` (blue) is the chrome accent: primary action, current selection, links, focus. Never decoration, never data |
-| Mint (`--in`) is money **in**, and a money verdict that came out right — a passed check, a met month. Never chrome    |
-| Money **out** has no hue: it is `--ink`. Most rows in a ledger are outflow, and forty red numbers is noise            |
-| `--flag` (amber) means look at this. `--danger` (coral) means destroy or refuse                                       |
-| Elevation inverts between themes. Use `--raised`, never a hard-coded `--surface-N`                                    |
-| Dark is the theme this was designed for. Light is its daylight counterpart, not the default                           |
+| Rule                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------ |
+| The primary pill inverts: `--pill` on `--pill-ink` — ink on white by day, white on black by night                  |
+| `--signal` (cobalt) is the accent: the record disc, links, the goal meter, a toggle that is on                     |
+| Mint (`--in`) is money **in**, and a money verdict that came out right — a met month, a passed check. Never chrome |
+| Money **out** has no hue: it is `--ink`. Most rows in a ledger are outflow, and forty red numbers is noise         |
+| `--flag` (amber) means look at this. `--danger` means destroy or refuse                                            |
+| A category's colour is a **key** (`--cat-teal` …), stored on the row, read only through `palette.ts`               |
+| Light is the default. Dark is the system preference or the explicit choice — black ground, `#16181a` cards         |
+| Press is luminance. Nothing scales. Shadow only under `Sheet` and `Toaster`                                        |
 
 Dark is **selected** twice — once under `prefers-color-scheme`, once under
 `[data-theme]` — so the Settings toggle wins in both directions. The values are
@@ -81,17 +80,25 @@ controls from the system preference.
 
 ### Global classes worth knowing
 
-| Class                  | What it is                                                            |
-| ---------------------- | --------------------------------------------------------------------- |
-| `.money`               | Mono, `tabular-nums`, right-aligned. **All money, always**            |
-| `.money--out` / `--in` | The direction's colour                                                |
-| `.slab`                | A raised surface: hairline, lit top edge, `--radius-lg`. No shadow    |
-| `.tile`                | One pressable list row inside a card: name + figure, context + figure |
-| `.u-label`             | The micro-label. The only place uppercase is allowed                  |
-| `.perforation`         | The score line separating two parts of one slab                       |
-| `.field`, `.btn`       | Form and button primitives, with `--primary` / `--quiet` / `--danger` |
-| `Sheet`                | The modal sheet. Pull the grip down, tap outside or Esc — no `✕`      |
-| `.visually-hidden`     | Screen-reader-only                                                    |
+| Class                                  | What it is                                                                                           |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `.page`                                | The one scroll region of a tab screen: a column of cards, `flex: none` each                          |
+| `.title`                               | A tab screen's name at 28 px, in the flow, so it scrolls away                                        |
+| `.card`, `.card--press`, `.card--list` | White on the ground, 20 px corners; pressable; a card of rows                                        |
+| `.label`                               | The card label: 13 px, sentence case, mute. Nothing is uppercase                                     |
+| `.row`, `.row__body`, `.row__end`      | The list row: circle · title over sub · amount over note. `--press` to tap                           |
+| `.circle`                              | 40 px identity circle, colour via `--c`; `--sm` 34, `--xs` 28, `--lg` 52                             |
+| `.meter`, `.meter__fill`               | 6 px track on the soft surface; `data-tone` done / behind                                            |
+| `.badge`                               | A 12 px pill: `--in`, `--flag`, `--card`, `--tiny`                                                   |
+| `.seg`, `.seg__item`                   | The segmented pill; `aria-pressed` selects; `--soft` inside a card                                   |
+| `.btn`                                 | Soft pill 40 px; `--primary` 48 inverted, `--card`, `--quiet`, `--danger`, `--sm`, `--lg`, `--block` |
+| `.round`                               | A 40 px round button on the card colour: close, back, settings                                       |
+| `.toggle`                              | 40 × 24, `aria-checked`                                                                              |
+| `.field`, `.field__input`              | Form primitives: soft, 12 px, 48 px tall, no border, accent ring on focus                            |
+| `.facts`, `.tile`, `.well`             | dt/dd rows with hairlines · a soft tile with a label · the recessed slab                             |
+| `.hint`, `.link`                       | 13 px mute copy · an accent text link                                                                |
+| `Sheet`                                | The modal sheet. Pull the grip down, tap outside or Esc — no `✕`                                     |
+| `.visually-hidden`                     | Screen-reader-only                                                                                   |
 
 ### Layout
 
@@ -99,45 +106,44 @@ The window never scrolls. Each screen is a fixed frame with its own internal
 scrolling — that is what guarantees the keypad can never be pushed below the
 fold on a short phone.
 
-`--touch: 44px` is the floor for anything you aim at. A control drawn at
-`--control: 24px` carries a transparent `::after` that pushes its hit area back
-out to `--touch`, which is why rows of small controls keep a `--control-gap`
-gutter: **that gutter is where the hit areas live.** Shrink it and neighbouring
-targets steal each other's taps.
+`--touch: 44px` is the floor for anything you aim at; primary pills are 48,
+keypad keys 56. Nothing is drawn under 44 and hit bigger any more — the
+transparent-inset trick of the second edition went with its 24 px controls.
 
-`.app:has(.tabbar)` raises `--toast-lift` so a confirmation never parks on top
-of the navigation. The entry route deliberately has no tab bar — the keypad owns
-the bottom of the phone, and the bar's centre disc is how you get back there.
+The tab bar floats: a frosted pill (`--glass`, backdrop blur, `--elev-bar`)
+absolutely positioned over the page's bottom edge. `.app:has(.tabbar)` sets
+`--page-end` and `--toast-lift` so the last row and a confirmation both clear
+it. `/zapis` deliberately has no tab bar — the keypad owns the
+bottom of the phone, and the bar's centre disc is how you get there.
 
 ---
 
 ## Routes
 
-| Route        | Screen                                                                   |
-| ------------ | ------------------------------------------------------------------------ |
-| `/`          | Entry. The launch route, and the one protected hardest                   |
-| `/tape`      | The ledger — reverse chronological, running balance, every day of it     |
-| `/mesic`     | The month — totals, Kontrola, Dluží mi, the split, buckets ranked        |
-| `/platby`    | Pravidelné platby — what goes out, what comes in, the year net of shares |
-| `/cil`       | The goal — the why, this month's figure, the record of months            |
-| `/jmeni`     | Holdings and the `celkem` total — and the only place one is edited       |
-| `/nastaveni` | Account, categories, theme, sync, backup, and `Začít znovu`              |
+| Route        | Screen                                                                        |
+| ------------ | ----------------------------------------------------------------------------- |
+| `/`          | Domů. The launch route: the month's net, the actions, the cards               |
+| `/zapis`     | Zápis. The keypad, full-screen, no bar; `✕` returns where it came from        |
+| `/tape`      | Výpis — reverse chronological, running balance, a card per day                |
+| `/prehled`   | Přehled — Měsíc \| Platby behind one segmented pill, the month switcher above |
+| `/ja`        | Já — the hub: Cíl, Jmění and Nastavení as cards                               |
+| `/cil`       | The goal — the why, this month's figure, the record of months                 |
+| `/jmeni`     | Holdings and the `celkem` total — and the only place one is edited            |
+| `/nastaveni` | Accounts, categories (with the icon/colour editor), theme, sync, data         |
 
-Six of the seven are in the tab bar — everything but `/`, three each side of the
-record disc. That is the bar's ceiling: seven cells on a 320 px phone give each
-label 46 px, and the label steps down to 10 px under 400 px rather than being
-cut. The entry screen carries no bar, so it keeps its four destinations as glyphs
-in the header slab.
+The bar is five slots — Domů · Výpis · ⊕ · Přehled · Já. The three detail
+screens keep Já lit. `/mesic` and `/platby` are `+page.ts` redirects into
+`/prehled`.
 
 ---
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-two files, **467
+Vitest, node environment, `requireAssertions: true`. Twenty-three files, **479
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
-Four files are the exceptions and each earns it:
+Six files are the exceptions and each earns it:
 
 | File                  | Why it is not in `domain/`                                                     |
 | --------------------- | ------------------------------------------------------------------------------ |
@@ -145,6 +151,8 @@ Four files are the exceptions and each earns it:
 | `db/schema.test.ts`   | Migrations, run against a database actually built at the old version           |
 | `sync/engine.test.ts` | The outbox drain against a stubbed `fetch`                                     |
 | `sync/pair.test.ts`   | The pre-flight probe — the sentence a wrong address produces                   |
+| `ui/tint.test.ts`     | Which currency tints the ground                                                |
+| `ui/palette.test.ts`  | The style accessor's fallbacks, and the derived account and holding colours    |
 
 The first three use `fake-indexeddb/auto`.
 
@@ -164,7 +172,7 @@ force-close → reopen → reconnect → verify.
 
 ## Data layer
 
-`lib/db/schema.ts` holds the `migrations` array, currently at **v12**. Add a new
+`lib/db/schema.ts` holds the `migrations` array, currently at **v13**. Add a new
 entry; never edit an existing one, even in development — a released version is
 already on the phone. `schema.test.ts` builds a database at the _old_ version
 and opens it with the current code: a migration that has only ever run against
@@ -191,6 +199,10 @@ Soft, like every other delete, so the tombstones sync like ordinary rows.
 cleared browser profile on an unpaired device. `importBackup` implements the same
 last-write-wins merge the sync layer uses, and refuses a file written by a newer
 build rather than merging it with the unknown tables dropped.
+
+`meta` holds device preferences, not ledger data: the device id, the active
+account and the folded months. (`profileName` was written by one build on
+2026-09-05 and read by nothing since — Q55.)
 
 ## Sync
 

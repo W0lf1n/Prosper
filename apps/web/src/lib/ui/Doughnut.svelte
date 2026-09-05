@@ -2,9 +2,8 @@
 	/**
 	 * A ring, drawn as one circle per segment with a dash pattern.
 	 *
-	 * Hand-rolled rather than a chart library (§13.8), and it costs about forty
-	 * lines: there is exactly one shape here and no axes, ticks, tooltips or
-	 * animation to buy along with it.
+	 * Hand-rolled rather than a chart library (§13.8): there is exactly one
+	 * shape here and no axes, ticks or tooltips to buy along with it.
 	 *
 	 * Segments are drawn from their **exact amounts**, never from the rounded
 	 * percentages shown in the legend — otherwise a ring made of 8 %, 9 % and
@@ -26,8 +25,10 @@
 		size?: number;
 		/** Ring thickness in viewBox units, out of 100. */
 		thickness?: number;
-		/** Colour of the ring behind the segments — shows through when they do not fill it. */
+		/** Colour of the ring behind the segments. The soft surface, like every meter. */
 		track?: string;
+		/** Round the ends. For a single-fill ring, never for a split one. */
+		round?: boolean;
 		/** Goes in the hole. */
 		centre?: Snippet;
 		/** For screen readers; the legend carries the same information visually. */
@@ -36,20 +37,16 @@
 
 	let {
 		segments,
-		size = 148,
-		thickness = 13,
-		track = 'var(--split-left)',
+		size = 120,
+		thickness = 14,
+		track = 'var(--surface-3)',
+		round = false,
 		centre,
 		title
 	}: Props = $props();
 
-	// Derived, not plain consts: `thickness` is a prop, and a ring drawn at the
-	// default radius with a different stroke width is silently the wrong size.
 	const radius = $derived(50 - thickness / 2);
 	const circumference = $derived(2 * Math.PI * radius);
-
-	/** A hairline of ground between neighbours, so two similar hues stay two. */
-	const GAP = 1.4;
 
 	const drawn = $derived.by(() => {
 		const total = segments.reduce((sum, s) => sum + Math.max(0, s.value), 0);
@@ -62,29 +59,14 @@
 			const length = (Math.max(0, segment.value) / total) * circumference;
 			const start = offset;
 			offset += length;
-			return {
-				...segment,
-				// Never eat a whole small segment with the gap: a 1 % slice must
-				// still be a visible tick rather than nothing.
-				dash: visible.length > 1 ? Math.max(length - GAP, Math.min(length, 0.6)) : length,
-				rest: circumference,
-				offset: -start
-			};
+			return { ...segment, dash: length, rest: circumference, offset: -start };
 		});
 	});
 </script>
 
 <div class="doughnut" style="width: {size}px; height: {size}px">
 	<svg viewBox="0 0 100 100" role="img" aria-label={title}>
-		<circle
-			class="track"
-			cx="50"
-			cy="50"
-			r={radius}
-			fill="none"
-			stroke={track}
-			stroke-width={thickness}
-		/>
+		<circle cx="50" cy="50" r={radius} fill="none" stroke={track} stroke-width={thickness} />
 		{#each drawn as segment (segment.label)}
 			<circle
 				cx="50"
@@ -95,7 +77,7 @@
 				stroke-width={thickness}
 				stroke-dasharray="{segment.dash} {segment.rest}"
 				stroke-dashoffset={segment.offset}
-				stroke-linecap="butt"
+				stroke-linecap={round ? 'round' : 'butt'}
 			/>
 		{/each}
 	</svg>
@@ -118,9 +100,6 @@
 		height: 100%;
 		/* Start at twelve o'clock rather than three. */
 		transform: rotate(-90deg);
-		/* The instrument spinning up: the ring settles into place once, on
-		   arrival, and never again. */
-		animation: spin-up var(--dur-slow) var(--ease-out) both;
 	}
 
 	/* Data changes travel round the ring instead of jumping to the new shape. */
@@ -140,16 +119,5 @@
 		gap: 1px;
 		text-align: center;
 		line-height: var(--leading-tight);
-	}
-
-	@keyframes spin-up {
-		from {
-			opacity: 0;
-			transform: rotate(-106deg) scale(0.93);
-		}
-		to {
-			opacity: 1;
-			transform: rotate(-90deg) scale(1);
-		}
 	}
 </style>

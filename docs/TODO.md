@@ -17,12 +17,12 @@
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 467 pass, 22 files              |
-| `pnpm check`               | 0 errors, 0 warnings, 418 files |
+| `pnpm test`                | 479 pass, 23 files              |
+| `pnpm check`               | 0 errors, 0 warnings, 424 files |
 | `pnpm lint`                | eslint passes; see the note     |
-| `pnpm budget`              | 89.9 kB of 150 kB brotli        |
+| `pnpm budget`              | 85.2 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v12** · **6**                 |
+| Schema · backup format     | **v13** · **6**                 |
 
 **Note on `pnpm lint`:** on a checkout made with `core.autocrlf=true` every
 file has CRLF endings and Prettier's check fails on all of them, touched or
@@ -83,6 +83,15 @@ is an expense from a bucket chosen in the sheet, the euro leg is income in a
 `SMĚNA` bucket created on first use, reversing the part of Q49 that kept
 transfer legs out of every measurement (`DECISIONS.md`, "An exchange counts
 the way it reads").
+
+**The third edition of the design landed on 2026-09-05** (`DECISIONS.md`, the
+third-edition pass): the Revolut-inspired handoff in `docs/redesign/` applied as
+specified — a five-slot bar (Domů · Výpis · ⊕ · Přehled · Já), the keypad on
+`/zapis`, `/mesic` and `/platby` folded into `/prehled`, the goal, the wealth
+and the settings as cards on `/ja`, Inter instead of Plex Mono, cards instead
+of slabs, every button a pill, and every bucket a coloured circle with an icon
+(schema **v13**, `Category.icon` / `Category.color`, editable in Nastavení).
+Flow, domain, checks, sync and the data layer did not change.
 
 **Two more on 2026-09-05, both out of use** (`DECISIONS.md`, the 2026-09-05
 pass): a holding's first value is typed **on the same sheet as its name**, with

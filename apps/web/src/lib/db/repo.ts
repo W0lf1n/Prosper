@@ -48,7 +48,7 @@ import type {
 } from '$lib/domain/types';
 import { normalize } from '$lib/domain/vocabulary';
 import { db } from './schema';
-import { seedCategories } from './seed';
+import { defaultCategoryStyle, seedCategories } from './seed';
 
 const META_DEVICE_ID = 'deviceId';
 const META_ACTIVE_ACCOUNT = 'activeAccountId';
@@ -215,6 +215,8 @@ export async function ensureSeeded(): Promise<SeedResult> {
 		sortOrder: index,
 		isArchived: false,
 		isIncome: seed.isIncome ?? false,
+		icon: seed.icon,
+		color: seed.color,
 		updatedAt,
 		deviceId,
 		isDeleted: false
@@ -603,6 +605,7 @@ export async function ensureExchangeCategory(): Promise<Category> {
 		sortOrder: await database.categories.count(),
 		isArchived: false,
 		isIncome: true,
+		...defaultCategoryStyle(EXCHANGE_CATEGORY_NAME),
 		updatedAt,
 		deviceId,
 		isDeleted: false
@@ -694,19 +697,25 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 
 export async function createCategory(
 	input: Pick<Category, 'name' | 'spendType'> &
-		Partial<Pick<Category, 'parentId' | 'monthlyCap' | 'isIncome'>>
+		Partial<Pick<Category, 'parentId' | 'monthlyCap' | 'isIncome' | 'icon' | 'color'>>
 ): Promise<Category> {
 	const database = db();
 	const { updatedAt, deviceId } = await stamp();
+	const name = input.name.trim();
+	// A bucket named like one of the seed's gets the seed's look; anything
+	// else the plain tag, which the editor changes in two taps.
+	const style = defaultCategoryStyle(name);
 	const category: Category = {
 		id: uuidv7(),
 		parentId: input.parentId ?? null,
-		name: input.name.trim(),
+		name,
 		spendType: input.spendType,
 		monthlyCap: input.monthlyCap ?? null,
 		sortOrder: await database.categories.count(),
 		isArchived: false,
 		isIncome: input.isIncome ?? false,
+		icon: input.icon ?? style.icon,
+		color: input.color ?? style.color,
 		updatedAt,
 		deviceId,
 		isDeleted: false
@@ -719,7 +728,17 @@ export async function createCategory(
 export async function updateCategory(
 	id: string,
 	patch: Partial<
-		Pick<Category, 'name' | 'spendType' | 'monthlyCap' | 'sortOrder' | 'isArchived' | 'isIncome'>
+		Pick<
+			Category,
+			| 'name'
+			| 'spendType'
+			| 'monthlyCap'
+			| 'sortOrder'
+			| 'isArchived'
+			| 'isIncome'
+			| 'icon'
+			| 'color'
+		>
 	>
 ): Promise<void> {
 	const database = db();

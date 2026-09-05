@@ -1,122 +1,138 @@
-# Design — graphite instrument
+# Design — third edition
 
-The app's design system, now in its **second edition** — same instrument,
-calmer machining. It is not a theme layered over the app: every colour, size
-and radius is a token in `apps/web/src/lib/styles/tokens.css`, and the four
-rules below are enforced by grep as much as by taste.
+The app's design system, in its **third edition** since 2026-09-05: a
+consumer-banking layout in the manner of Revolut. It replaced the "graphite
+instrument" of the first two editions — the true-black ground, the grain, the
+ambient pool behind the amount, the monospace money — with a soft-grey ground,
+white cards, one proportional sans, pills and circles.
 
-This document is the system as it stands. The second edition as it was
-delivered — tokens, four patches, previews — is
-[`design_handoff_prosper_visual_refresh/`](design_handoff_prosper_visual_refresh/),
-and the reasoning behind each move is in [`DECISIONS.md`](DECISIONS.md) under
-the two design passes.
+It arrived as a high-fidelity handoff and was applied as specified. The handoff
+— a clickable prototype and a README with every token, size and screen — is
+[`redesign/Prosper app redesign with Revolut inspiration/design_handoff_prosper_revolut/`](redesign/);
+the reasoning behind each move, and every deviation from it, is in
+[`DECISIONS.md`](DECISIONS.md) under the third edition. Every value lives in
+`apps/web/src/lib/styles/tokens.css`, and the rules below are enforced by grep
+as much as by taste.
+
+The screenshots in `screens/` predate this edition and are kept as a record of
+earlier passes — trust the code and `tokens.css` over them.
 
 ---
 
 ## The screens
 
-<table>
-<tr>
-<td width="33%" valign="top">
-<img src="screens/entry-light.png" alt="Entry screen in the light theme">
-<p align="center"><b>Entry</b><br><sub>The launch route, and the only one that never scrolls. Month standing on top, then the amount in a pool of light, three most-used buckets, keypad. Three actions to a saved row.</sub></p>
-</td>
-<td width="33%" valign="top">
-<img src="screens/tape-dark.png" alt="The ledger tape">
-<p align="center"><b>Výpis — the tape</b><br><sub>Reverse-chronological, running balance per row, days separated by score lines, days that cost nothing recessed and marked <i>bez výdaje</i>.</sub></p>
-</td>
-<td width="33%" valign="top">
-<img src="screens/split-dark.png" alt="The 10/10/10/70 split as two rings">
-<p align="center"><b>The split</b><br><sub>10 / 10 / 10 / 70 measured against <i>income</i>, not outflow — so overspending shows as a negative remainder instead of summing to a tidy 100 %. Shown on a month that overran, because that is the only time it can say so.</sub></p>
-</td>
-</tr>
-<tr>
-<td width="33%" valign="top">
-<img src="screens/goal-dark.png" alt="The goal screen">
-<p align="center"><b>Cíl — the goal</b><br><sub>The why in your own words, before any number. Then this month's figure, marked <i>committed</i> or merely <i>proposed</i>. Then the record of months.</sub></p>
-</td>
-<td width="33%" valign="top">
-<img src="screens/wealth-dark.png" alt="Holdings and the total">
-<p align="center"><b>Jmění — what it adds up to</b><br><sub>Hand-typed holding values with the day each was true. No tickers, no price feed. A reading that has gone stale raises an amber strip inside its own card. Growth is never counted as income.</sub></p>
-</td>
-<td width="33%" valign="top">
-<img src="screens/schedules-dark.png" alt="Recurring payments in settings">
-<p align="center"><b>Recurring payments</b><br><sub>Declared, not detected. Each one posts automatically or waits for one tap, with the annual cost stated where you set it.</sub></p>
-</td>
-</tr>
-</table>
+**Domů** leads with the month's net at 44 px, two pills for what came in and
+went out, and three actions — Zapsat, Výpis, Měsíc. Under them, cards: what the
+standing orders are waiting on, the goal's month, the wealth total, the last
+three rows. **Zápis** is full-screen: the direction as a segmented pill, the
+account rail, the amount at 56 px with the currency as text beside it, the
+bucket rail, the date and the payee, the keypad, Uložit. **Výpis** is a balance
+card, then a card per day. **Přehled** is Měsíc and Platby behind one segmented
+pill, with the month switcher in the title row. **Já** is a title and three
+cards — Cíl, Jmění, Nastavení — each opening a detail screen with a back
+chevron. The tab bar floats over every one of these as a frosted pill, and the
+page ends far enough under it for the last row to scroll clear.
 
-Both themes are first-class. Dark is the one it was designed for — this is an
-app used one-handed, in bed, with the lights off, and its ground is true black
-for exactly that reason.
+The bar is five slots: Domů · Výpis · ⊕ · Přehled · Já. The disc opens Zápis,
+which carries no bar of its own.
 
 ---
 
 ## The four rules
 
-**1 · Elevation is luminance, not shadow.** A card is raised because it is
-lighter than the ground, not because it throws one. Real shadow survives in
-exactly two places, both of which genuinely float over content — the sheet and
-the toast. Cards, buttons, the keypad shell and the tab bar all gave theirs up.
+**1 · Elevation is luminance, and only luminance.** A card is white on the
+ground and raised by nothing else — no hairline, no lit edge, no shadow. The two
+layers that genuinely float, the sheet and the toast, are the only shadows in
+the app.
 
-**2 · Recession is a pocket.** There is not one `inset` shadow in the app.
-Inside a card, recessed is `--ground-2` and raised is `--raised`, and it steps
-the right way in both themes: `#0c0c0e → #2a2a2c` dark, `#e8e8ec → #ffffff`
-light. Meter tracks, field inputs, the goal's _why_ slab and the ledger's gap
-days are all that same pocket.
+**2 · Every button is a pill.** Primary 48 px, secondary 40, small 32. Rank is
+fill, not shape: the primary pill inverts with the theme (ink on white by day,
+white on black by night), a soft pill sits inside a card, a card-coloured pill
+sits on the ground, quiet is text, danger is a 1.5 px outline. The old rule that
+reserved the pill for the primary action is gone with the second edition.
 
-**3 · One press, one number.** Every button presses with `scale(0.95)` over
-90 ms and nothing else moves. The one exception is a full-bleed list row, which
-presses by background luminance instead — scaling a 100 %-wide row by 5 % shows
-the ground through its own corners.
+**3 · Press is luminance.** A pill or a row darkens one step under the thumb.
+Nothing scales, nothing glows.
 
-**4 · Pill is reserved for the primary action.** `--radius-full` on a button
-means "this is _the_ action". Two buttons of equal size are told apart by shape,
-not by a second colour.
+**4 · Identity is a circle.** A bucket, an account, a holding — its colour
+behind a white glyph or a short code: 40 px in a list row, 34 in Settings, 28
+inside a chip, 52 on a preview. A category's colour and icon are the person's
+to pick, from ten hues and thirty-two icons, and they apply live everywhere the
+bucket appears.
 
 ---
 
 ## Colour
 
-**One chrome accent, and it is blue.** `--signal` is links, primary buttons, the
-focus ring, the current selection and the record disc. It is never decoration
-and it is never a data colour.
+**One accent, and it is cobalt.** `--signal` is the record disc, links, the
+goal's meter, a toggle that is on. It is never decoration and never
+a data colour — with one exception it shares its hue with: the category palette,
+which the person picks, and which contains the same cobalt under its own name.
+
+**The primary pill is the other chrome.** Ink on the light theme, white on the
+dark one — two tokens, `--pill` and `--pill-ink`, because a pill inverts between
+themes and nothing else does.
 
 **Money going out has no hue at all.** `--out` is the ink. A ledger is mostly
 outflow, and forty red numbers is noise rather than information — so the only
-coloured number on a ledger screen is an inflow.
+coloured amount on a ledger screen is an inflow, in mint.
 
-Data colour is the single exemption: mint for money in, amber for _look at
-this_, coral for _destroy or refuse_, and four hues for the classes of the
-split. All of them sit near the same lightness and chroma per theme, so no class
-shouts over another, and none of them is ever re-tuned alone.
+Data colour is the single exemption: mint for money in and a verdict that came
+out right, amber for _look at this_, red for _destroy or refuse_, and the
+category palette — ten hues, theme-independent, because a bucket's colour is a
+name and a name does not change with the lights. The four split classes borrow
+four of them. The denominator of every meter and ring is the soft surface.
 
-| Role                 | Dark (primary)                            | Light                                     |
-| -------------------- | ----------------------------------------- | ----------------------------------------- |
-| Ground → surfaces    | `#000000` → `#1d1d1f` `#252527` `#2a2a2c` | `#f5f5f7` → `#ffffff` `#fafafc` `#f2f2f5` |
-| Ink                  | `#f5f5f7`                                 | `#1d1d1f`                                 |
-| Signal — chrome only | `#409cff`                                 | `#0066cc`                                 |
-| In · flag · danger   | `#4ccfa1` · `#dfb567` · `#ef6f5e`         | `#007850` · `#8a6400` · `#c93f32`         |
+| Role                 | Light (default)                          | Dark                                          |
+| -------------------- | ---------------------------------------- | --------------------------------------------- |
+| Ground → card → soft | `#f4f4f4` → `#ffffff` → `#f0f0f2`        | `#000000` → `#16181a` → white at 8 %          |
+| Ink · mute · stone   | `#191c1f` · `#505a63` · `#8d969e`        | `#ffffff` · white at 72 % · white at 50 %     |
+| Pill                 | `#191c1f` on `#ffffff`                   | `#ffffff` on `#000000`                        |
+| Signal               | `#494fdf`                                | `#494fdf`                                     |
+| In · flag · danger   | `#00a87e` · `#ec7e00` · `#e23b4a`        | `#19c48f` · `#ec7e00` · `#e23b4a`             |
 
-Hairlines are ink at 9 % and 16 %, never a painted grey, so they sit correctly
-on every surface instead of being tuned to one. Two greps have to come back
-empty: **a literal hex outside `tokens.css`**, and **`font-weight: 500`** — the
-ladder is 400 / 600 / 700 and the middle weight does not exist here.
+Three greps have to come back empty: **a literal hex outside `tokens.css`**,
+**`font-weight: 700`** — the ladder is 400 / 500 / 600 — and
+**`text-transform: uppercase`** — every label is sentence case. The one colour
+written twice is the ground, in `app.html`'s `theme-color` and in the manifest,
+neither of which can take a custom property.
 
 ---
 
 ## Type
 
-**The app ships one typeface, and it ships it for money.** Every amount is IBM
-Plex Mono, tabular, right-aligned, always, so two figures in a column can be
-compared without being read. That is functional first and the visual identity
-second. Four woff2 files, latin + latin-ext, 57 kB self-hosted — a font CDN
-would break the offline promise.
+**One family: Inter**, self-hosted as a variable face — latin and latin-ext,
+400 to 600, two files and 133 kB — because a font CDN would break the offline
+promise. IBM Plex Mono left with this edition; money is Inter 600 with tabular
+figures, and the whole app is set `font-variant-numeric: tabular-nums` so a
+column of amounts still lines up without a monospace face.
 
-Everything that is not money is the system stack, which resolves to real SF Pro
-on Apple hardware and costs nothing at all. Instrument Sans left with the second
-edition, which is how a whole visual refresh landed **under** the bundle it
-started from.
+The weight 500 lives in exactly two places: the keypad's digits and the
+currency beside the amount. Sizes are fixed, not fluid — 11 for tab
+labels, 13 for card labels and row subs, 15 for body and row titles, 22 for a
+card figure, 28 for a screen title, 34 for a big figure, 40 for the Jmění hero,
+44 for the home hero, 56 for the amount being typed — and the large ones tighten
+as they grow, from −0.4 px at 22 to −1.8 px at 56.
+
+---
+
+## Shape, space and motion
+
+Cards have 20 px corners and 16 px of padding; inputs, cells and the check strip
+12 px; the account card 16; the sheet 28 at the top. The page gutter is 16, the
+gap between cards 12, a list row 60–64 px tall, a settings row 52, a bucket
+chip 40. Touch: primary pills 48, secondary 40, keypad keys 56, tab cells at
+least 44.
+
+The toast is a pill in the primary colours, centred above the bar, fading and
+rising in 220 ms and staying 2.6 s — six with Zpět on it. The toggle's knob
+moves in 150 ms. The account rail and the category rail are native horizontal
+scroll; the account rail snaps one card at a time. Nothing else animates, and
+`prefers-reduced-motion` turns even that off.
+
+**A sheet has no close button.** It is pulled down by its grip, dismissed by
+tapping the dimmed app behind it, or by Esc. A sheet that commits something
+carries its own primary pill, and that pill closes it on the way out.
 
 ---
 
@@ -130,31 +146,16 @@ started from.
 <img src="brand/icon.svg" width="96" alt="Prosper ring, dark">
 </div>
 
-The **P** is the app logo, cut for each theme. Its bowl is not a letterform
-decision — it is the 10/10/10/70 ring, drawn to the number: three arcs of a
-tenth each in signal, in and flag, then seven tenths of ink, which is the
-living share. The gap between segments is taken out of the share it follows,
-so the four still sum to the whole circle. The stem is the only thing added to
-make it read as a letter, and it is what the ring is clipped against.
+The **P** is the app logo, cut for each theme, and unchanged by this edition.
+Its bowl is the 10/10/10/70 ring, drawn to the number: three arcs of a tenth
+each in signal, in and flag, then seven tenths of ink, the living share. The
+stem is what makes it read as a letter, and what the ring is clipped against.
 
 The P is also the **app icon** — the favicon, the apple-touch icon and every
-manifest PNG are rasterised from the dark cut, since an icon sits on the
-true-black ground of the installed app. The maskable cut scales the mark to
-90 % so the stem's foot clears a round mask's safe zone. It is the first thing
-seen on launch too: the splash in `app.html` opens on the mark alone, the bowl
-gives way to a set letter, and the rest of the name arrives letter by letter —
-with the ring taking the **o** — until the lockup stands. The sequence plays
-out in full on every launch, about a second, by Petr's explicit choice: the
-app renders and gets ready underneath it, only the reveal waits. Under reduced
-motion there is no sequence, so the still lockup leaves as soon as the app is
-up.
+manifest PNG — and the first thing seen on launch: the splash in `app.html`
+opens on the mark alone and the rest of the name arrives letter by letter, the
+ring taking the **o**. It plays out in full on every launch, by Petr's choice.
+Under reduced motion there is no sequence.
 
-The **ring alone** is the same geometry with the stem taken off. It earned its
-use in the wordmark: it is the **o** of Prosper, in the lockup and at the end
-of the launch animation.
-
-Six files — a light and a dark cut of each, plus a `currentColor` cut of each
-that takes the colour of whatever it is placed in. All of them are stroked
-arcs on one circle, expressed as `stroke-dasharray` against the circumference,
-so the split is legible in the source rather than baked into path data. Under
-a kilobyte apiece, and nothing to rasterise.
+Inside the app the mark does not appear, and there is no avatar either: the app
+is one person's, and a header that says who is holding the phone says nothing.

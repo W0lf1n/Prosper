@@ -707,10 +707,10 @@ Two things about it are deliberate:
 - **`/jmeni` is not a tab.** It is the screen you open once a month, and a tab
   bar that holds everything holds nothing.
 
-The bar is a flex child of the app column rather than a fixed overlay, so it
-cannot cover a row and no screen has to reserve padding for it. The toast reads
-`.app:has(.tabbar)` and lifts itself clear — a confirmation parked on top of the
-navigation is a confirmation you have to wait out before you can leave.
+The bar was a flex child of the app column until 2026-09-05; since then it
+floats (Q56), and `.app:has(.tabbar)` reserves the room under it for both the
+page's end and the toast — a confirmation parked on top of the navigation is a
+confirmation you have to wait out before you can leave.
 
 ---
 
@@ -2141,3 +2141,155 @@ added across groups, per Q49.
 **Also folded in:** the settings card's record count was its own `liveQuery`
 over `txns`; it is now the length of the same live list the balances are read
 off, one query instead of two.
+
+---
+
+## Design pass · third edition — the Revolut layout · 2026-09-05
+
+Petr delivered a complete redesign as a high-fidelity handoff — a clickable
+prototype in an iPhone frame and a README specifying every token, size, weight,
+radius, screen and copy string — in
+`docs/redesign/Prosper app redesign with Revolut inspiration/design_handoff_prosper_revolut/`.
+The brief: replace the graphite instrument with a consumer-banking layout in the
+manner of Revolut, and change nothing about flow, domain, checks, sync or the
+data layer. It was applied as specified, on top of the existing `lib/domain`,
+`lib/db` and `lib/sync`, and this section records what moved and every place
+the implementation had to decide something the handoff did not.
+
+### Q53 — The redesign is the spec, and it overrides the earlier design rulings · answered 2026-09-05
+
+**Where the handoff contradicts an earlier design decision, the handoff wins,
+and the rule in `CLAUDE.md` changes to match.** The 2026-08-29 audit drew a line
+at structural rework Petr had not asked for; this time the structural rework is
+the ask, in writing, with the structure drawn. Four rules of the second edition
+fell:
+
+- **The pill was reserved for the primary action.** Now every button is a pill
+  and rank is fill — primary inverts with the theme, soft sits inside a card,
+  card-coloured sits on the ground, quiet is text, danger is an outline.
+- **Buttons pressed with `scale(0.95)`.** Now a press is background luminance,
+  on pills and rows alike. Nothing scales.
+- **Weight 500 did not exist.** The handoff's ladder is 400 / 500 / 600, and 500
+  is used in two places — the keypad's digits and the currency beside the
+  amount — so the face ships with it. What is forbidden now is 700, and `text-transform:
+  uppercase`: every card label is sentence case.
+- **Dark first.** Light is the default and the theme the design was drawn in;
+  dark is the system preference or the explicit choice, black ground and
+  near-black cards.
+
+Three things of the second edition went without a replacement, because the
+handoff's motion section is exhaustive and has no room for them: the grain over
+the ground, the ambient pool behind the amount, and `Scenery` — the wash of
+colour over the whole app on save. The toast is a pill in the primary colours
+and carries the whole confirmation, Zpět included; the fuse hairline that showed
+its lifetime went with the shape it was drawn on.
+
+IBM Plex Mono left. Money is Inter 600 with tabular figures, and the app root is
+set `tabular-nums`, which is what a monospace face was buying. Inter is
+self-hosted as a variable face — two files, latin and latin-ext, 133 kB — from
+the same Google Fonts build a CDN would have served; the three requested weights
+resolved to one file per subset, which is how the download was confirmed to be
+variable before the `@font-face` was written as `400 600`.
+
+### The bar folded from six cells to five slots
+
+`/mesic` and `/platby` became `/prehled` with a segmented pill — the month and
+the standing orders are the same month from two sides. `/cil`, `/jmeni` and
+`/nastaveni` became cards on `/ja` and stay reachable as detail screens with a
+back chevron, keeping Já lit. The keypad moved to `/zapis`, opened from the disc
+and from the Zapsat pill, so that `/` could lead with the month's net rather
+than with a number pad. The old addresses redirect — `/mesic` to `/prehled`,
+`/platby` to `/prehled?tab=platby` — for the phone that has them in its history.
+
+The 2026-08-28 observation in `TODO.md` §5 — "does a six-cell bar read?" — is
+answered by the design rather than by the fourteen days; the watch item is
+rewritten to the question the new structure raises, which is whether the hub is
+walked through.
+
+### Q54 — A category has an icon and a colour, stored as names · answered 2026-09-05
+
+Schema **v13**: `Category.icon` (a name in `Icon.svelte`'s set) and
+`Category.color` (a key of the ten `--cat-*` tokens). The handoff says "hex from
+the palette"; the implementation stores the **key**, not the value, so that the
+grep in rule 9 — no literal hex outside `tokens.css` — keeps holding, and so
+that a hue can be retuned per theme later without touching a row. The migration
+backfills by name, diacritics and case aside, so a bucket renamed "Jídlo" still
+gets the fork; anything the seed does not know gets the plain tag on stone, one
+tap from being something else. Rows from older builds — an old backup, an
+unpaired device — may still lack both fields, so nothing reads them directly:
+`categoryStyle()` in `lib/ui/palette.ts` is the accessor, and it refuses an icon
+or a colour it cannot draw one field at a time. The backup format stays at 6:
+the fields are additive and an older build ignores them.
+
+The icons are a subset of Lucide (ISC), copied in as paths rather than loaded:
+thirty-two of them come in under ten kilobytes and the offline promise does not
+bend for a CDN. The editor is a sheet opened from the category's row in
+Nastavení — name, type, swatches, an 8-column icon grid, Hotovo — and colour and
+icon apply live, so picking one is watching the whole app change.
+
+Accounts and holdings have no stored colour. An account's is its currency's —
+the home currency is the accent, EUR teal, USD light-blue, GBP pink — and a
+holding's is its kind. Both are derivations in `palette.ts`, not fields.
+
+### Q55 — There is no name and no avatar · answered 2026-09-05, reversed the same day
+
+The handoff shows "PB" and "Petr" and says nothing about where they come from.
+The first build of the pass made the name a `meta` entry (`profileName`), typed
+by tapping the header on Já, with the avatar showing its initials. Petr struck
+it the same afternoon: one person, one device, and the app already knows who
+is holding it — a profile is a thing to fill in for nobody. The avatar is gone
+from Domů and Já. Domů's header is the month alone, with the sliders on the
+right; Já is titled like every other screen. A `profileName` left in `meta` by
+the first build is ignored; nothing reads it.
+
+### Q56 — The currency beside the amount is text, and the tab bar floats · answered 2026-09-05
+
+Two departures from the handoff on Petr's ask, both on the chrome:
+
+- **The currency beside the amount is plain text.** The handoff drew it as a
+  pill with a chevron that cycled to the next account. The account rail two
+  rows above is that switch already, and it shows what the tap would do; a
+  second control for the same thing was a button the thumb found by accident.
+  The symbol stays, in 500, in `--ink-2`, and says which account is live.
+- **The tab bar floats over the page as frosted glass.** A pill the width of
+  the page minus the gutters, standing `--tabbar-lift` off the bottom edge,
+  backdrop-blurred over whatever scrolls under it, with a `--glass-edge`
+  border and `--elev-bar` — the one shadow besides the sheet's and the toast's,
+  because the bar genuinely hovers over content. The tokens are `--glass`,
+  `--glass-edge` and `--elev-bar`, with dark counterparts. Where the browser
+  cannot blur, the bar goes opaque `--surface` rather than translucent over
+  text. `.page` ends at `--page-end` — bar, lift and a gap — so the last row
+  scrolls clear; `/zapis` still has no bar and keeps its own bottom.
+
+### What the handoff left out, and what was kept
+
+The handoff shows one account and one state per card; the app has more. Where a
+shipped feature had no drawing, it kept its place in the new grammar rather than
+being dropped:
+
+- **The account chips on Přehled › Měsíc** (Q49) — per-account and _vše_ — sit
+  under the segmented pill as card-coloured pills, the chosen one primary.
+- **Dluží mi** on Přehled keeps its card; the action is on the tape's row.
+- **The amount override on a due payment** (the gas bill is never twice the
+  same): the row of the K potvrzení card opens a sheet with the field; the two
+  pills under it confirm or skip without one.
+- **The Kontrola copy, the Dny bez výdaje sentence and the "Nic k vytknutí"
+  state** were kept. Copy deletions are the line Petr drew on 2026-08-29.
+- **The category search** stays as the last pill on the bucket rail: it is the
+  only door to a first bucket when every one of a direction is archived.
+- **The currency tint** (Q50) stays, light only: the ground shifts a few degrees
+  for a foreign account and the dark ground stays black. The account rail on
+  Zápis now says which account it is as well.
+- **`Explainer`**, the vysvětlivka, stays on its six terms.
+
+One thing the handoff drew was not built: the second ring of the split — the
+book's shape under the actual — is gone, and the label carries the four numbers
+instead. The handoff's Rozdělení card has one ring, and the deltas beside it
+already say how far each class is from its mark.
+
+### A contrast note, for the audit that will come
+
+`--ink-3` (`#8d969e`) measures about 3.3:1 on white, under the 4.5:1 line the
+2026-08-29 audit held small text to; the handoff specifies it and it is used for
+running balances and the tab bar's inactive labels. Left as specified, and
+recorded here so the next audit knows it was a decision rather than a drift.

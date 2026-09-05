@@ -363,7 +363,7 @@
 
 	.amount__unit {
 		flex: none;
-		font-family: var(--font-mono);
+
 		font-size: var(--text-md);
 		color: var(--ink-3);
 	}
@@ -377,11 +377,11 @@
 		gap: var(--space-2);
 		min-height: var(--touch);
 		padding-inline: var(--space-3);
-		border: 1px solid var(--hairline);
+		border: 1px solid transparent;
 		border-radius: var(--radius-full);
-		background: var(--surface-2);
+		background: var(--surface-3);
 		font-size: var(--text-md);
-		font-weight: 400;
+		font-weight: 600;
 		color: var(--ink-2);
 		transition:
 			background var(--dur-fast) var(--ease-out),
@@ -394,9 +394,9 @@
 	}
 
 	.option--on {
-		background: color-mix(in srgb, var(--signal) 10%, var(--surface));
-		border-color: var(--signal);
-		color: var(--ink);
+		background: var(--pill);
+		border-color: transparent;
+		color: var(--pill-ink);
 		font-weight: 600;
 	}
 
@@ -446,8 +446,8 @@
 		flex-direction: column;
 		gap: var(--space-3);
 		padding: var(--space-3);
-		border: 1px solid var(--danger-edge);
-		border-radius: var(--radius-md);
+
+		border-radius: var(--radius-sm);
 		background: var(--danger-wash);
 	}
 

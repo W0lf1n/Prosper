@@ -502,3 +502,63 @@ describe('v11 → v12 — Account.pockets', () => {
 		upgraded.close();
 	});
 });
+
+describe('v12 → v13 — Category.icon and Category.color', () => {
+	it('gives a seeded bucket its own look and an unknown one the plain tag', async () => {
+		const name = `mig-style-${Date.now()}`;
+		const old = await openAtVersion(name, 12);
+		await old.table('categories').bulkPut([
+			{
+				id: 'cat-jidlo',
+				parentId: null,
+				name: 'Jídlo',
+				spendType: 'want',
+				monthlyCap: null,
+				sortOrder: 0,
+				isArchived: false,
+				isIncome: false,
+				...SYNCED
+			},
+			{
+				id: 'cat-pes',
+				parentId: null,
+				name: 'PES',
+				spendType: 'want',
+				monthlyCap: null,
+				sortOrder: 1,
+				isArchived: false,
+				isIncome: false,
+				...SYNCED
+			},
+			{
+				id: 'cat-styled',
+				parentId: null,
+				name: 'POTRAVINY',
+				spendType: 'need',
+				monthlyCap: null,
+				sortOrder: 2,
+				isArchived: false,
+				isIncome: false,
+				icon: 'coffee',
+				color: 'red',
+				...SYNCED
+			}
+		]);
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		// By name, case and diacritics aside: a renamed "Jídlo" still eats with a fork.
+		expect(await upgraded.categories.get('cat-jidlo')).toMatchObject({
+			icon: 'utensils',
+			color: 'orange'
+		});
+		// Nothing the seed knows about: the plain tag on stone.
+		expect(await upgraded.categories.get('cat-pes')).toMatchObject({ icon: 'tag', color: 'stone' });
+		// A style that already exists — a merge from a newer device — is kept.
+		expect(await upgraded.categories.get('cat-styled')).toMatchObject({
+			icon: 'coffee',
+			color: 'red'
+		});
+		upgraded.close();
+	});
+});

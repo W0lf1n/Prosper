@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { liveQuery } from 'dexie';
+	import { page } from '$app/state';
 	import { db, SCHEMA_VERSION } from '$lib/db/schema';
 	import {
 		CurrencyTakenError,
 		addPocket,
-		archiveCategory,
 		createAccount,
 		createCategory,
 		createTransfer,
@@ -22,18 +22,12 @@
 	import {
 		ACCOUNT_KIND_LABEL,
 		availableCurrencies,
+		homeCurrency,
 		liveAccounts,
 		pocketsOf,
 		validatePocket
 	} from '$lib/domain/accounts';
-	import {
-		ZERO,
-		currencySymbol,
-		formatMoney,
-		parseAmount,
-		sum,
-		type Minor
-	} from '$lib/domain/money';
+	import { ZERO, currencySymbol, formatMoney, parseAmount, sum } from '$lib/domain/money';
 	import { formatDateTime, formatShortDate, today } from '$lib/domain/datetime';
 	import { summariseMonth } from '$lib/domain/checks';
 	import { RECORDS, counted } from '$lib/domain/czech';
@@ -42,17 +36,19 @@
 	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
 	import { sharesOf } from '$lib/domain/receivables';
 	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
-	import type { Account, AccountKind, Category, SpendType, Txn } from '$lib/domain/types';
+	import type { Account, AccountKind, Category, Txn } from '$lib/domain/types';
+	import type { Minor } from '$lib/domain/money';
 	import { applyTheme, readTheme, type Theme } from '$lib/ui/theme';
 	import { defaultBaseUrl, pair, unpair } from '$lib/sync/pair';
 	import { initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
+	import CategorySheet, { type CategoryInput } from '$lib/ui/CategorySheet.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
-	import Money from '$lib/ui/Money.svelte';
 	import ResetSheet from '$lib/ui/ResetSheet.svelte';
 	import BottomSheet from '$lib/ui/Sheet.svelte';
 	import TransferSheet, { type TransferInput } from '$lib/ui/TransferSheet.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
+	import { accountColor, categoryStyle, colorVar } from '$lib/ui/palette';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
 
@@ -60,61 +56,49 @@
 
 	const allAccounts = liveQuery(() => db().accounts.toArray());
 	const accountRows = $derived(liveAccounts(($allAccounts ?? []) as Account[]));
-	/**
-	 * Derived from the live list rather than its own `liveQuery`: a query
-	 * closing over `data.accountId` only re-runs on Dexie writes, and switching
-	 * accounts writes `meta` — the fold would keep showing the old account
-	 * until something else touched the table. This is the one screen a switch
-	 * happens on, so it is the one screen that must re-derive.
-	 */
+	/* Derived from the live list, not its own `liveQuery`: this is the one
+	   screen an account switch happens on (`CLAUDE.md`). */
 	const account = $derived(
 		(($allAccounts ?? []) as Account[]).find((a) => a.id === data.accountId) ?? null
 	);
 	const otherAccounts = $derived(accountRows.filter((a) => a.id !== data.accountId));
 	const activeCurrency = $derived(account?.currency ?? 'CZK');
+	const home = $derived(homeCurrency(($allAccounts ?? []) as Account[]));
 	const categories = liveQuery(() => db().categories.orderBy('sortOrder').toArray());
-	/** Every exchange ever written — the transfer sheet opens its bucket on the
-	    last one used (2026-09-02). */
 	const exchanges = liveQuery(() =>
 		db()
 			.txns.filter((t) => t.transferPairId !== null)
 			.toArray()
 	);
-	/**
-	 * Live rows, not every row ever written.
-	 *
-	 * The count was `txns.count()` once, which includes tombstones — so the
-	 * figure never went down, and after "začít znovu" the card would have
-	 * reported a thousand records against an empty tape. The scan is over one
-	 * small table on a screen nobody opens in a hurry, and the rows themselves
-	 * are what the balances below are read off.
-	 */
+	/* Live rows, not every row ever written — tombstones only ever go up. */
 	const allTxns = liveQuery(async () =>
 		(await db().txns.toArray()).filter((t: Txn) => !t.isDeleted)
 	);
 	const txnCount = $derived(($allTxns ?? []).length);
 
-	/**
-	 * What is on every account right now, by currency, broken into the bank
-	 * account's own line and each pocket that joined it (Q50) — the figure
-	 * `/mesic`'s "vše" and `/jmeni`'s "Na účtu" print, shown here with the
-	 * parts it is made of (Q52).
-	 */
 	const balances = $derived(
 		balancesByCurrency(($allAccounts ?? []) as Account[], ($allTxns ?? []) as Txn[])
 	);
 
-	const SPEND_TYPES: { value: SpendType; label: string }[] = [
-		{ value: 'need', label: 'nutné' },
-		{ value: 'want', label: 'chtěné' },
-		{ value: 'give', label: 'dávání' },
-		{ value: 'save', label: 'spoření' },
-		{ value: 'debt', label: 'dluh' }
-	];
+	const TYPE_LABEL: Record<Category['spendType'], string> = {
+		need: 'nutné',
+		want: 'chtěné',
+		give: 'dávání',
+		save: 'spoření',
+		debt: 'dluh'
+	};
+
+	/* A row on Já links here with a hash; the page's own scroll region is what
+	   has to move, so the browser's default is not enough. */
+	$effect(() => {
+		const id = page.url.hash.slice(1);
+		if (!id) return;
+		requestAnimationFrame(() =>
+			document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+		);
+	});
 
 	// ── account ─────────────────────────────────────────────────────────────
-	// Writable deriveds: they seed themselves from the stored account and accept
-	// typing on top, then re-seed once a save lands.
 	let accountName = $derived(account?.name ?? '');
 	let openingBalance = $derived(
 		account ? formatMoney(account.openingBalance, { currency: false }) : ''
@@ -122,19 +106,7 @@
 	let openingDate = $derived(account?.openingDate ?? today());
 	let accountError = $state('');
 
-	/**
-	 * Setup, not maintenance — so the card folds down to one line.
-	 *
-	 * Three fields typed once, and then a permanent invitation to edit the
-	 * number every other figure in the app is measured from. It is not disabled
-	 * outright, because a wrong opening balance is precisely what reconciling
-	 * finds out three months later, and a setting nobody can reach is a bug
-	 * report. It just stops shouting.
-	 *
-	 * `null` means "whatever the ledger says": open while there is nothing
-	 * recorded, folded once there is. That is also what puts the card back on
-	 * screen after "začít znovu" — the wipe removes the rows that closed it.
-	 */
+	/** Setup, not maintenance: the form folds once there is a ledger. */
 	let accountOpen = $state<boolean | null>(null);
 	const accountExpanded = $derived(accountOpen ?? txnCount === 0);
 
@@ -151,15 +123,11 @@
 			openingBalance: parsed.value,
 			openingDate
 		});
-		// Back to automatic: folds if there is a ledger, stays put if there is not.
 		accountOpen = null;
 		toast.show('Účet uložen');
 	}
 
 	// ── money elsewhere (Q50) ───────────────────────────────────────────────
-	// One account per currency, so the koruny on a Revolut card join the CZK
-	// account here — as a named amount that opens it, not as a second account
-	// nobody wants to choose between.
 	const pockets = $derived(account ? pocketsOf(account) : []);
 	const pocketsTotal = $derived(sum(pockets.map((p) => p.amount)));
 	let pocketName = $state('');
@@ -194,13 +162,6 @@
 		await removePocket(data.accountId, id);
 	}
 
-	/**
-	 * Which account the keypad writes to — the one everything else reads (Q49).
-	 * The layout hands `accountId` to every route, so a switch re-runs its load
-	 * and the whole app follows. The same switch sits on the entry screen, on
-	 * the currency glyph (Q50); this one stays because this is also where an
-	 * account is added or archived.
-	 */
 	async function switchTo(next: Account) {
 		await setActiveAccountId(next.id);
 		await invalidateAll();
@@ -217,12 +178,6 @@
 	let newAccountError = $state('');
 
 	const ACCOUNT_KINDS = Object.entries(ACCOUNT_KIND_LABEL) as [AccountKind, string][];
-
-	/**
-	 * One account per currency (Q50): the form offers only the currencies no
-	 * live account holds, and disappears when there are none left. Archiving
-	 * an account frees its currency again.
-	 */
 	const freeCurrencies = $derived(availableCurrencies(($allAccounts ?? []) as Account[]));
 
 	function openAdd() {
@@ -268,11 +223,6 @@
 		toast.show(`Účet „${name}“ přidán`);
 	}
 
-	/**
-	 * Archiving the active account hands "active" to the next one first — the
-	 * app always writes somewhere, so the last account cannot be archived at
-	 * all (the button never renders without a successor).
-	 */
 	let confirmingArchive = $state(false);
 
 	async function archiveActive() {
@@ -300,20 +250,32 @@
 	}
 
 	// ── categories ──────────────────────────────────────────────────────────
-	let newCategoryName = $state('');
-	let newCategoryType = $state<SpendType>('want');
-	let newCategoryIncome = $state(false);
+	const visibleCategories = $derived(
+		(($categories ?? []) as Category[]).filter((c) => !c.isDeleted)
+	);
+	let categorySheetOpen = $state(false);
+	let editingCategoryId = $state<string | null>(null);
+	/* Read back out of the live list, so the sheet sees each patch land. */
+	const editingCategory = $derived(
+		editingCategoryId ? (visibleCategories.find((c) => c.id === editingCategoryId) ?? null) : null
+	);
 
-	async function addCategory() {
-		const name = newCategoryName.trim();
-		if (!name) return;
-		await createCategory({
-			name,
-			spendType: newCategoryType,
-			isIncome: newCategoryIncome
-		});
-		newCategoryName = '';
-		newCategoryIncome = false;
+	function openCategory(category: Category | null) {
+		editingCategoryId = category?.id ?? null;
+		categorySheetOpen = true;
+	}
+
+	async function addCategory(input: CategoryInput) {
+		await createCategory(input);
+		categorySheetOpen = false;
+		toast.show(`Kategorie „${input.name}“ přidána`);
+	}
+
+	async function patchCategory(
+		id: string,
+		patch: Partial<CategoryInput> & { isArchived?: boolean }
+	) {
+		await updateCategory(id, patch);
 	}
 
 	// ── theme ───────────────────────────────────────────────────────────────
@@ -338,18 +300,6 @@
 		URL.revokeObjectURL(url);
 	}
 
-	/**
-	 * The ledger as a spreadsheet — `PROJECT-PLAN.md` P5.
-	 *
-	 * The JSON backup above is for restoring the app; this is for reading the
-	 * data somewhere else, which is a different job and deserves a different
-	 * file. It is one-way on purpose: a spreadsheet edited by hand and imported
-	 * back is precisely the loop this app was written to end.
-	 *
-	 * Money goes out as an exact decimal built from the integer's own digits —
-	 * `domain/xlsx.ts` never divides — so a column of amounts sums in Excel to
-	 * the same figure the app shows.
-	 */
 	async function downloadWorkbook() {
 		const database = db();
 		const [rows, cats, goalRows, holdingRows, valuationRows] = await Promise.all([
@@ -382,10 +332,8 @@
 			rows: [...live]
 				.sort((a, b) => a.date.localeCompare(b.date))
 				.map((t) => {
-					// All shares together (Q47): the total, the names, and whether
-					// everything — or only part of it — has come back.
 					const shares = sharesOf(t);
-					const owedTotal = shares.reduce((sum, s) => sum + s.amount, 0);
+					const owedTotal = shares.reduce((total, s) => total + s.amount, 0);
 					const settled = shares.filter((s) => s.settledByTxnId !== null).length;
 					return [
 						{ date: t.date },
@@ -421,9 +369,6 @@
 			])
 		};
 
-		// One row per bucket per month — the shape a pivot table wants, and the
-		// only one that answers "what has JÍDLO done since January" without
-		// rebuilding the ledger by hand.
 		const perCategory: Sheet = {
 			name: 'Kategorie po měsících',
 			header: ['Měsíc', 'Kategorie', 'Typ', 'Částka', 'Počet'],
@@ -490,26 +435,14 @@
 			const result = await importBackup(parsed);
 			toast.show(`Načteno ${result.txns} záznamů`);
 		} catch (error) {
-			toast.show(error instanceof Error ? error.message : 'Zálohu se nepodařilo načíst', {
-				tone: 'out'
-			});
+			toast.show(error instanceof Error ? error.message : 'Zálohu se nepodařilo načíst');
 		} finally {
 			input.value = '';
 		}
 	}
 
 	// ── sync ────────────────────────────────────────────────────────────────
-	//
-	// The only screen that mentions sync at all. Everything else in the app is
-	// built to work with the server permanently down, so a failed cycle belongs
-	// here, in a panel somebody chose to open — never as a banner over the
-	// keypad.
 	const sync = syncStatus();
-
-	// Prefilled with the origin the app was served from, because in the
-	// deployment this repository describes that is the answer — client and API
-	// are one nginx and one domain. A wrong address is caught by the health
-	// probe in `pair()` rather than by a 404 nobody can read.
 	let syncBaseUrl = $state(defaultBaseUrl());
 	let syncCode = $state('');
 	let syncDeviceName = $state('');
@@ -551,19 +484,8 @@
 	};
 
 	// ── starting over ───────────────────────────────────────────────────────
-	//
-	// The sheet owns the gate and the ordering; this owns the three things only
-	// the app can do. `resetLedger` is the whole of the wipe — every rule about
-	// what survives it lives in `repo.ts`, not here.
 	let resetOpen = $state(false);
 
-	/**
-	 * Did everything actually reach the server?
-	 *
-	 * `syncNow` never throws (that is rule 5 — nothing waits on sync), so the
-	 * answer has to be read off the status afterwards. An empty outbox and no
-	 * error is the only reading that lets the wipe start.
-	 */
 	async function pushBeforeReset(): Promise<{ ok: boolean; error: string | null }> {
 		await syncNow();
 		if (sync.state === 'error') return { ok: false, error: sync.lastError };
@@ -595,304 +517,252 @@
 	<title>Prosper — nastavení</title>
 </svelte:head>
 
-<AppBar title="Nastavení" />
-
 <main class="page">
-	<section class="card card--account">
-		<h2 class="u-label">Účty</h2>
+	<AppBar title="Nastavení" />
 
-		{#if accountExpanded}
-			<label class="field">
-				<span class="field__label">Název</span>
-				<input class="field__input" bind:value={accountName} />
-			</label>
+	<!-- ── účty ──────────────────────────────────────────────────────── -->
+	<section class="card" id="ucty">
+		<h2 class="label">Účty</h2>
 
-			<label class="field">
-				<span class="field__label">Počáteční zůstatek</span>
-				<input
-					class="field__input field__input--mono"
-					bind:value={openingBalance}
-					inputmode="decimal"
-				/>
-			</label>
-
-			<label class="field">
-				<span class="field__label">Ke dni</span>
-				<input class="field__input field__input--mono" type="date" bind:value={openingDate} />
-			</label>
-
-			<!--
-			  Money in this currency that sits somewhere else — Q50. One account
-			  per currency, so the koruny on a Revolut card join this account
-			  here, as a named amount that opens it, rather than becoming an
-			  account nobody wants to choose between on the keypad.
-			-->
-			<div class="pockets">
-				<span class="field__label">Peníze jinde</span>
-
-				{#if pockets.length > 0}
-					<ul class="pockets__list">
-						{#each pockets as pocket (pocket.id)}
-							<li class="pockets__row">
-								<span class="pockets__name">{pocket.name}</span>
-								<span class="mono">{formatMoney(pocket.amount, { code: activeCurrency })}</span>
-								<button
-									type="button"
-									class="pockets__drop"
-									aria-label={`Odebrat ${pocket.name}`}
-									onclick={() => dropPocket(pocket.id)}
-								>
-									<Icon name="close" size={16} />
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-
-				<div class="pockets__add">
-					<input
-						class="field__input"
-						bind:value={pocketName}
-						placeholder="Revolut"
-						aria-label="Kde"
-					/>
-					<input
-						class="field__input field__input--mono"
-						bind:value={pocketAmount}
-						inputmode="decimal"
-						placeholder="0"
-						aria-label="Kolik"
-					/>
-					<button type="button" class="btn" onclick={savePocket}>Přidat</button>
-				</div>
-
-				{#if pocketError}
-					<p class="error-text">{pocketError}</p>
-				{/if}
-
-				<span class="field__hint">
-					Peníze v téhle měně na jiné kartě nebo v hotovosti. Přičtou se k zůstatku tohohle účtu;
-					výdaje z nich zapisuješ sem jako z každého jiného.
-				</span>
-			</div>
-
-			{#if accountError}
-				<p class="error-text">{accountError}</p>
-			{/if}
-
-			<button type="button" class="btn btn--primary btn--block" onclick={saveAccount}>
-				Uložit účet
-			</button>
-
-			<p class="hint prose">
-				Zůstatek se počítá z počátečního stavu a všech záznamů. Zadej ho přesně tak, jak ho
-				ukazovala banka k uvedenému dni — jinak nebude sedět nikdy. Měna je daná při založení ({activeCurrency})
-				— účet s historií ji změnit nemůže.
-			</p>
-
-			{#if otherAccounts.length > 0}
-				{#if confirmingArchive}
-					<div class="archive-ask">
-						<p class="archive-ask__text">
-							Archivovat „{account?.name}“? Záznamy zůstanou, zapisovat se bude na „{otherAccounts[0]
-								?.name}“.
-						</p>
-						<div class="archive-ask__actions">
-							<button type="button" class="btn" onclick={() => (confirmingArchive = false)}>
-								Zpět
-							</button>
-							<button type="button" class="btn btn--danger" onclick={archiveActive}>
-								Archivovat
-							</button>
-						</div>
-					</div>
-				{:else}
-					<button
-						type="button"
-						class="btn btn--quiet btn--block"
-						onclick={() => (confirmingArchive = true)}
-					>
-						Archivovat účet
-					</button>
-				{/if}
-			{/if}
-		{:else}
-			<!--
-			  Folded, but it still says everything the fields would: the whole
-			  point of collapsing this is that the answer stops needing checking,
-			  and a summary that hides the number would not deliver that.
-			-->
-			<button type="button" class="summary" onclick={() => (accountOpen = true)}>
-				<span class="summary__lines">
-					<span class="summary__name">{account?.name ?? 'Účet'}</span>
-					<span class="summary__detail">
-						začal na
-						<span class="mono">
-							{formatMoney(account?.openingBalance ?? ZERO, { code: activeCurrency })}
-						</span>
-						{formatShortDate(openingDate)}
-						{#if pocketsTotal > 0}
-							· jinde
-							<span class="mono">{formatMoney(pocketsTotal, { code: activeCurrency })}</span>
+		{#each balances as group (group.code)}
+			<div class="group">
+				{#if group.lines.length > 1 || balances.length > 1}
+					<div class="group__head">
+						<span class="label">{group.code}{group.lines.length > 1 ? ' · celkem' : ''}</span>
+						{#if group.lines.length > 1}
+							<span class="group__total">{formatMoney(group.total, { code: group.code })}</span>
 						{/if}
-					</span>
-				</span>
-				<span class="summary__go">Upravit</span>
-			</button>
-		{/if}
-
-		<!--
-		  Every account with what is on it right now, by currency, and under
-		  each one the pockets that joined it (Q50) — above a group of two or
-		  more lines, the figure they make together. That figure is the one
-		  /mesic's "vše" and /jmeni's "Na účtu" print, and this is the only
-		  place it is broken back into its parts (Q52). Tapping an account that
-		  is not the active one makes it the account the keypad writes to — the
-		  switcher lives here as well as on the keypad, because this is also
-		  where an account is added or archived.
-		-->
-		<div class="balances">
-			{#each balances as group (group.code)}
-				<section class="group">
-					{#if group.lines.length > 1 || balances.length > 1}
-						<header class="group__head">
-							<span class="u-label">
-								{group.code}{group.lines.length > 1 ? ' · celkem' : ''}
+					</div>
+				{/if}
+				{#each group.lines as line (line.pocket?.id ?? line.account.id)}
+					{#if line.pocket}
+						<div class="row row--short acct acct--pocket">
+							<span class="circle circle--sm circle--soft acct__pocket">·</span>
+							<span class="row__body">
+								<span class="acct__name">{line.name}</span>
+								<span class="row__sub">peníze jinde</span>
 							</span>
-							{#if group.lines.length > 1}
-								<Money value={group.total} code={group.code} colour={false} bold />
-							{/if}
-						</header>
+							<span class="row__amount acct__amount"
+								>{formatMoney(line.amount, { code: group.code })}</span
+							>
+						</div>
+					{:else if line.account.id === data.accountId}
+						<div class="row row--short acct">
+							<span
+								class="circle"
+								style="--c: {colorVar(accountColor(line.account.currency, home))}"
+							>
+								{currencySymbol(line.account.currency)}
+							</span>
+							<span class="row__body">
+								<span class="row__title">{line.name}</span>
+								<span class="row__sub"
+									>{ACCOUNT_KIND_LABEL[line.account.kind]} · zapisuje se sem</span
+								>
+							</span>
+							<span class="row__amount">{formatMoney(line.amount, { code: group.code })}</span>
+						</div>
+					{:else}
+						<button
+							type="button"
+							class="row row--short row--press acct"
+							onclick={() => switchTo(line.account)}
+						>
+							<span
+								class="circle"
+								style="--c: {colorVar(accountColor(line.account.currency, home))}"
+							>
+								{currencySymbol(line.account.currency)}
+							</span>
+							<span class="row__body">
+								<span class="row__title">{line.name}</span>
+								<span class="row__sub"
+									>{ACCOUNT_KIND_LABEL[line.account.kind]} · ťukni a zapisuj sem</span
+								>
+							</span>
+							<span class="row__amount">{formatMoney(line.amount, { code: group.code })}</span>
+						</button>
 					{/if}
-					<ul class="accounts">
-						{#each group.lines as line (line.pocket?.id ?? line.account.id)}
-							<li>
-								{#if line.pocket}
-									<div class="account-row account-row--pocket">
-										<span class="account-row__lines">
-											<span class="account-row__name">{line.name}</span>
-											<span class="account-row__meta">peníze jinde</span>
-										</span>
-										<Money value={line.amount} code={group.code} colour={false} />
-									</div>
-								{:else if line.account.id === data.accountId}
-									<div class="account-row account-row--active">
-										<span class="account-row__lines">
-											<span class="account-row__name">{line.name}</span>
-											<span class="account-row__meta">
-												{ACCOUNT_KIND_LABEL[line.account.kind]} · zapisuje se sem
-											</span>
-										</span>
-										<Money value={line.amount} code={group.code} colour={false} />
-									</div>
-								{:else}
-									<button type="button" class="account-row" onclick={() => switchTo(line.account)}>
-										<span class="account-row__lines">
-											<span class="account-row__name">{line.name}</span>
-											<span class="account-row__meta">{ACCOUNT_KIND_LABEL[line.account.kind]}</span>
-										</span>
-										<Money value={line.amount} code={group.code} colour={false} />
-										<span class="account-row__go">Přepnout</span>
-									</button>
-								{/if}
-							</li>
-						{/each}
-					</ul>
-				</section>
-			{/each}
-		</div>
+				{/each}
+			</div>
+		{/each}
 
-		<div class="row-actions">
+		<div class="actions actions--fill">
 			{#if freeCurrencies.length > 0}
 				<button type="button" class="btn" onclick={openAdd}>Přidat účet</button>
 			{/if}
+			<button type="button" class="btn" onclick={() => (accountOpen = !accountExpanded)}>
+				{accountExpanded ? 'Skrýt' : 'Upravit'}
+			</button>
 			{#if accountRows.length > 1}
 				<button type="button" class="btn" onclick={() => (transferOpen = true)}>Převod</button>
 			{/if}
 		</div>
 
-		<p class="hint prose">
-			Klávesnice zapisuje na aktivní účet; přepnout jde tady, nebo na hlavní obrazovce klepnutím na
-			měnu u částky. V každé měně je jeden účet — koruny z jiné banky se k tomu korunovému přidají
-			jako peníze jinde a nahoře je, kolik dělají dohromady. Mezi měnami se nesčítá nic: kurz se
-			nikde nebere.
-		</p>
-	</section>
+		{#if accountExpanded}
+			<div class="edit">
+				<label class="field">
+					<span class="field__label">Název</span>
+					<input class="field__input" bind:value={accountName} />
+				</label>
 
-	<section class="card">
-		<h2 class="u-label">Kategorie</h2>
+				<label class="field">
+					<span class="field__label">Počáteční zůstatek</span>
+					<input class="field__input" bind:value={openingBalance} inputmode="decimal" />
+				</label>
 
-		<ul class="categories">
-			{#each ($categories ?? []).filter((c: Category) => !c.isDeleted) as category (category.id)}
-				<li class="category" class:category--archived={category.isArchived}>
-					<span class="category__dot" data-type={category.spendType}></span>
-					<input
-						class="category__name"
-						value={category.name}
-						onchange={(e) => updateCategory(category.id, { name: e.currentTarget.value })}
-					/>
-					<select
-						class="category__type"
-						value={category.spendType}
-						onchange={(e) =>
-							updateCategory(category.id, { spendType: e.currentTarget.value as SpendType })}
-					>
-						{#each SPEND_TYPES as type (type.value)}
-							<option value={type.value}>{type.label}</option>
-						{/each}
-					</select>
-					{#if category.isArchived}
-						<button
-							type="button"
-							class="category__action"
-							onclick={() => updateCategory(category.id, { isArchived: false })}
-							aria-label="Vrátit {category.name}"
-						>
-							<Icon name="plus" size={17} />
-						</button>
+				<label class="field">
+					<span class="field__label">Ke dni</span>
+					<input class="field__input" type="date" bind:value={openingDate} />
+				</label>
+
+				<!-- Money in this currency that sits somewhere else — Q50. -->
+				<div class="field">
+					<span class="field__label">Peníze jinde</span>
+
+					{#if pockets.length > 0}
+						<ul class="pockets">
+							{#each pockets as pocket (pocket.id)}
+								<li class="pocket">
+									<span class="pocket__name">{pocket.name}</span>
+									<span class="pocket__amount"
+										>{formatMoney(pocket.amount, { code: activeCurrency })}</span
+									>
+									<button
+										type="button"
+										class="pocket__drop"
+										aria-label={`Odebrat ${pocket.name}`}
+										onclick={() => dropPocket(pocket.id)}
+									>
+										<Icon name="close" size={16} />
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+
+					<div class="pocket-add">
+						<input
+							class="field__input"
+							bind:value={pocketName}
+							placeholder="Revolut"
+							aria-label="Kde"
+						/>
+						<input
+							class="field__input"
+							bind:value={pocketAmount}
+							inputmode="decimal"
+							placeholder="0"
+							aria-label="Kolik"
+						/>
+						<button type="button" class="btn btn--lg" onclick={savePocket}>Přidat</button>
+					</div>
+
+					{#if pocketError}
+						<p class="error-text">{pocketError}</p>
+					{/if}
+
+					<span class="field__hint">
+						Peníze v téhle měně na jiné kartě nebo v hotovosti. Přičtou se k zůstatku tohohle účtu;
+						výdaje z nich zapisuješ sem jako z každého jiného.
+					</span>
+				</div>
+
+				{#if accountError}
+					<p class="error-text">{accountError}</p>
+				{/if}
+
+				<button type="button" class="btn btn--primary btn--block" onclick={saveAccount}
+					>Uložit účet</button
+				>
+
+				<p class="hint">
+					Zůstatek se počítá z počátečního stavu a všech záznamů. Zadej ho přesně tak, jak ho
+					ukazovala banka k uvedenému dni — jinak nebude sedět nikdy. Měna je daná při založení ({activeCurrency})
+					— účet s historií ji změnit nemůže.
+					{#if pocketsTotal > 0}
+						Jinde je {formatMoney(pocketsTotal, { code: activeCurrency })}.
+					{/if}
+					Účet začal {formatShortDate(openingDate)}.
+				</p>
+
+				{#if otherAccounts.length > 0}
+					{#if confirmingArchive}
+						<div class="ask">
+							<p class="hint">
+								Archivovat „{account?.name}“? Záznamy zůstanou, zapisovat se bude na „{otherAccounts[0]
+									?.name}“.
+							</p>
+							<div class="actions actions--fill">
+								<button type="button" class="btn" onclick={() => (confirmingArchive = false)}
+									>Zpět</button
+								>
+								<button type="button" class="btn btn--danger" onclick={archiveActive}
+									>Archivovat</button
+								>
+							</div>
+						</div>
 					{:else}
 						<button
 							type="button"
-							class="category__action"
-							onclick={() => archiveCategory(category.id)}
-							aria-label="Archivovat {category.name}"
+							class="btn btn--quiet btn--block"
+							onclick={() => (confirmingArchive = true)}
 						>
-							<Icon name="close" size={16} />
+							Archivovat účet
 						</button>
 					{/if}
-				</li>
-			{/each}
-		</ul>
+				{/if}
+			</div>
+		{/if}
 
-		<div class="add">
-			<input
-				class="field__input add__name"
-				bind:value={newCategoryName}
-				placeholder="Nová kategorie"
-			/>
-			<select class="field__input add__type" bind:value={newCategoryType}>
-				{#each SPEND_TYPES as type (type.value)}
-					<option value={type.value}>{type.label}</option>
-				{/each}
-			</select>
-			<label class="checkbox">
-				<input type="checkbox" bind:checked={newCategoryIncome} />
-				<span>příjem</span>
-			</label>
-			<button type="button" class="btn add__go" onclick={addCategory}>Přidat</button>
-		</div>
-
-		<p class="hint prose">Kategorie se archivují, nemažou — staré záznamy musí zůstat čitelné.</p>
+		<p class="hint">
+			Klávesnice zapisuje na aktivní účet; přepnout jde tady, nebo na obrazovce zápisu posunutím
+			karty účtu. V každé měně je jeden účet — koruny z jiné banky se k tomu korunovému přidají jako
+			peníze jinde. Mezi měnami se nesčítá nic: kurz se nikde nebere.
+		</p>
 	</section>
 
-	<section class="card">
-		<h2 class="u-label">Vzhled</h2>
-		<div class="segments" role="group" aria-label="Motiv">
+	<!-- ── kategorie ─────────────────────────────────────────────────── -->
+	<section class="card card--list cats" id="kategorie">
+		<h2 class="label cats__label">Kategorie</h2>
+		{#each visibleCategories as category (category.id)}
+			{@const style = categoryStyle(category)}
+			<button
+				type="button"
+				class="row row--short row--press"
+				class:cat--archived={category.isArchived}
+				onclick={() => openCategory(category)}
+			>
+				<span class="circle circle--sm" style="--c: {colorVar(style.color)}">
+					<Icon name={style.icon} size={16} stroke={2} />
+				</span>
+				<span class="row__body">
+					<span class="cat__name">{category.name}</span>
+				</span>
+				<span class="badge">{category.isIncome ? 'příjem' : TYPE_LABEL[category.spendType]}</span>
+				{#if category.isArchived}
+					<span class="badge">v archivu</span>
+				{/if}
+				<span class="card__go"><Icon name="chevron-right" size={16} /></span>
+			</button>
+		{/each}
+		<p class="hint cats__hint">
+			Ťukni na kategorii a vyber jí ikonu a barvu. Kategorie se archivují, nemažou — staré záznamy
+			musí zůstat čitelné.
+		</p>
+		<div class="cats__foot">
+			<button type="button" class="btn" onclick={() => openCategory(null)}>Nová kategorie</button>
+		</div>
+	</section>
+
+	<!-- ── vzhled ────────────────────────────────────────────────────── -->
+	<section class="card" id="vzhled">
+		<h2 class="label">Vzhled</h2>
+		<div class="seg seg--soft" role="group" aria-label="Motiv">
 			{#each [{ value: 'system', label: 'systém' }, { value: 'light', label: 'světlý' }, { value: 'dark', label: 'tmavý' }] as option (option.value)}
 				<button
 					type="button"
-					class="segment"
-					class:segment--on={theme === option.value}
+					class="seg__item"
 					aria-pressed={theme === option.value}
 					onclick={() => chooseTheme(option.value as Theme)}
 				>
@@ -900,24 +770,15 @@
 				</button>
 			{/each}
 		</div>
-		<p class="hint prose">
-			Tmavý je výchozí. Tahle appka se používá jednou rukou, v posteli, se zhasnutým světlem.
-		</p>
+		<p class="hint">Tmavý na noc, jednou rukou, se zhasnutým světlem.</p>
 	</section>
 
-	<!--
-	  Synchronizace — P2.
-
-	  The app is offline-first and stays that way: this panel adds a second copy
-	  of the ledger, it does not become the ledger. Nothing on any other screen
-	  waits for it, and a failed cycle is a line here rather than an interruption
-	  anywhere else.
-	-->
-	<section class="card">
-		<h2 class="u-label">Synchronizace</h2>
+	<!-- ── synchronizace ─────────────────────────────────────────────── -->
+	<section class="card" id="synchronizace">
+		<h2 class="label">Synchronizace</h2>
 
 		{#if sync.state === 'off'}
-			<p class="hint prose">
+			<p class="hint">
 				Zatím jen tenhle prohlížeč. Spáruj zařízení se serverem a záznamy se budou přenášet mezi
 				telefonem a počítačem — zapisovat půjde dál i offline, fronta se odešle, až bude signál.
 			</p>
@@ -933,17 +794,16 @@
 				/>
 			</label>
 
-			<div class="pair-row">
+			<div class="pair">
 				<label class="field">
 					<span class="field__label">Párovací kód</span>
 					<input
-						class="field__input field__input--mono"
+						class="field__input"
 						bind:value={syncCode}
 						autocomplete="off"
 						inputmode="numeric"
 					/>
 				</label>
-
 				<label class="field">
 					<span class="field__label">Název zařízení</span>
 					<input class="field__input" bind:value={syncDeviceName} placeholder="Telefon" />
@@ -954,10 +814,10 @@
 				<p class="error-text">{syncError}</p>
 			{/if}
 
-			<div class="row-actions">
+			<div class="actions">
 				<button
 					type="button"
-					class="btn btn--primary"
+					class="btn btn--primary pair__go"
 					disabled={syncBusy || !syncBaseUrl.trim() || !syncCode.trim()}
 					onclick={runPair}
 				>
@@ -968,17 +828,15 @@
 			<dl class="facts">
 				<div>
 					<dt>Stav</dt>
-					<dd data-state={sync.state}>{SYNC_LABEL[sync.state] ?? sync.state}</dd>
+					<dd data-state={sync.state} class="sync-state">{SYNC_LABEL[sync.state] ?? sync.state}</dd>
 				</div>
 				<div>
 					<dt>Čeká na odeslání</dt>
-					<dd class="mono">{sync.pending}</dd>
+					<dd>{sync.pending}</dd>
 				</div>
 				<div>
 					<dt>Naposledy</dt>
-					<!-- The date alone could not tell "právě teď" from "ráno", and two
-					     cycles in one day is the normal case. -->
-					<dd class="mono">{sync.lastSyncedAt ? formatDateTime(sync.lastSyncedAt) : '—'}</dd>
+					<dd>{sync.lastSyncedAt ? formatDateTime(sync.lastSyncedAt) : '—'}</dd>
 				</div>
 			</dl>
 
@@ -986,29 +844,24 @@
 				<p class="error-text">{sync.lastError}</p>
 			{/if}
 
-			<p class="hint prose">
+			<p class="hint">
 				{sync.pending > 0
 					? `${counted(sync.pending, RECORDS)} zatím jen tady. Dokud fronta nedojede na nulu, druhá kopie sešitu neexistuje.`
 					: 'Fronta je prázdná — všechno je i na serveru.'}
 			</p>
 
-			<div class="row-actions">
+			<div class="actions">
 				<button type="button" class="btn" onclick={() => void syncNow()}>Synchronizovat teď</button>
 				<button type="button" class="btn btn--quiet" onclick={runUnpair}>Odpojit</button>
 			</div>
 		{/if}
 	</section>
 
-	<section class="card">
-		<h2 class="u-label">Data</h2>
+	<!-- ── data ──────────────────────────────────────────────────────── -->
+	<section class="card" id="data">
+		<h2 class="label">Data</h2>
 
-		<p class="hint prose">
-			Dokud není synchronizace, žije celý sešit jen v tomhle prohlížeči. Vyexportuj si zálohu, než
-			na ni budeš spoléhat. <strong>Záloha</strong> je JSON pro obnovu aplikace,
-			<strong>Excel</strong> je na čtení jinde — zpátky se načíst nedá.
-		</p>
-
-		<div class="row-actions">
+		<div class="actions">
 			<button type="button" class="btn" onclick={downloadBackup}>Export zálohy</button>
 			<button type="button" class="btn" onclick={() => importInput?.click()}>Načíst zálohu</button>
 			<button type="button" class="btn" onclick={downloadWorkbook}>Export do Excelu</button>
@@ -1024,7 +877,7 @@
 		<dl class="facts">
 			<div>
 				<dt>Záznamů</dt>
-				<dd class="mono">{txnCount}</dd>
+				<dd>{txnCount}</dd>
 			</div>
 			<div>
 				<dt>Trvalé úložiště</dt>
@@ -1040,7 +893,7 @@
 			</div>
 			<div>
 				<dt>Verze schématu</dt>
-				<dd class="mono">{SCHEMA_VERSION}</dd>
+				<dd>{SCHEMA_VERSION}</dd>
 			</div>
 			<div>
 				<dt>Synchronizace</dt>
@@ -1048,23 +901,21 @@
 			</div>
 		</dl>
 
-		<!--
-		  The way out of a sešit that is not worth keeping — a month of testing
-		  the app, an import that went wrong, a year that is over.
+		<p class="hint">
+			<strong>Záloha</strong> je JSON pro obnovu aplikace, <strong>Excel</strong> je na čtení jinde —
+			zpátky se načíst nedá. Dokud není synchronizace, žije celý sešit jen v tomhle prohlížeči.
+		</p>
 
-		  Last thing on the last card, under a rule, and it is the only button in
-		  the app that opens onto a typed confirmation. Everything it needs to
-		  say is said in the sheet: down here it is one line, so that reading the
-		  Data card top to bottom never arrives at a wall of red.
-		-->
-		<div class="danger">
-			<button type="button" class="btn btn--danger btn--block" onclick={() => (resetOpen = true)}>
-				Začít znovu
-			</button>
-			<p class="hint prose">
-				Smaže celý sešit a nechá ti kategorie a nastavení. Zálohu si to nabídne uložit předtím.
-			</p>
-		</div>
+		<button
+			type="button"
+			class="btn btn--danger btn--lg btn--block"
+			onclick={() => (resetOpen = true)}
+		>
+			Začít znovu
+		</button>
+		<p class="hint">
+			Smaže celý sešit a nechá ti kategorie a nastavení. Zálohu si to nabídne uložit předtím.
+		</p>
 	</section>
 </main>
 
@@ -1076,7 +927,7 @@
 			<input class="field__input" bind:value={newAccountName} placeholder="Revolut" />
 		</label>
 
-		<div class="form-pair">
+		<div class="pair">
 			<label class="field">
 				<span class="field__label">Druh</span>
 				<select class="field__input" bind:value={newAccountKind}>
@@ -1093,17 +944,17 @@
 						<option value={code}>{code} — {currencySymbol(code)}</option>
 					{/each}
 				</select>
-				<span class="field__hint">
-					Napořád — účet s historií měnu změnit nemůže. V každé měně je jeden účet.
-				</span>
 			</label>
 		</div>
+		<span class="field__hint"
+			>Napořád — účet s historií měnu změnit nemůže. V každé měně je jeden účet.</span
+		>
 
-		<div class="form-pair">
+		<div class="pair">
 			<label class="field">
 				<span class="field__label">Počáteční zůstatek</span>
 				<input
-					class="field__input field__input--mono"
+					class="field__input"
 					bind:value={newAccountBalance}
 					inputmode="decimal"
 					placeholder="0"
@@ -1112,7 +963,7 @@
 
 			<label class="field">
 				<span class="field__label">Ke dni</span>
-				<input class="field__input field__input--mono" type="date" bind:value={newAccountDate} />
+				<input class="field__input" type="date" bind:value={newAccountDate} />
 			</label>
 		</div>
 
@@ -1120,9 +971,9 @@
 			<p class="error-text">{newAccountError}</p>
 		{/if}
 
-		<button type="button" class="btn btn--primary btn--block" onclick={addAccount}>
-			Založit účet
-		</button>
+		<button type="button" class="btn btn--primary btn--block" onclick={addAccount}
+			>Založit účet</button
+		>
 	</div>
 </BottomSheet>
 
@@ -1134,6 +985,14 @@
 	defaultFromId={data.accountId}
 	onsave={saveTransfer}
 	onclose={() => (transferOpen = false)}
+/>
+
+<CategorySheet
+	open={categorySheetOpen}
+	category={editingCategory}
+	oncreate={addCategory}
+	onpatch={patchCategory}
+	onclose={() => (categorySheetOpen = false)}
 />
 
 <ResetSheet
@@ -1148,463 +1007,61 @@
 <TabBar />
 
 <style>
-	.page {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
-		overscroll-behavior: contain;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-3);
-		padding: 0 var(--space-3) var(--space-5);
-	}
-
-	/* ── categories ──────────────────────────────────────────────────────── */
-
-	.categories {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		max-height: 22rem;
-		overflow-y: auto;
-		overscroll-behavior: contain;
-	}
-
-	.category {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-	}
-
-	.category--archived {
-		opacity: 0.45;
-	}
-
-	/* The same five colours as the entry chips and the ring on the month screen. */
-	.category__dot {
-		flex: none;
-		width: 6px;
-		height: 6px;
-		border-radius: var(--radius-full);
-		background: var(--ink-3);
-	}
-
-	.category__dot[data-type='want'] {
-		background: var(--flag);
-	}
-
-	.category__dot[data-type='give'] {
-		background: var(--split-give);
-	}
-
-	.category__dot[data-type='save'] {
-		background: var(--in);
-	}
-
-	.category__dot[data-type='debt'] {
-		background: var(--split-debt);
-	}
-
-	.category__name {
-		flex: 1;
-		min-width: 0;
-		min-height: var(--touch);
-		padding-inline: var(--space-2);
-		border: 1px solid transparent;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		font-size: var(--text-md);
-		transition:
-			background var(--dur-fast) var(--ease-out),
-			border-color var(--dur-fast) var(--ease-out);
-	}
-
-	.category__name:focus-visible {
-		outline: none;
-		border-color: var(--signal);
-		background: var(--surface-2);
-	}
-
-	.category__type {
-		flex: none;
-		min-height: var(--touch);
-		padding-inline: var(--space-2);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-sm);
-		background: var(--surface-2);
-		color: var(--ink-2);
-		font-size: var(--text-xs);
-	}
-
-	.category__action {
-		display: grid;
-		place-items: center;
-		flex: none;
-		width: var(--touch);
-		height: var(--touch);
-		border-radius: var(--radius-full);
-		color: var(--ink-3);
-		transition:
-			background var(--dur-fast) var(--ease-out),
-			color var(--dur-fast) var(--ease-out);
-	}
-
-	.category__action:active {
-		background: var(--surface-2);
-		color: var(--ink);
-	}
-
-	@media (hover: hover) {
-		.category__action:hover {
-			background: var(--surface-2);
-			color: var(--ink);
-		}
-	}
-
-	.add {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--space-2);
-		padding-top: var(--space-4);
-		border-top: 1px solid var(--hairline);
-	}
-
-	.add__name {
-		flex: 1 1 9rem;
-		min-width: 8rem;
-	}
-
-	.add__type {
-		flex: 0 1 7rem;
-	}
-
-	.add__go {
-		flex: 0 0 auto;
-	}
-
-	.checkbox {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		min-height: var(--touch);
-		padding-inline: var(--space-1);
-		font-size: var(--text-md);
-		color: var(--ink-2);
-		cursor: pointer;
-	}
-
-	/* The box is 20 px to look at; the label around it is the 44 px target. */
-	.checkbox input {
-		width: 20px;
-		height: 20px;
-		margin: 0;
-		accent-color: var(--signal);
-		cursor: pointer;
-	}
-
-	/* ── sync ────────────────────────────────────────────────────────────── */
-
-	.pair-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--space-3);
-	}
-
-	@media (max-width: 360px) {
-		.pair-row {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	.facts dd[data-state='error'] {
-		color: var(--danger);
-	}
-
-	.facts dd[data-state='idle'] {
-		color: var(--in);
-	}
-
-	/* ── theme ───────────────────────────────────────────────────────────
-	   A three-position switch, built from the same parts as the direction
-	   switch on the entry screen.
-
-	   The track is the pocket, the selection is raised: `--ground-2` up to
-	   `--raised`. One rule, and it steps the right way in both themes. */
-	.segments {
-		display: flex;
-		gap: 2px;
-		padding: 3px;
-		background: var(--ground-2);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-md);
-	}
-
-	.segment {
-		flex: 1;
-		min-height: var(--touch);
-		border-radius: var(--radius-sm);
-		font-size: var(--text-md);
-		font-weight: 400;
-		color: var(--ink-3);
-		transition:
-			background var(--dur-base) var(--ease-out),
-			color var(--dur-base) var(--ease-out);
-	}
-
-	.segment--on {
-		background: var(--raised);
-		color: var(--ink);
-		font-weight: 600;
-	}
-
-	@media (hover: hover) {
-		.segment:not(.segment--on):hover {
-			color: var(--ink-2);
-		}
-	}
-
-	/* ── account ─────────────────────────────────────────────────────────
-	   Folded, the card is a single full-bleed row. It presses by background
-	   luminance rather than by scale, like every other row in the app that
-	   runs edge to edge. */
-
-	.card--account:has(.summary) {
-		gap: var(--space-3);
-	}
-
-	.summary {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-3);
-		width: 100%;
-		min-height: var(--touch);
-		padding: var(--space-2) var(--space-3);
-		margin-inline: calc(var(--space-3) * -1);
-		width: calc(100% + var(--space-3) * 2);
-		border-radius: var(--radius-md);
-		text-align: left;
-		transition: background var(--dur-fast) var(--ease-out);
-	}
-
-	.summary:active {
-		background: var(--surface-2);
-	}
-
-	@media (hover: hover) {
-		.summary:hover {
-			background: var(--surface-2);
-		}
-	}
-
-	.summary__lines {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
-	}
-
-	.summary__name {
-		font-size: var(--text-md);
-		color: var(--ink);
-	}
-
-	.summary__detail {
-		font-size: var(--text-xs);
-		color: var(--ink-3);
-	}
-
-	.summary__go {
-		flex: none;
-		font-size: var(--text-sm);
-		font-weight: 600;
-		color: var(--signal);
-	}
-
-	/* ── the accounts, by currency, and the sheet that adds one ──────────── */
-
-	.balances {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-3);
-	}
+	/* ── accounts ────────────────────────────────────────────────────────── */
 
 	.group {
 		display: flex;
 		flex-direction: column;
 	}
 
-	/* The sum sits above its parts, on the same grid as the rows beneath it,
-	   so the figure and the figures it is made of line up in one column. */
 	.group__head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-3);
-		min-height: var(--touch);
-		padding-inline: var(--space-1);
-		border-bottom: 1px solid var(--hairline);
+		min-height: 36px;
 	}
 
-	.accounts {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
+	.group__total {
+		font-weight: 600;
 	}
 
-	/* Same full-bleed row recipe as the fold above: presses by luminance. */
-	.account-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-3);
-		min-height: var(--touch);
-		padding: var(--space-2) var(--space-3);
-		margin-inline: calc(var(--space-3) * -1);
-		width: calc(100% + var(--space-3) * 2);
-		border-radius: var(--radius-md);
-		text-align: left;
-		transition: background var(--dur-fast) var(--ease-out);
+	.acct + .acct {
+		border-top: none;
 	}
 
-	.account-row:active {
-		background: var(--surface-2);
-	}
-
-	@media (hover: hover) {
-		.account-row:hover {
-			background: var(--surface-2);
-		}
-	}
-
-	/* The active account is a row like the others, minus the press: it is
-	   where the keypad already writes, and there is nothing to switch to. A
-	   pocket is not a destination at all — it is part of the account above
-	   it, and steps in to say so. */
-	.account-row--active,
-	.account-row--active:active,
-	.account-row--active:hover,
-	.account-row--pocket,
-	.account-row--pocket:active,
-	.account-row--pocket:hover {
-		background: transparent;
-		cursor: default;
-	}
-
-	.account-row--pocket {
-		padding-left: calc(var(--space-3) + var(--space-4));
-	}
-
-	.account-row--pocket .account-row__name {
+	.acct--pocket .acct__name {
+		font-size: var(--text-base);
 		color: var(--ink-2);
 	}
 
-	.account-row__lines {
-		display: flex;
-		flex: 1;
-		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
-	}
-
-	.account-row :global(.money) {
-		flex: none;
-	}
-
-	.account-row__name {
-		font-size: var(--text-md);
-		color: var(--ink);
-	}
-
-	.account-row__meta {
-		font-size: var(--text-xs);
+	.acct__pocket {
 		color: var(--ink-3);
 	}
 
-	.account-row__go {
-		flex: none;
-		font-size: var(--text-sm);
-		font-weight: 600;
-		color: var(--signal);
+	.acct__amount {
+		font-weight: 400;
+		color: var(--ink-2);
 	}
 
-	.form {
+	.edit {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--hairline);
 	}
 
-	.form-pair {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--space-3);
-	}
-
-	@media (max-width: 360px) {
-		.form-pair {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	.archive-ask {
+	.ask {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-2);
+		gap: var(--space-3);
 		padding: var(--space-3);
-		border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--hairline));
 		border-radius: var(--radius-sm);
 		background: var(--danger-wash);
 	}
 
-	.archive-ask__text {
-		font-size: var(--text-sm);
-		color: var(--ink);
-	}
-
-	.archive-ask__actions {
-		display: flex;
-		gap: var(--space-2);
-	}
-
-	.archive-ask__actions .btn {
-		flex: 1;
-	}
-
-	/* ── data ────────────────────────────────────────────────────────────── */
-
-	.danger {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		padding-top: var(--space-4);
-		border-top: 1px solid var(--hairline);
-	}
-
-	.row-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-2);
-	}
-
-	.row-actions .btn {
-		flex: 1 1 auto;
-	}
-
-	/* ── money elsewhere (Q50) ───────────────────────────────────────────── */
-
 	.pockets {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-	}
-
-	.pockets__list {
 		list-style: none;
 		margin: 0;
 		padding: 0;
@@ -1613,125 +1070,107 @@
 		gap: var(--space-1);
 	}
 
-	/* A pocket sits in a pocket: recessed is --ground-2, like every other
-	   thing inside a card that is held rather than raised. */
-	.pockets__row {
+	.pocket {
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
 		min-height: var(--touch);
 		padding-left: var(--space-3);
 		border-radius: var(--radius-sm);
-		background: var(--ground-2);
+		background: var(--surface-3);
 	}
 
-	.pockets__name {
+	.pocket__name {
 		flex: 1;
 		min-width: 0;
 		font-size: var(--text-md);
-		color: var(--ink);
+		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 
-	.pockets__drop {
+	.pocket__amount {
+		font-weight: 600;
+	}
+
+	.pocket__drop {
 		display: grid;
 		place-items: center;
 		flex: none;
 		width: var(--touch);
 		height: var(--touch);
 		color: var(--ink-3);
-		border-radius: var(--radius-full);
-		transition: color var(--dur-fast) var(--ease-out);
 	}
 
-	.pockets__drop:active {
-		color: var(--danger);
-	}
-
-	@media (hover: hover) {
-		.pockets__drop:hover {
-			color: var(--danger);
-		}
-	}
-
-	.pockets__add {
+	.pocket-add {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 0.7fr) auto;
 		gap: var(--space-2);
 		align-items: stretch;
 	}
 
-	.facts {
-		margin: 0;
-		display: flex;
-		flex-direction: column;
-		font-size: var(--text-md);
+	/* ── categories ──────────────────────────────────────────────────────── */
+
+	.cats {
+		padding-top: var(--space-4);
+		padding-bottom: var(--space-3);
 	}
 
-	/* Every row is 44 px, because one of them holds an action and rows that
-	   change height around a single control read as a mistake. */
-	.facts > div {
+	.cats__label {
+		padding-bottom: var(--space-1);
+	}
+
+	.cat__name {
+		font-size: var(--text-base);
+	}
+
+	.cat--archived {
+		opacity: 0.5;
+	}
+
+	.cats__hint {
+		padding-top: var(--space-3);
+	}
+
+	.cats__foot {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		padding-top: var(--space-3);
+	}
+
+	/* ── sync ────────────────────────────────────────────────────────────── */
+
+	.pair {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
 		gap: var(--space-3);
-		min-height: var(--touch);
-		border-bottom: 1px solid var(--hairline);
 	}
 
-	.facts > div:last-child {
-		border-bottom: none;
+	@media (max-width: 360px) {
+		.pair {
+			grid-template-columns: 1fr;
+		}
 	}
 
-	.facts dt {
-		color: var(--ink-2);
+	.pair__go {
+		min-height: 44px;
+		padding: 0 var(--space-5);
 	}
 
-	.facts dd {
-		margin: 0;
-		color: var(--ink);
+	.sync-state[data-state='error'] {
+		color: var(--danger);
 	}
 
-	.mono {
-		font-family: var(--font-mono);
-		font-variant-numeric: tabular-nums;
+	.sync-state[data-state='idle'] {
+		color: var(--in);
 	}
 
 	.fact-ok {
 		color: var(--in);
 	}
 
-	/* An action inside a data row still has to be a thumb's worth to hit. */
-	.link {
-		display: inline-flex;
-		align-items: center;
-		min-height: var(--touch);
-		padding-inline: var(--space-2);
-		margin-right: calc(var(--space-2) * -1);
-		border-radius: var(--radius-sm);
-		color: var(--signal);
-		font-weight: 600;
-		text-decoration: underline;
-		text-underline-offset: 3px;
-		text-decoration-thickness: 1px;
-		transition: background var(--dur-fast) var(--ease-out);
-	}
-
-	.link:active {
-		background: var(--signal-wash);
-	}
-
-	@media (hover: hover) {
-		.link:hover {
-			background: var(--signal-wash);
-		}
-	}
-
-	.hint {
-		font-size: var(--text-xs);
-		color: var(--ink-3);
-		line-height: var(--leading-base);
+	.form {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
 	}
 </style>

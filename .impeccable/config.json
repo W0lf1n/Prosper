@@ -47,6 +47,12 @@
         ],
         "createdAt": "2026-08-29T20:24:46.388Z",
         "reason": "codebase comment at .meter__fill: width not scaleX because scaling a pill squashes its end radius; animates once on data change, no recurring layout cost"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-09-05T15:28:30.620Z",
+        "reason": "Petr's redesign handoff (docs/redesign/.../README.md, Type section) specifies Inter 400/500/600 as the one family; recorded as the third edition in docs/DECISIONS.md Q53"
       }
     ]
   }

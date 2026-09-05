@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-09-05 · schema v12 · 467 web tests · 50 API tests
+**Last revised:** 2026-09-05 · schema v13 · 479 web tests · 50 API tests
 
 ---
 
@@ -18,7 +18,7 @@ not get built.** Before adding anything, name which law it serves.
 
 | Law           | Mechanism in the app                                                         |
 | ------------- | ---------------------------------------------------------------------------- |
-| **Tracking**  | Launch straight into the keypad; a day with no expense says so, and stays fixable |
+| **Tracking**  | The record screen is one tap from anywhere; Domů leads with the month's net; a day with no expense says so, and stays fixable |
 | **Targeting** | A goal needs a why, an amount and a date; a month gets a target it writes itself |
 | **Trimming**  | `spendType` on every bucket; the 10/10/10/70 split measured against income   |
 | **Training**  | Checks on every keystroke; the record of months; days without an expense     |
@@ -84,10 +84,14 @@ apps/web/src/
 │                  and every rule is unit tested.
 ├─ lib/db/         Dexie schema + migrations, and repo.ts — the only writer.
 ├─ lib/ui/         Hand-rolled components. No component library.
+│                  palette.ts turns a category, an account or a holding into
+│                  its circle — the only reader of Category.icon / .color.
 ├─ lib/styles/     tokens.css (the only place colours exist), app.css, fonts.
-│                  app.css also owns the shared primitives: slab, card, meter,
-│                  tile, btn, field. One definition each, no per-route copies.
-├─ routes/         / · /tape · /mesic · /platby · /cil · /jmeni · /nastaveni
+│                  app.css also owns the shared primitives: page, card, row,
+│                  circle, meter, badge, seg, btn, field, toggle, facts, tile.
+│                  One definition each, no per-route copies.
+├─ routes/         / · /zapis · /tape · /prehled · /ja · /cil · /jmeni · /nastaveni
+│                  (/mesic and /platby redirect into /prehled)
 └─ service-worker.ts
 ```
 
@@ -107,7 +111,7 @@ The runbook is `docs/DEPLOYMENT.md`.
 | `money.ts`        | The **only** place money is computed. Integer haléře, branded   |
 | `amount-input.ts` | Keypad state machine — whole koruny first, haléře after a comma |
 | `datetime.ts`     | `IsoDate` / `IsoDateTime`, month arithmetic, Czech formatting   |
-| `czech.ts`        | Czech plurals — "3 záznamy", not "3 záznamů"                    |
+| `czech.ts`        | Czech plurals — "3 záznamy", not "3 záznamů" — and `capitalize` |
 | `ids.ts`          | UUIDv7, hand-rolled, no dependency                              |
 | `types.ts`        | The data model. Mirrors the server, when there is one           |
 | `accounts.ts`     | One account per currency, pockets, home currency, never-sum-across, transfers |
@@ -145,15 +149,19 @@ Violations are bugs regardless of test status. The long version is
    there, with tests, before it belongs on a screen.
 7. **No check may block a save.** Checks advise, offer a one-tap fix, and get out
    of the way. The one exception in the whole app is the goal form.
-8. **No component library.** Hand-rolled against the token set. `.slab`,
-   `.card`, `.meter`, `.tile` and the `.btn` / `.field` families live once, in
-   `app.css`. A screen that needs a variant declares only the difference — a
+8. **No component library.** Hand-rolled against the token set. The primitives —
+   `.page`, `.card`, `.row`, `.circle`, `.meter`, `.badge`, `.seg`, the `.btn`
+   and `.field` families, `.toggle`, `.facts`, `.tile` — live once, in
+   `app.css`. A screen that needs a variant declares only the difference; a
    scoped rule outranks the global one, so it never restates the recipe.
-9. **Colours only from `tokens.css`**, and the weight ladder is **400 / 600 /
-   700 — 500 does not exist in this app.** Two greps must return nothing: a
-   literal hex outside `tokens.css`, and `font-weight: 500`. The one colour
-   written twice anywhere is the ground, in `app.html`'s `theme-color` and in
-   the manifest, neither of which can take a custom property.
+9. **Colours only from `tokens.css`**, and the weight ladder is **400 / 500 /
+   600 — 700 does not exist in this app, and neither does uppercase.** Three
+   greps must return nothing: a literal hex outside `tokens.css`,
+   `font-weight: 700`, and `text-transform: uppercase`. A category's colour is
+   a palette *key* on the row, never a hex — `lib/ui/palette.ts` turns it into
+   the token. The one colour written twice anywhere is the ground, in
+   `app.html`'s `theme-color` and in the manifest, neither of which can take a
+   custom property.
 10. **No `localStorage` for domain data.** IndexedDB only. `localStorage` holds
     the theme preference and nothing else.
 11. **Czech dates and money through `Intl`**, never hand-rolled. Czech plurals
@@ -164,19 +172,22 @@ Violations are bugs regardless of test status. The long version is
     to an existing one — a released version is already on the phone.
 14. **Update `docs/DECISIONS.md`** whenever a question gets answered or an
     assumption turns out wrong.
-15. **A sheet is closed by pulling it down**, tapping the blurred app behind
-    it, or Esc — never by a button. `Sheet.svelte` owns all three, and the only
-    close *control* left is `visually-hidden`, for assistive technology that
-    cannot produce a drag. A `✕` in the top-right corner of a one-handed app is
-    a target the thumb cannot reach.
-16. **Elevation is luminance; recession is a pocket.** A card is raised because
-    it is lighter than the ground, not because it throws a shadow — real shadow
-    survives only under `Sheet` and `Toaster`, which genuinely float over
-    content. Inside a card, recessed is `--ground-2` and raised is `--raised`;
-    there are no `inset` shadows in the app. Buttons press with `scale(0.95)`,
-    full-bleed rows press by background luminance, and `--radius-full` on a
-    button means "this is the action" and is reserved for it. The long version
-    is `docs/DECISIONS.md` under the second edition.
+15. **A sheet is closed by pulling it down**, tapping the dimmed app behind it,
+    or Esc — never by a close control. `Sheet.svelte` owns all three, and the
+    only close *control* left is `visually-hidden`, for assistive technology
+    that cannot produce a drag. A sheet that commits something carries its own
+    primary pill, and that pill closes it on the way out — a commit is not a
+    close control. A `✕` in the top-right corner of a one-handed app is a target
+    the thumb cannot reach.
+16. **Elevation is luminance; press is luminance; every button is a pill.** A
+    card is raised because it is lighter than the ground — no hairline, no
+    shadow; real shadow survives only under `Sheet` and `Toaster`, which
+    genuinely float over content. Inside a card, recessed is `--ground-2` (the
+    well) and soft is `--surface-3`; there are no `inset` shadows in the app. A
+    pill or a row darkens one step under the thumb and nothing scales. Rank is
+    fill, not shape: `.btn--primary` inverts with the theme, `.btn` is soft,
+    `.btn--card` sits on the ground, `.btn--quiet` is text, `.btn--danger` is
+    an outline. The long version is `docs/DECISIONS.md` under the third edition.
 
 ---
 
@@ -191,14 +202,16 @@ subtracted the just-saved amount from a derived remainder double-counted every
 contribution, because `liveQuery` had already flushed.
 
 **`$store` auto-subscription is not to be trusted outside the main scroll
-region.** On `/mesic` the month switcher lives in `<header>` and rendered against
-the empty first tick, permanently. Subscribe to the `liveQuery` by hand and
-assign into `$state` — a `$state` write invalidates every reader unconditionally.
+region.** On the old `/mesic` the month switcher lived in `<header>` and rendered
+against the empty first tick, permanently. Subscribe to the `liveQuery` by hand
+and assign into `$state` — a `$state` write invalidates every reader
+unconditionally. `/prehled` still does this for its rows, though its switcher
+now scrolls with the page.
 
 **`overflow: hidden` on a flex item is never cosmetic.** It drops the item's
 automatic minimum size to zero. A month card asking for 1 843 px was squashed
 into 422 and silently truncated. Any card inside a scrolling flex column needs
-`flex: none`.
+`flex: none` — `.page > *` in `app.css` says so for every screen.
 
 **IndexedDB cannot index booleans.** `isDeleted`, `isArchived` and `isOneOff` are
 stored but not indexed, and filtered in memory.
@@ -221,7 +234,9 @@ dropped.
 **A field that is absent is not `null`.** The v5 migration backfills
 `scheduleId: null` rather than leaving it undefined, because
 `row.scheduleId === null` would otherwise answer false for the entire existing
-ledger.
+ledger. The same goes for `Category.icon` / `Category.color` (v13): backfilled
+by name, and still read only through `categoryStyle()`, because an old backup
+can bring back a row without them.
 
 **Dexie must not be constructed during SSR/prerender.** `db()` is lazy for
 exactly that reason. `ssr = false`, `prerender = true` in `routes/+layout.ts`.
@@ -232,8 +247,8 @@ screen a navigation re-mounts — but Settings is where the account *switch*
 happens, and its active-account card kept showing the old account after
 `invalidateAll()`, because switching writes only `meta`. A screen that must
 react to the active account changing derives from a table-wide live list
-instead of owning a keyed query. The entry screen joined that club on
-2026-09-02, when the switch moved onto its currency glyph (Q50).
+instead of owning a keyed query. `/zapis` (the account rail) and `/` (the
+month figures) are in that club too.
 
 ---
 
@@ -244,6 +259,8 @@ instead of owning a keyed query. The entry screen joined that club on
 | `docs/PROJECT-PLAN.md`          | The specification. Describes the app **as it stands**. Binding |
 | `docs/DECISIONS.md`             | Every answered question and every deviation. Binding           |
 | `docs/TODO.md`                  | **The only list of unfinished work.** Start here               |
+| `docs/DESIGN.md`                | The design system — third edition, the Revolut-inspired layout |
+| `docs/redesign/`                | The handoff the third edition was built from — prototype + README |
 | `docs/TRIMMING-AND-TRAINING.md` | Laws 3 and 4 — design for what is not built yet                |
 | `docs/INVESTMENTS.md`           | `/jmeni` — what shipped, and items 5–8 which did not           |
 | `docs/RECURRING.md`             | Declared recurring payments — shipped                          |

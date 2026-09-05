@@ -167,12 +167,11 @@
 		justify-content: center;
 		gap: var(--space-2);
 		padding-block: var(--space-2);
-		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
 		font-size: var(--text-3xl);
 		font-weight: 600;
 		line-height: 1;
-		letter-spacing: var(--track-display);
+		letter-spacing: var(--track-3xl);
 		color: var(--ink);
 	}
 
@@ -199,11 +198,9 @@
 		justify-content: center;
 		gap: var(--space-1);
 		min-height: 1.2em;
-		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
 		font-size: var(--text-md);
 		font-weight: 600;
-		letter-spacing: var(--track-tight);
 		color: var(--danger);
 	}
 
@@ -217,7 +214,6 @@
 		align-items: center;
 		gap: var(--space-2);
 		padding: var(--space-2) var(--space-3);
-		border: 1px solid color-mix(in srgb, var(--flag) 42%, var(--hairline));
 		border-radius: var(--radius-sm);
 		background: var(--flag-wash);
 		font-size: var(--text-sm);
@@ -240,11 +236,11 @@
 	.date {
 		flex: 1;
 		min-height: var(--touch);
-		border: 1px solid var(--hairline);
-		border-radius: var(--radius-sm);
-		background: var(--surface-2);
+		border: 1px solid transparent;
+		border-radius: var(--radius-full);
+		background: var(--surface-3);
 		font-size: var(--text-sm);
-		font-weight: 400;
+		font-weight: 600;
 		color: var(--ink-2);
 		transition:
 			background var(--dur-fast) var(--ease-out),
@@ -253,9 +249,9 @@
 	}
 
 	.date--on {
-		background: color-mix(in srgb, var(--signal) 10%, var(--surface));
-		border-color: var(--signal);
-		color: var(--ink);
+		background: var(--pill);
+		border-color: transparent;
+		color: var(--pill-ink);
 		font-weight: 600;
 	}
 </style>

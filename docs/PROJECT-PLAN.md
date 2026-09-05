@@ -80,13 +80,13 @@ laws with no mechanism at all.
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | A `Goal` cannot be saved without **all three** of: a why (min 10 chars), an amount, and a date. The refusal is the mechanism, not a validation nicety — the save button names the missing piece rather than accepting the tap and complaining.                               | `domain/goals.ts` → `validateGoal`, `/cil`                         |
 | **The month is the horizon anybody acts on.** A `MonthTarget` is one month's written commitment. The app can always _compute_ what the month has to carry; that number becomes a target only once he says yes to it, and the screen shows which of the two it is looking at. | `domain/types.ts` → `MonthTarget`, `db/repo.ts` → `setMonthTarget` |
-| The goal is on the launch route, permanently: name, this month's bar, what is still missing.                                                                                                                                                                                 | `ui/GoalStrip.svelte`                                              |
+| The goal is on the launch route, permanently: a card on Domů with this month's figure and its meter, and the same card again on Já. | `/` and `/ja` |
 | Progress is read off the ledger that already exists — money that landed in the goal's bucket, nothing else. No second set of books, which is the only reason it can be trusted.                                                                                              | `domain/goals.ts` → `contributions`                                |
 | Saving into the goal's bucket makes the confirmation say where the month now stands. The cheapest place to put a target in front of somebody is the half-second after they moved towards it.                                                                                 | `/` → `goalLine`                                                   |
 | `SPOŘENÍ` is its own bucket, and is what a new goal points at by default. In the spreadsheet, "dlouhodobá investice" — 2 000 Kč every month without fail — was buried inside OSTATNÍ, so the one number this law needs could not be read.                                    | `db/seed.ts`, `domain/goals.ts` → `defaultGoalCategory`            |
 | Required monthly contribution, computed exactly and **rounded up** — a number that lands a few haléře short every month misses the date.                                                                                                                                     | `domain/goals.ts` → `requiredMonthly`                              |
 | The record of months, ✓ or ✗ against the number he committed to. This is where Targeting turns into Training.                                                                                                                                                                | `domain/goals.ts` → `monthHistory`                                 |
-| The month's net is the first thing on screen, every launch.                                                                                                                                                                                                                  | `ui/MonthTotals.svelte`                                            |
+| The month's net is the first thing on screen, every launch — the hero of Domů. | `/` |
 
 ### 2.3 Trimming — _"necessary" expenses expand to match income_
 
@@ -99,11 +99,11 @@ law is enforced at entry time rather than at review time.
 | Groceries (`POTRAVINY`, need) are separated from eating out (`JÍDLO`, want) — the discretionary half is the half you can act on.                                                                                              | `db/seed.ts`                                       |
 | A description that looks like another bucket raises a one-tap correction **before** the row is saved.                                                                                                                         | `checks.ts` → `misfiled`                           |
 | `OSTATNÍ` is watched: once it passes 15 % of the month's recurring outflow, the app says so — **and the finding opens the month's rows in that bucket, largest first, each with the bucket the vocabulary would move it to.** | `checks.ts` → `other-overflow`, `domain/refile.ts` |
-| One-off spending is separated from the running cost of a month, so a single purchase cannot flatter or ruin the average.                                                                                                      | `Txn.isOneOff`, `/mesic`                           |
+| One-off spending is separated from the running cost of a month, so a single purchase cannot flatter or ruin the average.                                                                                                      | `Txn.isOneOff`, `/prehled`                           |
 | A vague description on a large amount is challenged while it can still be fixed.                                                                                                                                              | `checks.ts` → `vague`                              |
-| The **10 / 10 / 10 / 70 split**, measured against income rather than outflow — a share of outflow always sums to 100 % and can never say whether more went out than came in. Two rings: what you did, and what the book says. | `domain/prosperity.ts`, `/mesic`                   |
+| The **10 / 10 / 10 / 70 split**, measured against income rather than outflow — a share of outflow always sums to 100 % and can never say whether more went out than came in. Two rings: what you did, and what the book says. | `domain/prosperity.ts`, `/prehled`                   |
 | `give` is a spend type of its own. Money given away with nothing expected back is not a want, and filed as one it vanishes into the discretionary pile.                                                                       | `domain/types.ts` — DECISIONS.md Q33               |
-| A recurring payment can be **declared** — what is owed, to whom, out of which bucket, on which day, and how much of it somebody pays back — with its annual cost, net, where it is set.                                       | `domain/recurring.ts`, `/platby`                   |
+| A recurring payment can be **declared** — what is owed, to whom, out of which bucket, on which day, and how much of it somebody pays back — with its annual cost, net, where it is set.                                       | `domain/recurring.ts`, `/prehled`                   |
 
 **Evidence this law needed teeth:** 25 286 Kč of food was filed under BYDLENÍ,
 LIFESTYLE, DARY and PROJEKTY across eight months while JÍDLO reported 13 083 Kč.
@@ -539,323 +539,309 @@ KVĚTEN −45 937, ČERVENEC −10 048 — and no screen he looked at ever said 
 
 ## 8. Screens
 
-Seven. Six of them sit in the tab bar — `/tape`, `/mesic`, `/platby`, `/cil`,
-`/jmeni`, `/nastaveni` — three each side of a record disc that returns to the
-entry screen. **The entry screen carries no tab bar**: the keypad owns the bottom
-of the phone and needs every pixel on a short screen, so its four destinations
-live as glyphs in the header slab instead.
+Five tabs and three detail screens, since the third edition of the design
+(2026-09-05). The bar reads **Domů · Výpis · ⊕ · Přehled · Já**. The disc in the
+middle opens `/zapis`, which carries no bar of its own — the keypad owns the
+bottom of the phone there, and `✕` returns to whatever screen opened it. `/cil`,
+`/jmeni` and `/nastaveni` are reached from Já as cards and keep that tab lit
+while they are open; each wears a back chevron. `/mesic` and `/platby` redirect
+into `/prehled`, so a phone that still has them in its history lands somewhere.
 
-Six is the bar's ceiling, reached on 2026-08-28 when `/platby` became a screen
-and `/jmeni` was asked for down there rather than only in the corner. Seven cells
-on a 320 px phone give each label 46 px; an eighth would give it nothing. (The
-2026-08-29 audit proposed demoting `/jmeni`; Petr declined — the bar stays six.)
+The bar was six cells around a disc until this edition, and at its ceiling. Two
+pairs of screens turned out to be two halves of one question — the month and the
+standing orders are the same month from two sides, and the goal, the wealth and
+the settings are all "about me" — so they became one screen with a switch and
+one hub with cards, and the keypad moved off the launch route so the launch
+route could say how the month stands.
 
-### `/` — Entry (the launch route)
+### `/` — Domů (the launch route)
 
 ```
 ┌────────────────────────────────────┐
-│ SRPEN 2026   [tape][jmění][↻][⚙] │  ← the header slab
-│ −22 301,00 Kč      ↑59 400 ↓81 701 │  ← the month, tap = /mesic
-│ zůstatek měsíce                    │
-│ ┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈ │
-│ Rezerva  ▬ 5 000,00/5 000  splněn  │  ← the goal, always, tap = /cil
-├────────────────────────────────────┤
+│ Září 2026                     [⚙]  │  ← the month · sliders → /nastaveni
 │                                    │
-│         (↓)  249  Kč               │  ← the object, in a pool of light
-│                                    │     the disc IS the direction toggle
-│ [POTRAVINY][JÍDLO][BYDLENÍ][ 🔍 ]  │  ← 3 most-used + search sheet
-│ [dnes] [komu / za co...........▾]  │
-│ mimořádný výdaj [ ○]    dluží mi › │
-│ ⚠ Spíš JÍDLO?          DÁT DO JÍDLO│  ← live check, one-tap fix
-│ ┌────────────────────────────────┐ │
-│ │  7    8    9                   │ │  ← floating slab
-│ │  4    5    6                   │ │
-│ │  1    2    3                   │ │
-│ │  ,    0    ⌫                   │ │
-│ │  [        ULOŽIT        ]      │ │
-│ └────────────────────────────────┘ │
+│           Zůstatek měsíce          │
+│           +4 015,50 Kč             │  ← the month's net, 44 px
+│      [↑ 59 400,00] [↓ 55 384,50]   │
+│ [  Zapsat  ] [ Výpis ] [ Měsíc ]   │  ← the primary pill → /zapis
+│ ┌ K potvrzení ─────────────── ● ┐  │  ← only while a confirm schedule is due
+│ │ (⌂) Internet · BYDLENÍ · dnes  │  │
+│ │ [ Potvrdit ] [ Přeskočit ]     │  │
+│ └────────────────────────────────┘  │
+│ ┌ Cíl · Rezerva ── měsíc splněn ─┐  │  → /cil
+│ │ 5 000,00 Kč    z 5 000,00 Kč   │  │
+│ │ ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ │  │
+│ └────────────────────────────────┘  │
+│ ┌ Jmění celkem ─────────────── › ┐  │  → /jmeni
+│ ┌ Poslední záznamy ─ Zobrazit vše┐  │  → /tape · last three rows, every account
+│ │ (◔) Bolt        LIFESTYLE · Včera │
+├────────────────────────────────────┤
+│  Domů    Výpis   (⊕)  Přehled  Já  │
 └────────────────────────────────────┘
 ```
 
 The month's standing is the first thing visible, every launch — the answer to
-"how am I doing" before anything is typed.
+"how am I doing" before anything is tapped. The figure is the active account's
+month (Q49); the two pills under it are what came in and what went out.
 
-Direction is the **coin**: a disc beside the amount carrying an arrow, tapped to
-flip between výdaj and příjem. It replaced a two-word segmented control, which
-replaced a `−` glyph nobody could read. The ambient light behind the amount takes
-the direction's hue, so which way the money is going is answered before the sign
-is read.
+Everything that used to be a glyph in a header slab is a card here: what the
+standing orders are waiting on, with Potvrdit and Přeskočit under each row
+(`ui/DueCard.svelte`, tapping the row first when the amount needs correcting);
+the goal's month, with its meter and a badge when the month is met or behind;
+the wealth total with its two halves; and the last three rows of the ledger
+across every account, each with its bucket's circle.
 
-When a declared recurring payment is due, a strip appears above the keypad
-offering it: one tap accepts, the amount is editable first, and skipping needs no
-reason (`ui/DueStrip.svelte`).
+### `/zapis` — Zápis (the record screen)
+
+```
+┌────────────────────────────────────┐
+│ (✕)       [ Výdaj │ Příjem ]       │
+│ ┌ (Kč) Běžný účet · CZK  60 369,50┐│  ← the account rail (Q50): swipe = switch
+│ └──────────────────────────────────┘│     · · ·
+│                Výdaj               │
+│             249  (Kč ▾)            │  ← 56 px; the button cycles accounts
+│                                    │
+│ [(🛒) POTRAVINY] [(🍴) JÍDLO] [(⌂)…│  ← ranked, every bucket, search at the end
+│ [ dnes ] [ komu / za co          ] │
+│ (○) mimořádný výdaj     dluží mi › │
+│ ● Spíš JÍDLO?             [JÍDLO]  │  ← live check, one-tap fix
+│      1        2        3           │
+│      4        5        6           │  ← 56 px keys, transparent, lit on press
+│      7        8        9           │
+│      ,        0        ⌫           │
+│ [            Uložit             ]  │
+└────────────────────────────────────┘
+```
+
+The direction is a segmented pill in the header; Příjem preselects the one
+income bucket when there is exactly one. The account is the rail under it: one
+card per account with its colour, its code and its balance, snapping one at a
+time, and the selected card is the account the row is written to and the
+currency the amount is in. Sticky, like the date — the same meta write Settings
+makes, so every other screen follows (Q50). The currency beside the amount is
+text, not a control: the rail is the switch (Q56).
+
+Below the amount: the bucket rail (every category, most-used first, a coloured
+circle on each), the date pill and the payee field, the two rare properties on
+an outflow, and the live check strip with its one-tap fix. Nothing here blocks a
+save; the pill dims and reads _Vyber kategorii_ until there is a bucket.
+
+On save the screen goes home and the toast says what was written — _−410,00 Kč
+· JÍDLO · Restaurace_ — with Zpět on it. The date survives the save, so several
+rows for one back-filled day are typed without re-picking it.
 
 ### `/tape` — Výpis
 
-Reverse-chronological, the account balance on a slab at the top, one floating
-card per month, days separated by score lines, running balance per row, days with
-nothing on them reading `bez výdaje` on a recessed surface, open receivables
-flagged. Tap a row to edit or delete.
+The account's balance on a card at the top, then the ledger newest first: a
+month row with its two figures, and under it one card per day with the day's
+name and net above it. Every row is the bucket's circle, the payee (or the
+bucket's name), the bucket underneath, the signed amount and the running
+balance. A day with nothing on it is one row reading `bez výdaje` behind a teal
+check. Tap a row to edit or delete.
 
-**A month folds.** Its header is the control, and folded it still carries the two
-figures that decide whether to open it — in and out. Which months are shut is
-remembered in `meta`, per device, because a fold that resets on every launch
-buys nothing: the whole point is not scrolling past January again tomorrow.
+**A month folds.** Its row is the control, and folded it still carries the two
+figures that decide whether to open it. Which months are shut is remembered in
+`meta`, per device, because a fold that resets on every launch buys nothing.
 
-The balance slab carries **Srovnat s bankou** and how long it has been since it
-was last done. The sheet shows the ledger's figure first and unprompted, takes
-the statement's figure under it, and computes the difference as you type — this
-is not a memory test, the two numbers are supposed to agree.
+The balance card carries **Srovnat s bankou** and how long it has been since it
+was last done, and **Převod mezi účty** once there is a second account. The
+reconcile sheet shows the ledger's figure first and unprompted, takes the
+statement's figure under it, and computes the difference as you type.
 
-**Dluží mi is on the row.** Tapping a row opens the edit sheet, and an outflow's
-sheet carries the whole of its receivable: mark it received, change the share,
-change who owes it, or clear it. `/mesic` keeps the list of everything
-outstanding — that is the report — but the action lives where the app shows you
-the debt, which is here.
+**Dluží mi is on the row.** The edit sheet of an outflow carries the whole of
+its receivable: mark it received, change the share, change who owes it, add a
+second person, or clear it. Přehled keeps the list of everything outstanding —
+that is the report — but the action lives where the app shows you the debt.
 
 **A difference is offered as a row to write, never as a balance to overwrite.**
-Overwriting would close the gap and destroy the evidence in one move. The
-adjustment is one-off by construction: a correction is not the running cost of a
-month. There is a second, quieter option — record the disagreement and write
-nothing — which is the right answer when the difference is a card payment that
-has not cleared.
+The adjustment is one-off by construction. The quieter second option — record
+the disagreement and write nothing — is the right answer when the difference is
+a card payment that has not cleared.
 
-### `/mesic` — Měsíc
+### `/prehled` — Přehled: Měsíc | Platby
 
-The workbook's `SUMA` sheet, rebuilt, in this order: income / outflow / net; the
-one-off figure separated from the running cost of the month; the goal's month;
-the **Kontrola** panel listing the month's findings; **Dluží mi** — everything
-outstanding, with a one-tap _Přijato_ that creates the repayment; **Rozdělení
-příjmu**; and **Kam to šlo**, buckets ranked by spend with spend-type colouring.
+One title row — _Přehled_ and the month switcher — and a full-width segmented
+pill under it. The month view keeps its own account chips (Q49): per-account is
+a month in that account's currency with everything the screen knows how to say;
+_vše_ lays the currencies side by side and never adds them up.
 
-**Dny bez výdaje** sits above Kontrola: a ring of days that cost nothing against
-days _elapsed_, and the current run of them. It was **Zápisy** — days recorded —
-until 2026-08-28, when a day with nothing on it stopped being a hole and the
-report card would have read 100 % for ever. It keeps its place: this is a
-statement about the month as a whole rather than one of the month's findings.
+**Měsíc** is the workbook's `SUMA` sheet, rebuilt, in this order: the net with
+_Přišlo_ and _Odešlo_ as two tiles and the one-off figure separated from the
+running cost; **Dny bez výdaje** — a ring of days that cost nothing against
+days _elapsed_, and the current run; the **Kontrola** card listing the month's
+findings, each with its fix where one exists; **Dluží mi** — everything
+outstanding, with a one-tap _Přijato_; **Rozdělení příjmu** — the 10/10/10/70
+split as one ring with the remainder in its centre and, beside it, each class
+with its share and its distance from the mark; and **Kam to šlo**, buckets
+ranked by spend, each with its circle and a meter in its own colour. The second
+ring — the book's shape — went with this edition; the label carries the four
+numbers and the deltas carry the comparison.
 
-Rozdělení příjmu is the 10 / 10 / 10 / 70 split as two rings, what you did above
-what the book says, sharing one set of colours so the comparison is made by eye.
-The centre of the first ring carries the remainder — what is left of the month's
-income, or how far past it you went. Each class shows its distance from its mark,
-and one line names the single class furthest below.
+**Platby** is the standing orders and what they cost: the same _K potvrzení_
+card as Domů, the **net year** with the month's figures under it, **Odchází** —
+every declared outflow with its day, its bucket, its mode as a badge, and either
+the payments left or the share somebody pays back — and **Přichází**, money that
+turns up every month on its own, declared the same way on an income category.
+
+### `/ja` — Já
+
+The hub. A title — there is no name and no avatar (Q55) — and three cards: **Cíl** with the goal's total and its meter, **Jmění** with the
+total and how many readings have gone stale, and **Nastavení** as a list of the
+five sections, each opening `/nastaveni` at that section.
 
 ### `/cil` — Cíl
 
-The Targeting law, in three parts and that order: **the why** in his own words at
-the top, before any number; **this month's** figure, with a one-tap _Odložit_
-that writes the ordinary outflow; and **the record of months**, ✓ or ✗ against
-the figure that month was aiming at.
+The Targeting law, in three parts and that order: **the why** in his own words
+in a recessed slab, before any number; **this month's** figure, with a one-tap
+_Odložit_ that writes the ordinary outflow; and **the record of months**, ✓ or
+✗ in a coloured mark against the figure that month was aiming at.
 
 **The month's number writes itself.** `catchUpGoalTargets` puts it there on
 launch — remaining ÷ months left — so the record means something without a
-monthly ritual in front of it, and a bad month raises the next one by itself. It
-was confirmed by hand until 2026-08-28, and the case that mechanism protected
-turned out to be thin: not wanting a goal this month says itself by nothing
-going into it. `Upravit cíl měsíce` is what survived, because *that* was the
-real case — "this month I can do 2 000, not 4 500" is a decision, and the month
-is then marked against 2 000.
+monthly ritual in front of it. `Upravit cíl měsíce` is what survived of the old
+confirm step, because "this month I can do 2 000, not 4 500" is a decision.
 
-**Which goal reaches the entry screen is chosen.** `mít na očích` pins one, and
-a pin beats the nearest-deadline guess absolutely — including for a goal that is
-finished or overdue, because that is exactly the goal somebody wants kept in
-front of them.
+**Which goal reaches Domů is chosen.** `mít na očích` pins one, and a pin beats
+the nearest-deadline guess absolutely — including for a goal that is finished or
+overdue, because that is exactly the goal somebody wants kept in front of them.
 
 The form is the refusal: the save button reads _"Napiš proč"_ until the why
 clears ten characters, _"Zadej termín"_ until the date is in the future. This is
-the one place in the app where something blocks a save — a half-written goal
-records nothing, unlike a half-described expense, which at least holds the
-amount.
+the one place in the app where something blocks a save.
 
 ### `/jmeni` — Jmění
 
-`celkem`: the ledger balance plus every holding's current value, with the two
-halves named separately underneath. Then one card per holding — its value, the
-day that value was true, and the reminder it is counting towards: _"k 3. 6. ·
-připomínka za 12 dní"_, turning amber and counting the other way once the
-reading is older than that holding's own cadence. Tapping one opens the keypad
-sheet to record a new reading.
+_Celkem_ at 40 px, centred; under it two half-width cards — _Na účtu_ and _V
+investicích_ — and one more per foreign currency, standing beside the total
+rather than inside it (Q49). Then one card per reading that has gone stale, with
+_Přepsat hodnotu_ opening the keypad on that holding; then the holdings as rows
+— a circle with a short code in the kind's colour, the name, the day the value
+was true with what was put in, the value and what it did — and _Přidat
+investici_ under them.
 
-**Adding a holding is one sheet** (since 2026-09-05, Q51): the name, what it is
-worth today, what it is, and after how many days to remind — three presets, or
-any number typed. Saving writes the holding and today's reading together, so an
-investment account with 100 000 Kč on it is on the total in one step. Left
-blank, the value is asked on the keypad straight afterwards, and the holding
-shows on the screen as _zatím bez hodnoty_ until it is.
-
-**The reminders are on the screen they are about.** Between the total and the
-list, a _Připomínky_ slab lists every holding past its cadence — the same
-finding Kontrola raises on `/mesic` — with _Zapsat hodnotu_ opening the keypad
-on that holding. It renders nothing while every reading is current.
+**Adding a holding is one sheet** (Q51): the name, what it is worth today, what
+it is, and after how many days to remind. Left blank, the value is asked on the
+keypad straight afterwards.
 
 **Everything about a holding is on this screen**, in two sheets that hand over
 to each other: `ValuationSheet` is the number, and `Upravit investici` inside it
 opens `HoldingSheet` — the name, the kind, the cadence, the bucket that feeds it,
-and archiving. The second one lived in `/settings` until 2026-08-28, which meant
-a holding had two editors on two screens and neither could do the other's job: a
-typo was fixed in Settings and a value was typed here, and nothing said so.
+and archiving.
 
 Below it, a line that has to stay there: the values are what you copied off a
 statement, nothing is fetched, and growth is neither income nor part of the
 month's split.
 
-### `/platby` — Pravidelné platby
-
-The standing orders, and what they cost. The figure at the top is the **net
-year**: the gross is what the balance sees on the 15th, the net is what the
-decision is made against once a shared payment's half comes back (Q46).
-
-Two lists, because they answer two questions. **Odchází** — every declared
-outflow, with its day, its bucket, its mode, and either the year or how many
-payments are left on a mortgage; a shared one carries a second line naming who
-pays back how much and what it leaves. **Přichází** — money that turns up every
-month on its own, declared the same way on an income category.
-
-The confirmation strip is here as well as on the entry screen. There because it
-must not be missed; here because this is the screen somebody opens *to deal
-with* standing orders.
-
 ### `/nastaveni` — Nastavení
 
-Account name, opening balance and **peníze jinde** (pockets, Q50) · the other
-accounts with **Přepnout**, **Přidat účet** for a currency not yet held, and
-**Převod** · category management (rename, spend type, archive, add) · theme ·
-sync pairing and the last cycle, to the minute · JSON export/import backup,
-storage-persistence status, schema version · **Začít znovu**. It was
-`/settings` until 2026-09-05 (Q52); the screen has always been called
-Nastavení, and the address now says so too.
+Five cards, each with an anchor the rows on Já point at. **Účty**: every live
+account with what is on it right now, by currency, the pockets that joined it
+(Q50) indented under it; _Přidat účet_ for a currency not yet held, _Upravit_
+for the opening figures and the pockets, _Převod_ once there are two; tapping an
+account that is not the active one makes it the account the keypad writes to.
+**Kategorie**: one row per bucket with its circle, its type and a chevron —
+tapping opens the editor (`ui/CategorySheet.svelte`): name, type, ten colours,
+thirty-two icons, and archiving; colour and icon apply live, everywhere the
+bucket appears. _Nová kategorie_ opens the same sheet empty. **Vzhled**: systém
+/ světlý / tmavý. **Synchronizace**: pairing, or the last cycle to the minute.
+**Data**: the JSON backup out and in, the spreadsheet, the counts, and **Začít
+znovu** — the app's only destructive action, behind a typed phrase and a backup
+ticked by default (`resetLedger` in `repo.ts`, `domain/reset.ts` for the phrase).
 
-**The account list shows the balances, by currency, and what each one is made
-of.** Every live account with what is on it right now, and under it every
-pocket it holds (Q50) — _CZK · celkem 20 000 Kč_, then _Běžný účet 15 000 Kč_
-and _Revolut · jinde 5 000 Kč_; a euro account is its own group with its own
-figure and joins nothing. The account's own line carries every row, because a
-pocket is opening money and nothing spent afterwards is attributed back to the
-card it came from. That per-currency sum is exactly what `/mesic`'s _vše_ and
-`/jmeni`'s _Na účtu_ print, and this is the one place it is broken back into
-its parts (`balancesByCurrency` in `domain/ledger.ts`). The active account is
-marked _zapisuje se sem_; tapping any other one switches to it.
-
-**The account card is setup, not maintenance.** Three fields typed once, and it
-folds to a single line — name, opening balance, the day it was true, and what
-sits elsewhere — the moment the ledger has a row in it. It is not disabled: a
-wrong opening balance is precisely what reconciling finds out three months
-later, and a setting nobody can reach is a bug report. `Upravit` opens it again.
-
-**One account per currency** (Q50). The add form offers only currencies no
-live account holds and disappears when there are none. Koruny on another card
-are not a second CZK account: they are a *pocket* on the CZK account — a name
-and an amount that opened it — and every flow after that is a row like any
-other. The switch between accounts also lives on the entry screen, on the
-currency glyph beside the amount, and the ground of every screen takes the
-colour of a foreign currency so the account being written to is known before a
-digit is typed.
-
-**Začít znovu** is the app's only destructive action and the only place friction
-is the point. A sheet, a list of what goes and what stays, a backup box ticked by
-default, and the phrase `začínám znovu` typed out before the button will fire —
-a confirm dialog is dismissed by the same tap that opened it, and thirteen
-characters cannot be muscle memory. The wipe itself is `resetLedger` in
-`repo.ts`: soft-deletes every recorded row, keeps the categories and the account,
-and puts the opening balance back to zero as of today, which is what re-opens the
-account card. `domain/reset.ts` owns the phrase.
-
-Two things moved out. Pravidelné platby lived here until 2026-08-28 and is now
-`/platby`: a standing order is not a setting, it is the part of the ledger that
-has not happened yet. **Jmění** went the same day, to `/jmeni`, for the reason
-above it.
-
----
+**One account per currency** (Q50). Koruny on another card are a *pocket* on the
+CZK account — a name and an amount that opened it. The switch between accounts
+lives on the record screen's rail as well as here, and the ground of every
+screen takes the colour of a foreign currency so the account being written to
+is known before a digit is typed.
 
 ## 9. Design
 
-The system is called **graphite instrument**, and it replaced the "quiet blue
-paper" palette this document originally specified. Tokens live in
-`lib/styles/tokens.css` and are the only place colours are defined.
+The third edition, delivered 2026-09-05 as a high-fidelity handoff
+(`docs/redesign/…/design_handoff_prosper_revolut/README.md`) and applied as
+specified: a consumer-banking layout in the manner of Revolut. A soft-grey
+ground, white cards with 20 px corners and no shadow, one proportional sans at
+three weights, every button a pill, every bucket a coloured circle with an icon
+in it, and a five-slot bar with a record disc in the middle. Tokens live in
+`lib/styles/tokens.css` and that is the only place a colour is defined; the
+reasoning behind each move is in `DECISIONS.md` under the third edition.
+
+**Light first.** The default is the light theme; dark — a black ground with
+near-black cards — is the system preference or the explicit choice. Both are
+declared twice, once for `prefers-color-scheme` and once for `[data-theme]`, so
+the toggle wins in both directions, and an explicit choice moves `color-scheme`
+with it.
 
 **A sheet has no close button.** It is pulled down by its grip, dismissed by
-tapping the blurred app behind it, or by Esc. The `✕` in the top-right went on
-2026-08-28: it was the one corner a thumb cannot reach on a phone held in one
-hand, next to a grip that already said how the thing opens and shuts.
+tapping the dimmed app behind it, or by Esc. A sheet that commits something
+carries its own primary pill, and that pill closes it on the way out — a commit
+is not a close control.
 
-**Dark first.** The app is used one-handed, in bed, with the lights off, so the
-graphite theme is the one it was designed for and the light theme is its daylight
-counterpart — not the other way round. Both palettes are declared twice, once for
-the system preference and once for an explicit `data-theme`, so the toggle wins
-in both directions. An explicit choice moves `color-scheme` with it, or the
-browser keeps painting native controls from the system preference.
+### The colour rules
 
-### The colour rules, and they are short
+The values are **not restated here** — `tokens.css` is the single source and
+carries the charter in its header. What is binding are the roles:
 
-The values are **not restated here**. This section used to print the
-first-edition palette and drifted the moment the second edition landed — the
-2026-08-29 audit had to detect that by diffing this table against the file.
-`apps/web/src/lib/styles/tokens.css` is the single source for every value and
-carries the charter in its header; what is binding here are the roles:
-
-- **`--signal` (blue) is the chrome accent: the primary action, the current
-  selection, links, the focus ring. Nothing else.** It is never decoration and
-  never a data colour.
-- **Mint (`--in`) is money coming in, and a money verdict that came out right**
-  — a passed check, a met month, a day that cost nothing. Ruled 2026-08-29;
-  the boundary against `--signal` stays sharp because mint is never chrome.
+- **The primary pill inverts**: ink on white by day, white on black by night. It
+  is the primary action, the selected segment, the selected chip.
+- **`--signal` (cobalt) is the accent**: the record disc, links, the goal's
+  meter, a toggle that is on. Never decoration, and never a data colour —
+  the one exception is the category palette, which the person picks, and which
+  happens to contain the same cobalt under its own name.
+- **Mint (`--in`) is money coming in, and a money verdict that came out right** —
+  a met month, a day that cost nothing, a passed check.
 - **Money going out has no hue.** It is the ink. Most rows in a ledger are
-  outflow, and forty red numbers is noise, not information. The one place this is
-  deliberately suspended is the ambient pool behind the entry amount, where there
-  is exactly one number on screen and the whole question is which way it points.
-- **`--flag` (amber) means look at this. `--danger` (coral) means destroy or
-  refuse.**
-- **Elevation is luminance.** Each step up is a step lighter; shadows only
-  confirm what luminance already said. The scale **inverts** between themes, so a
-  control uses `--raised` rather than hard-coding an end of it.
-- The 10/10/10/70 split has four colours of its own, chosen to stay apart at a
-  glance in a ring thirteen units thick — debt is copper, a quarter turn of hue
-  from both amber and coral. `--split-left` is the shared "empty": every meter
-  track and ring remainder, visible against the card in both themes, because a
-  denominator you infer is not a denominator.
+  outflow, and forty red numbers is noise, not information.
+- **`--flag` (amber) means look at this. `--danger` means destroy or refuse.**
+- **A category's colour is a name.** Ten hues, stored as keys, the same in both
+  themes under a white glyph, because a bucket's colour does not change with the
+  lights. The four split classes borrow four of them; the denominator of every
+  meter and ring is the soft surface.
 
 ### Form
 
-- **Slabs, not sheets.** Every surface has a hairline, a lit top edge, a soft
-  shadow and a 20 px radius, and sits above a graphite ground with a fine grain
-  over it. The grain is the difference between a flat fill and a material.
-- **The amount sits in light.** A radial glow behind it, nothing else near it —
-  the one "object" on the screen. Pure CSS; there is no 3D asset to download.
+- **Cards, not slabs.** A card is white on the ground and raised by nothing but
+  luminance. No hairline, no lit edge, no shadow — the two layers that genuinely
+  float, the sheet and the toast, are the only shadows in the app.
+- **Every button is a pill.** Primary 48 px, secondary 40 px, small 32 px; a
+  card-coloured pill sits on the ground, a soft one inside a card. The old rule
+  that reserved the pill for the primary action is gone; rank is fill, not shape.
+- **Circles carry identity.** A bucket, an account, a holding — 40 px in a list
+  row, 34 in Settings, 28 inside a chip, 52 on a preview — its colour behind a
+  white glyph or a short code.
+- **Recession is the ground.** Inside a card, the recessed slab — the goal's
+  why — is the ground's own colour; a track or a chip is the soft surface.
+- **Press is luminance.** A pill or a row darkens one step under the thumb.
+  Nothing scales.
 - **App shell.** The window never scrolls. Each screen is a fixed frame with its
   own internal scrolling, which is what guarantees the keypad can never be
   pushed below the fold.
 
-### Type — the signature
+### Type
 
-- UI / body: the **system stack** — real SF Pro on Apple hardware, the platform
-  sans elsewhere, zero bytes either way. Instrument Sans left with the second
-  edition.
-- **All money is monospace, always** — IBM Plex Mono, `tabular-nums`,
-  right-aligned. Columns of amounts align to the decimal. This is functional and
-  it is the visual identity.
-- The largest type on any screen is a mono amount. No decorative display face.
-- Eight fixed sizes, never fluid. The single `clamp()` in the system is the
-  keypad amount, and that one is a hero rather than a heading.
-- Uppercase is allowed in exactly one place: `.u-label`, the micro-label. These
-  are machine labels on an instrument, not headings in a document.
-- The one shipped face, IBM Plex Mono, is **self-hosted** (latin + latin-ext).
-  A font CDN would break the offline promise.
+- **One family: Inter**, self-hosted as a variable face (latin + latin-ext,
+  400–600), because a font CDN would break the offline promise. IBM Plex Mono
+  left with this edition; money is Inter 600 with tabular figures, and the
+  whole app is set `tabular-nums` so a column of amounts still lines up.
+- The ladder is 400 / 500 / 600. 500 lives in two places: the keypad's digits
+  and the currency beside the amount.
+- Sizes are fixed, not fluid: 11 for tab labels, 13 for card labels and subs,
+  15 for body and rows, 22 for a card figure, 28 for a screen title, 34 for a
+  big figure, 44 for the home hero, 56 for the amount being typed.
+- **Card labels are sentence case.** Nothing in the app is uppercase any more.
 
-### Money toasts
+### Motion
 
-Saving money is not the same event as saving a setting, and does not look like
-one: the amount at 28 px in the direction's colour, an arrow badge, bucket and
-payee underneath, undo, and a spring-in landing. The toast lifts itself clear of
-the tab bar on screens that have one.
+Press by luminance. The toast fades and rises in 220 ms and stays 2.6 s — six
+with an undo on it. The toggle's knob moves in 150 ms. The account rail and the
+category rail are native horizontal scroll; the account rail snaps one card at
+a time. `prefers-reduced-motion` turns all of it off.
 
 ### Quality floor, unannounced
 
-Thumb-reachable primary actions and a **44 px minimum touch target**. Small
-controls are drawn at 24 px and recover the target with a transparent inset,
-which is why rows of them keep a derived gutter — that gutter is where the hit
-areas live. Visible keyboard focus, `prefers-reduced-motion` respected, works at
-320 px width, keypad fully operable from a hardware keyboard, and text on the
-bare ground is never small (it belongs on a slab).
+Thumb-reachable primary actions and a **44 px minimum touch target** — primary
+pills 48, keys 56, tab cells at least 44. Visible keyboard focus, works at 320 px
+width, the keypad fully operable from a hardware keyboard, and small text never
+sits on the bare ground — it belongs in a card.
 
 ---
 

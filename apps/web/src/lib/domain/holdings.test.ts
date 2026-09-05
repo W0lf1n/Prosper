@@ -375,6 +375,8 @@ describe('holdings never reach the month summary or the split', () => {
 			sortOrder: 0,
 			isArchived: false,
 			isIncome: false,
+			icon: 'tag',
+			color: 'stone',
 			...SYNCED
 		},
 		{
@@ -386,6 +388,8 @@ describe('holdings never reach the month summary or the split', () => {
 			sortOrder: 1,
 			isArchived: false,
 			isIncome: true,
+			icon: 'tag',
+			color: 'stone',
 			...SYNCED
 		}
 	];
