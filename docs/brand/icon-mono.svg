@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Prosper">
+  <g transform="rotate(-90 256 256)" fill="none" stroke="currentColor" stroke-width="60">
+    <circle cx="256" cy="256" r="162" stroke-dasharray="87.8 930.1" stroke-dashoffset="-7.0"></circle>
+    <circle cx="256" cy="256" r="162" stroke-dasharray="87.8 930.1" stroke-dashoffset="-108.8"></circle>
+    <circle cx="256" cy="256" r="162" stroke-dasharray="87.8 930.1" stroke-dashoffset="-210.6"></circle>
+    <circle cx="256" cy="256" r="162" stroke-dasharray="698.5 319.4" stroke-dashoffset="-312.4"></circle>
+  </g>
+</svg>

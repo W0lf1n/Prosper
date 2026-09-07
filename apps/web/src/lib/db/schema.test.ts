@@ -1,0 +1,564 @@
+/**
+ * Migrations, exercised the only way that proves anything: build the database
+ * at the *old* version, put old-shaped rows in it, then open it with the
+ * current code and look at what came out.
+ *
+ * A released version is already on the phone, so a migration that has only ever
+ * run against an empty database has not been tested at all.
+ */
+
+import 'fake-indexeddb/auto';
+import Dexie from 'dexie';
+import { describe, expect, it } from 'vitest';
+
+import { FinanceDb, SCHEMA_VERSION, migrations } from './schema';
+
+/** A database built from the migrations up to `version`, and no further. */
+async function openAtVersion(name: string, version: number): Promise<Dexie> {
+	const old = new Dexie(name);
+	for (const migration of migrations.filter((m) => m.version <= version)) {
+		const declared = old.version(migration.version).stores(migration.stores);
+		if (migration.upgrade) declared.upgrade(migration.upgrade);
+	}
+	await old.open();
+	return old;
+}
+
+const SYNCED = { updatedAt: '2026-08-01T00:00:00.000Z', deviceId: 'old', isDeleted: false };
+
+describe('the migration array', () => {
+	it('is ordered, gapless, and starts at 1', () => {
+		expect(migrations.map((m) => m.version)).toEqual(
+			Array.from({ length: migrations.length }, (_, i) => i + 1)
+		);
+	});
+
+	it('reports the last entry as the schema version', () => {
+		expect(SCHEMA_VERSION).toBe(migrations[migrations.length - 1]!.version);
+	});
+});
+
+describe('v5 → v6 — Holding.startDate', () => {
+	it('backfills from the holding’s earliest reading', async () => {
+		const name = `mig-earliest-${Date.now()}`;
+		const old = await openAtVersion(name, 5);
+		await old.table('holdings').put({
+			id: 'h1',
+			name: 'Penzijko',
+			kind: 'investment',
+			currency: 'CZK',
+			categoryId: null,
+			reminderDays: 90,
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		await old.table('valuations').bulkPut([
+			{
+				id: 'v2',
+				holdingId: 'h1',
+				date: '2026-05-17',
+				value: 200_000_00,
+				note: null,
+				createdAt: '2026-05-17T09:00:00.000Z',
+				...SYNCED
+			},
+			{
+				id: 'v1',
+				holdingId: 'h1',
+				date: '2026-03-04',
+				value: 100_000_00,
+				note: null,
+				createdAt: '2026-03-04T09:00:00.000Z',
+				...SYNCED
+			}
+		]);
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const holding = await upgraded.holdings.get('h1');
+
+		// The first of the month of the earliest reading — never later, so it can
+		// never claim a contribution the holding might not have received.
+		expect(holding?.startDate).toBe('2026-03-01');
+		upgraded.close();
+	});
+
+	it('falls back to the current month for a holding never valued', async () => {
+		const name = `mig-blank-${Date.now()}`;
+		const old = await openAtVersion(name, 5);
+		await old.table('holdings').put({
+			id: 'h2',
+			name: 'ETF',
+			kind: 'investment',
+			currency: 'CZK',
+			categoryId: null,
+			reminderDays: 30,
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const holding = await upgraded.holdings.get('h2');
+
+		expect(holding?.startDate).toBe(`${new Date().toISOString().slice(0, 7)}-01`);
+		upgraded.close();
+	});
+
+	it('leaves every other field alone', async () => {
+		const name = `mig-intact-${Date.now()}`;
+		const old = await openAtVersion(name, 5);
+		await old.table('holdings').put({
+			id: 'h3',
+			name: 'Spořicí účet',
+			kind: 'savings',
+			currency: 'CZK',
+			categoryId: 'cat-save',
+			reminderDays: 7,
+			isArchived: false,
+			sortOrder: 3,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const holding = await upgraded.holdings.get('h3');
+
+		expect(holding).toMatchObject({
+			name: 'Spořicí účet',
+			kind: 'savings',
+			categoryId: 'cat-save',
+			reminderDays: 7,
+			sortOrder: 3,
+			updatedAt: SYNCED.updatedAt
+		});
+		upgraded.close();
+	});
+});
+
+describe('v4 → v5 — Txn.scheduleId', () => {
+	it('backfills null rather than leaving the field absent', async () => {
+		const name = `mig-sched-${Date.now()}`;
+		const old = await openAtVersion(name, 4);
+		await old.table('txns').put({
+			id: 't1',
+			accountId: 'acc',
+			date: '2026-07-04',
+			amount: -24900,
+			categoryId: 'cat',
+			payee: 'Oběd',
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			createdAt: '2026-07-04T10:00:00.000Z',
+			isOneOff: false,
+			owedAmount: null,
+			owedBy: null,
+			settledByTxnId: null,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const txn = await upgraded.txns.get('t1');
+
+		// `undefined` would make `row.scheduleId === null` answer false for the
+		// entire pre-existing ledger, which is the whole reason this backfills.
+		expect(txn).toHaveProperty('scheduleId');
+		expect(txn?.scheduleId).toBeNull();
+		upgraded.close();
+	});
+});
+
+describe('v6 → v7 — the share of a schedule that comes back', () => {
+	it('backfills null on a schedule declared before the field existed', async () => {
+		const name = `mig-owed-${Date.now()}`;
+		const old = await openAtVersion(name, 6);
+		await old.table('schedules').put({
+			id: 's1',
+			payee: 'Hypotéka',
+			categoryId: 'cat-home',
+			amount: -30_000_00,
+			dayOfMonth: 15,
+			startMonth: '2026-01',
+			endMonth: '2051-12',
+			mode: 'auto',
+			lastPostedMonth: '2026-07',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const schedule = (await upgraded.schedules.get('s1')) as unknown as {
+			owedAmount?: number | null;
+			owedBy?: string | null;
+		};
+
+		// Absent is not null: `row.owedAmount === null` has to answer true for
+		// every schedule that existed before the field did. The fields left the
+		// model at v9, but the v7 backfill still has to have happened — v9 reads
+		// them to build the shares array.
+		expect(schedule).toHaveProperty('owedAmount');
+		expect(schedule.owedAmount).toBeNull();
+		expect(schedule.owedBy).toBeNull();
+		// And the payment itself is untouched.
+		expect(schedule).toMatchObject({
+			amount: -30_000_00,
+			mode: 'auto',
+			lastPostedMonth: '2026-07'
+		});
+		upgraded.close();
+	});
+});
+
+describe('v8 → v9 — one share becomes a list of them', () => {
+	it('wraps an existing share into a one-element array, settlement and all', async () => {
+		const name = `mig-shares-${Date.now()}`;
+		const old = await openAtVersion(name, 8);
+		await old.table('txns').put({
+			id: 't-shared',
+			accountId: 'acc',
+			date: '2026-08-15',
+			amount: -250000,
+			categoryId: 'cat',
+			payee: 'plyn',
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			createdAt: '2026-08-15T10:00:00.000Z',
+			isOneOff: false,
+			owedAmount: 125000,
+			owedBy: 'Bea',
+			settledByTxnId: 'txn-repayment',
+			scheduleId: null,
+			...SYNCED
+		});
+		await old.table('schedules').put({
+			id: 's-shared',
+			payee: 'Hypotéka',
+			categoryId: 'cat-home',
+			amount: -30_000_00,
+			dayOfMonth: 15,
+			startMonth: '2026-01',
+			endMonth: null,
+			mode: 'auto',
+			owedAmount: 15_000_00,
+			owedBy: 'Partner',
+			lastPostedMonth: '2026-07',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const txn = await upgraded.txns.get('t-shared');
+		const schedule = await upgraded.schedules.get('s-shared');
+
+		// The same id `sharesOf()` synthesises at read time, so the share keeps
+		// its identity whichever path a legacy row took into this build.
+		expect(txn?.shares).toEqual([
+			{ id: 'legacy', who: 'Bea', amount: 125000, settledByTxnId: 'txn-repayment' }
+		]);
+		expect(schedule?.shares).toEqual([{ id: 'legacy', who: 'Partner', amount: 15_000_00 }]);
+		upgraded.close();
+	});
+
+	it('backfills an empty array rather than leaving the field absent', async () => {
+		const name = `mig-shares-empty-${Date.now()}`;
+		const old = await openAtVersion(name, 8);
+		await old.table('txns').put({
+			id: 't-plain',
+			accountId: 'acc',
+			date: '2026-08-15',
+			amount: -24900,
+			categoryId: 'cat',
+			payee: 'Oběd',
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			createdAt: '2026-08-15T10:00:00.000Z',
+			isOneOff: false,
+			owedAmount: null,
+			owedBy: null,
+			settledByTxnId: null,
+			scheduleId: null,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const txn = await upgraded.txns.get('t-plain');
+
+		// An absent field is not an empty list — every reader would need a guard
+		// for ever, which is the v5 lesson all over again.
+		expect(txn).toHaveProperty('shares');
+		expect(txn?.shares).toEqual([]);
+		upgraded.close();
+	});
+});
+
+describe('v9 → v10 — Goal.startAmount', () => {
+	it('backfills zero on a goal written before the field existed', async () => {
+		const name = `mig-start-${Date.now()}`;
+		const old = await openAtVersion(name, 9);
+		await old.table('goals').put({
+			id: 'g-old',
+			name: 'Rezerva na půl roku',
+			why: 'Abych mohl dát výpověď, aniž bych panikařil.',
+			targetAmount: 180_000_00,
+			targetDate: '2027-06-30',
+			linkedAccountId: null,
+			categoryId: 'cat-sporeni',
+			startDate: '2026-02-01',
+			isPinned: false,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const goal = await upgraded.goals.get('g-old');
+
+		// Absent would be NaN in every sum, and zero is also the honest value —
+		// a goal written before the field existed never claimed a head start.
+		expect(goal).toHaveProperty('startAmount');
+		expect(goal?.startAmount).toBe(0);
+		upgraded.close();
+	});
+});
+
+describe('v10 → v11 — Schedule.accountId', () => {
+	it('backfills the active account from meta', async () => {
+		const name = `mig-schedacct-${Date.now()}`;
+		const old = await openAtVersion(name, 10);
+		await old.table('accounts').put({
+			id: 'acc-kb',
+			name: 'Běžný účet',
+			kind: 'checking',
+			openingBalance: 0,
+			openingDate: '2026-01-01',
+			currency: 'CZK',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		await old.table('meta').put({ key: 'activeAccountId', value: 'acc-kb' });
+		await old.table('schedules').put({
+			id: 's-net',
+			payee: 'Netflix',
+			categoryId: 'cat',
+			amount: -39900,
+			dayOfMonth: 5,
+			startMonth: '2026-01',
+			endMonth: null,
+			mode: 'confirm',
+			shares: [],
+			lastPostedMonth: '2026-07',
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const schedule = await upgraded.schedules.get('s-net');
+
+		// Every schedule meant the active account while there was only one.
+		expect(schedule?.accountId).toBe('acc-kb');
+		upgraded.close();
+	});
+
+	it('falls back to the first live account when meta never said', async () => {
+		const name = `mig-schedacct-fb-${Date.now()}`;
+		const old = await openAtVersion(name, 10);
+		await old.table('accounts').bulkPut([
+			{
+				id: 'acc-dead',
+				name: 'Smazaný',
+				kind: 'checking',
+				openingBalance: 0,
+				openingDate: '2026-01-01',
+				currency: 'CZK',
+				isArchived: false,
+				sortOrder: 0,
+				...SYNCED,
+				isDeleted: true
+			},
+			{
+				id: 'acc-live',
+				name: 'Běžný účet',
+				kind: 'checking',
+				openingBalance: 0,
+				openingDate: '2026-01-01',
+				currency: 'CZK',
+				isArchived: false,
+				sortOrder: 1,
+				...SYNCED
+			}
+		]);
+		await old.table('schedules').put({
+			id: 's-hypo',
+			payee: 'Hypotéka',
+			categoryId: 'cat',
+			amount: -30_000_00,
+			dayOfMonth: 15,
+			startMonth: '2026-01',
+			endMonth: null,
+			mode: 'auto',
+			shares: [],
+			lastPostedMonth: null,
+			isArchived: false,
+			sortOrder: 0,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		expect((await upgraded.schedules.get('s-hypo'))?.accountId).toBe('acc-live');
+		upgraded.close();
+	});
+});
+
+describe('v7 → v8 — which goal is na očích', () => {
+	it('backfills false on a goal written before the field existed', async () => {
+		const name = `mig-pin-${Date.now()}`;
+		const old = await openAtVersion(name, 7);
+		await old.table('goals').put({
+			id: 'g1',
+			name: 'Rezerva na půl roku',
+			why: 'Abych mohl dát výpověď, aniž bych panikařil.',
+			targetAmount: 180_000_00,
+			targetDate: '2027-06-30',
+			linkedAccountId: null,
+			categoryId: 'cat-sporeni',
+			startDate: '2026-02-01',
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const goal = await upgraded.goals.get('g1');
+
+		// Absent is not false: `pickPrimary` asks `goal.isPinned` of every row,
+		// and an undefined would read the same as "not chosen" right up until
+		// something tried to un-choose it.
+		expect(goal).toHaveProperty('isPinned');
+		expect(goal?.isPinned).toBe(false);
+		// The goal itself is untouched — this migration adds, it does not decide.
+		expect(goal).toMatchObject({
+			targetAmount: 180_000_00,
+			targetDate: '2027-06-30',
+			startDate: '2026-02-01'
+		});
+		upgraded.close();
+	});
+});
+
+describe('v11 → v12 — Account.pockets', () => {
+	it('backfills an empty list on every account, and keeps one that already exists', async () => {
+		const name = `mig-pockets-${Date.now()}`;
+		const old = await openAtVersion(name, 11);
+		await old.table('accounts').bulkPut([
+			{
+				id: 'acc-kb',
+				name: 'Běžný účet',
+				kind: 'checking',
+				openingBalance: 20_000_00,
+				openingDate: '2026-01-01',
+				currency: 'CZK',
+				isArchived: false,
+				sortOrder: 0,
+				...SYNCED
+			},
+			{
+				id: 'acc-odd',
+				name: 'Z novější zálohy',
+				kind: 'checking',
+				openingBalance: 0,
+				openingDate: '2026-01-01',
+				currency: 'EUR',
+				isArchived: false,
+				sortOrder: 1,
+				pockets: [{ id: 'p1', name: 'Revolut', amount: 5_000_00 }],
+				...SYNCED
+			}
+		]);
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const kb = await upgraded.accounts.get('acc-kb');
+		const odd = await upgraded.accounts.get('acc-odd');
+
+		// An absent field is not an empty list — every reader would need a guard.
+		expect(kb?.pockets).toEqual([]);
+		expect(odd?.pockets).toEqual([{ id: 'p1', name: 'Revolut', amount: 5_000_00 }]);
+		upgraded.close();
+	});
+});
+
+describe('v12 → v13 — Category.icon and Category.color', () => {
+	it('gives a seeded bucket its own look and an unknown one the plain tag', async () => {
+		const name = `mig-style-${Date.now()}`;
+		const old = await openAtVersion(name, 12);
+		await old.table('categories').bulkPut([
+			{
+				id: 'cat-jidlo',
+				parentId: null,
+				name: 'Jídlo',
+				spendType: 'want',
+				monthlyCap: null,
+				sortOrder: 0,
+				isArchived: false,
+				isIncome: false,
+				...SYNCED
+			},
+			{
+				id: 'cat-pes',
+				parentId: null,
+				name: 'PES',
+				spendType: 'want',
+				monthlyCap: null,
+				sortOrder: 1,
+				isArchived: false,
+				isIncome: false,
+				...SYNCED
+			},
+			{
+				id: 'cat-styled',
+				parentId: null,
+				name: 'POTRAVINY',
+				spendType: 'need',
+				monthlyCap: null,
+				sortOrder: 2,
+				isArchived: false,
+				isIncome: false,
+				icon: 'coffee',
+				color: 'red',
+				...SYNCED
+			}
+		]);
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		// By name, case and diacritics aside: a renamed "Jídlo" still eats with a fork.
+		expect(await upgraded.categories.get('cat-jidlo')).toMatchObject({
+			icon: 'utensils',
+			color: 'orange'
+		});
+		// Nothing the seed knows about: the plain tag on stone.
+		expect(await upgraded.categories.get('cat-pes')).toMatchObject({ icon: 'tag', color: 'stone' });
+		// A style that already exists — a merge from a newer device — is kept.
+		expect(await upgraded.categories.get('cat-styled')).toMatchObject({
+			icon: 'coffee',
+			color: 'red'
+		});
+		upgraded.close();
+	});
+});

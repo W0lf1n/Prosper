@@ -1,0 +1,384 @@
+/**
+ * Design tokens — third edition, 2026-09-05. Soft-grey ground, white cards,
+ * one proportional sans, pills and circles.
+ *
+ * The "graphite instrument" of the first two editions is retired with its
+ * grain, its ambient pool and its monospace money. What replaces it is a
+ * consumer-banking layout: a ground the cards float on by luminance, one
+ * family of type at three weights, every button a pill, every category a
+ * coloured circle with an icon in it. The handoff that specifies it is
+ * `docs/redesign/third-edition-handoff/README.md`; the reasoning is
+ * in `docs/DECISIONS.md` under the third edition.
+ *
+ * The colour roles keep their names and most of their meaning:
+ *   · SIGNAL (cobalt) is the accent: the record disc, links, the avatar, the
+ *     goal meter, the active toggle. Still never a data colour — the one
+ *     exception is the category palette, which the person picks, and which
+ *     happens to contain the same cobalt under its own name.
+ *   · The PILL is the primary action: ink on the light theme, white on the
+ *     dark one. Two tokens, because a pill inverts between themes and nothing
+ *     else does.
+ *   · --in is money coming in and a verdict that came out right; --flag says
+ *     look at this; --danger says destroy or refuse. Money going out has no
+ *     hue at all — it is the ink.
+ *   · The category palette is theme-independent: the same ten hues under a
+ *     white glyph in both themes, because a category's colour is a name and a
+ *     name does not change with the lights.
+ *
+ * Weight ladder: 400 / 500 / 600. Inter, self-hosted as a variable face.
+ */
+
+:root {
+	color-scheme: light dark;
+
+	/* ═══ light — the default ════════════════════════════════════════════ */
+
+	--ground: #f4f4f4;
+	/* The well: a recessed slab inside a card takes the ground's own colour. */
+	--ground-2: #f4f4f4;
+	--surface: #ffffff;
+	/* A card, pressed. Luminance only — nothing scales any more. */
+	--surface-2: #f5f5f7;
+	/* Soft: chips, meter tracks, secondary pills, inputs. */
+	--surface-3: #f0f0f2;
+
+	--hairline: #e2e2e7;
+	--hairline-2: #cfcfd6;
+
+	--raised: var(--surface);
+
+	--ink: #191c1f;
+	--ink-2: #505a63;
+	--ink-3: #8d969e;
+
+	/* The primary pill. Inverts with the theme. */
+	--pill: #191c1f;
+	--pill-ink: #ffffff;
+
+	--signal: #494fdf;
+	--signal-ink: #ffffff;
+	--signal-wash: rgb(73 79 223 / 12%);
+
+	/* ── money ─────────────────────────────────────────────────────────── */
+	--out: #191c1f;
+	--in: #00a87e;
+	--flag: #ec7e00;
+	--danger: #e23b4a;
+
+	--in-wash: rgb(0 168 126 / 12%);
+	--flag-wash: rgb(236 126 0 / 12%);
+	--danger-wash: rgb(226 59 74 / 10%);
+
+	/* ── the category palette ───────────────────────────────────────────
+	   Ten hues the person picks from. `Category.color` stores the key, never
+	   the value, so the value lives here and only here. The glyph on top is
+	   always white. */
+	--cat-teal: #00a87e;
+	--cat-orange: #ec7e00;
+	--cat-blue: #007bc2;
+	--cat-pink: #e61e49;
+	--cat-yellow: #b09000;
+	--cat-cobalt: #494fdf;
+	--cat-green: #428619;
+	--cat-brown: #936d62;
+	--cat-stone: #8d969e;
+	--cat-red: #e23b4a;
+	--cat-ink: #ffffff;
+	/* The toggle knob: white in both themes, like the glyph on a circle. */
+	--knob: #ffffff;
+
+	/* ── the 10/10/10/70 split ─────────────────────────────────────────── */
+	--split-give: var(--cat-cobalt);
+	--split-save: var(--cat-green);
+	--split-debt: var(--cat-brown);
+	--split-live: var(--cat-stone);
+	/* The denominator of every meter and ring — the soft surface. */
+	--split-left: var(--surface-3);
+
+	/* ── elevation ─────────────────────────────────────────────────────────
+	   No shadow on a resting surface. Only the layers that float: the sheet
+	   has its own, and every other floating layer is glass. */
+	--elev-sheet: 0 -12px 48px rgb(0 0 0 / 25%);
+	--overlay: rgb(0 0 0 / 45%);
+
+	/* ── glass ── a frosted surface for what sits *over* content or the
+	   ground — the tab bar, the sheet, the toast, the round buttons, every
+	   control on Zápis. Never a card, never a page ground: a card has nothing
+	   scrolling under it to blur. The fill, the 1 px edge, and the one shadow
+	   a floating glass layer carries. */
+	--glass: rgb(255 255 255 / 72%);
+	--glass-edge: rgb(255 255 255 / 60%);
+	--elev-glass: 0 8px 32px rgb(25 28 31 / 14%);
+	/* A lens, not a pane: the rim catches the light on the side it comes
+	   from (shine), falls into shade on the far side (rim), and the lens
+	   under the active tab is the same glass a step lighter. */
+	--glass-shine: rgb(255 255 255 / 95%);
+	--glass-rim: rgb(25 28 31 / 10%);
+	--glass-lens: rgb(255 255 255 / 60%);
+	/* Tinted glass — the money toast only (Q65): the same frost, coloured the
+	   direction of what moved, red for out and green for in, under a white
+	   line. Theme-independent like the category palette: the colour of what
+	   just happened does not change with the lights. This is the one place
+	   money going out has a hue, and it is the danger red, because a toast
+	   is the moment a mis-tap is still one tap from undone. */
+	--glass-out: rgb(226 59 74 / 82%);
+	--glass-in: rgb(0 168 126 / 82%);
+	--glass-tint-edge: rgb(255 255 255 / 35%);
+	--glass-tint-ink: #ffffff;
+
+	/* The lights behind Zápis in the dark — two soft radial pools the glass
+	   has something to blur against. Nothing in the light theme. */
+	--glow: none;
+
+	/* ═══ theme-independent ══════════════════════════════════════════════ */
+
+	/* ── type ── one family, three weights, tabular figures everywhere. */
+	--font-ui:
+		'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+		sans-serif;
+
+	--text-2xs: 0.6875rem; /* 11 — tab labels, mode badges */
+	--text-xs: 0.75rem; /* 12 — small pills, running balance, tile labels */
+	--text-sm: 0.8125rem; /* 13 — card labels, row subs, hints */
+	--text-md: 0.875rem; /* 14 — facts rows, segment labels, aside copy */
+	--text-base: 0.9375rem; /* 15 — body, row titles, pills */
+	--text-lg: 1.0625rem; /* 17 — back-header title, month row, sheet title */
+	--text-xl: 1.375rem; /* 22 — card figure */
+	--text-2xl: 1.75rem; /* 28 — screen title */
+	--text-3xl: 2.125rem; /* 34 — big figure in a card */
+	--text-4xl: 2.5rem; /* 40 — the Jmění hero */
+	--text-hero: 2.75rem; /* 44 — the home hero */
+	--text-display: 3.5rem; /* 56 — the record amount */
+
+	--track-display: -1.8px;
+	--track-hero: -1.3px;
+	--track-4xl: -1.2px;
+	--track-3xl: -0.8px;
+	--track-title: -0.5px;
+	--track-xl: -0.4px;
+	--track-name: -0.3px;
+	--track-body: 0.1px;
+	--track-label: 0.24px;
+
+	--leading-tight: 1.1;
+	--leading-snug: 1.35;
+	--leading-base: 1.5;
+
+	/* ── space ── 4 px base. */
+	--space-1: 0.25rem; /* 4 */
+	--space-2: 0.5rem; /* 8 */
+	--space-3: 0.75rem; /* 12 */
+	--space-4: 1rem; /* 16 */
+	--space-5: 1.5rem; /* 24 */
+	--space-6: 2rem; /* 32 */
+	--space-7: 2.5rem; /* 40 */
+	--space-8: 3.5rem; /* 56 */
+
+	/* ── radius ── 12 for inputs and cells, 16 for the account card, 20 for
+	   cards, 28 for the sheet, and the pill for every button. */
+	--radius-sm: 12px;
+	--radius-md: 16px;
+	--radius-lg: 20px;
+	--radius-xl: 28px;
+	--radius-full: 9999px;
+
+	/* ── targets ── */
+	--touch: 44px;
+	--touch-lg: 48px;
+	--key: 56px;
+	--tabbar: 62px; /* the floating bar's height */
+	/* How far the bar stands off the bottom edge: 24 px, or 12 px past the
+	   home indicator on a phone that has one, whichever is more. */
+	--tabbar-lift: max(var(--space-5), calc(var(--space-3) + env(safe-area-inset-bottom, 0px)));
+
+	/* ── motion ── */
+	--dur-fast: 150ms;
+	--dur-base: 220ms;
+	--dur-slow: 360ms;
+
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+	--ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+	/* Overshoots and comes back — liquid, not mechanical. The lens only. */
+	--ease-spring: cubic-bezier(0.3, 1.45, 0.5, 1);
+
+	--transition: var(--dur-fast) var(--ease-out);
+
+	/* ── layers ── */
+	--z-raised: 1;
+	--z-nav: 20;
+	--z-sticky: 30;
+	--z-toast: 60;
+}
+
+/**
+ * The currency tint — Q50, kept through the third edition.
+ *
+ * The room takes the colour of the currency the keypad writes in: the home
+ * currency is the soft grey above, any other shifts the ground a few degrees
+ * of hue at the same lightness. Only the ground moves — cards, ink and every
+ * data colour are defined against surfaces and measure what they measured.
+ * The dark ground stays charcoal in every currency: the lights-off decision
+ * holds, and the account rail on the record screen says which account it is.
+ *
+ * The root attribute is set by `lib/ui/tint.ts` from the active account.
+ */
+:root[data-currency='EUR'] {
+	--ground: #ecf5fc;
+	--ground-2: #ecf5fc;
+}
+
+:root[data-currency='USD'] {
+	--ground: #eef7ee;
+	--ground-2: #eef7ee;
+}
+
+:root[data-currency='GBP'] {
+	--ground: #fbf0f6;
+	--ground-2: #fbf0f6;
+}
+
+:root[data-currency='CZK'] {
+	--ground: #fbf3ec;
+	--ground-2: #fbf3ec;
+}
+
+/**
+ * Dark — a charcoal ground, graphite cards. Lifted from true black on
+ * 2026-09-06 so that glass has a tone to frost against and a card is still
+ * a step lighter than what it sits on.
+ *
+ * Selected twice — once for the system preference, once for the explicit
+ * choice, so the Settings toggle wins in both directions — and CSS gives no
+ * way to put one declaration block behind two selectors when one of them lives
+ * inside a media query. So the selectors are duplicated and **the values are
+ * not**: every dark value is named once, here, and each block below only
+ * points the role at it.
+ */
+:root {
+	--dark-ground: #121416;
+	--dark-ground-2: #191c1f;
+	--dark-surface: #1f2226;
+	--dark-surface-2: #272b30;
+	--dark-surface-3: rgb(255 255 255 / 8%);
+
+	--dark-hairline: rgb(255 255 255 / 12%);
+	--dark-hairline-2: rgb(255 255 255 / 20%);
+
+	--dark-ink: #ffffff;
+	--dark-ink-2: rgb(255 255 255 / 74%);
+	--dark-ink-3: rgb(255 255 255 / 52%);
+
+	--dark-pill: #ffffff;
+	--dark-pill-ink: #000000;
+
+	--dark-signal-wash: rgb(73 79 223 / 24%);
+
+	--dark-out: #ffffff;
+	--dark-in: #19c48f;
+
+	--dark-in-wash: rgb(25 196 143 / 14%);
+	--dark-flag-wash: rgb(236 126 0 / 16%);
+	--dark-danger-wash: rgb(226 59 74 / 16%);
+
+	--dark-elev-sheet: 0 -12px 48px rgb(0 0 0 / 60%);
+	--dark-overlay: rgb(0 0 0 / 60%);
+	--dark-glass: rgb(31 34 38 / 72%);
+	--dark-glass-edge: rgb(255 255 255 / 10%);
+	--dark-elev-glass: 0 8px 32px rgb(0 0 0 / 45%);
+	--dark-glass-shine: rgb(255 255 255 / 32%);
+	--dark-glass-rim: rgb(0 0 0 / 40%);
+	--dark-glass-lens: rgb(255 255 255 / 9%);
+	/* Indigo top-left, teal mid-right — the accent and the money-in hue, at
+	   the strength of a lamp in the next room. */
+	--dark-glow:
+		radial-gradient(60% 34% at 20% 8%, rgb(73 79 223 / 45%), transparent 70%),
+		radial-gradient(50% 30% at 90% 42%, rgb(0 168 126 / 28%), transparent 70%);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--ground: var(--dark-ground);
+		--ground-2: var(--dark-ground-2);
+		--surface: var(--dark-surface);
+		--surface-2: var(--dark-surface-2);
+		--surface-3: var(--dark-surface-3);
+
+		--hairline: var(--dark-hairline);
+		--hairline-2: var(--dark-hairline-2);
+
+		--ink: var(--dark-ink);
+		--ink-2: var(--dark-ink-2);
+		--ink-3: var(--dark-ink-3);
+
+		--pill: var(--dark-pill);
+		--pill-ink: var(--dark-pill-ink);
+
+		--signal-wash: var(--dark-signal-wash);
+
+		--out: var(--dark-out);
+		--in: var(--dark-in);
+
+		--in-wash: var(--dark-in-wash);
+		--flag-wash: var(--dark-flag-wash);
+		--danger-wash: var(--dark-danger-wash);
+
+		--elev-sheet: var(--dark-elev-sheet);
+		--overlay: var(--dark-overlay);
+		--glass: var(--dark-glass);
+		--glass-edge: var(--dark-glass-edge);
+		--elev-glass: var(--dark-elev-glass);
+		--glass-shine: var(--dark-glass-shine);
+		--glass-rim: var(--dark-glass-rim);
+		--glass-lens: var(--dark-glass-lens);
+		--glow: var(--dark-glow);
+	}
+}
+
+/**
+ * An explicit choice moves `color-scheme` with it, or the browser keeps
+ * painting its own surfaces — form controls, the date picker — from the
+ * system preference.
+ */
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
+	--ground: var(--dark-ground);
+	--ground-2: var(--dark-ground-2);
+	--surface: var(--dark-surface);
+	--surface-2: var(--dark-surface-2);
+	--surface-3: var(--dark-surface-3);
+
+	--hairline: var(--dark-hairline);
+	--hairline-2: var(--dark-hairline-2);
+
+	--ink: var(--dark-ink);
+	--ink-2: var(--dark-ink-2);
+	--ink-3: var(--dark-ink-3);
+
+	--pill: var(--dark-pill);
+	--pill-ink: var(--dark-pill-ink);
+
+	--signal-wash: var(--dark-signal-wash);
+
+	--out: var(--dark-out);
+	--in: var(--dark-in);
+
+	--in-wash: var(--dark-in-wash);
+	--flag-wash: var(--dark-flag-wash);
+	--danger-wash: var(--dark-danger-wash);
+
+	--elev-sheet: var(--dark-elev-sheet);
+	--overlay: var(--dark-overlay);
+	--glass: var(--dark-glass);
+	--glass-edge: var(--dark-glass-edge);
+	--elev-glass: var(--dark-elev-glass);
+	--glass-shine: var(--dark-glass-shine);
+	--glass-rim: var(--dark-glass-rim);
+	--glass-lens: var(--dark-glass-lens);
+	--glow: var(--dark-glow);
+}

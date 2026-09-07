@@ -1,0 +1,35 @@
+# The web image builds from the repository root, so everything here is context
+# that would otherwise be uploaded to the daemon and then thrown away.
+#
+# `node_modules` is the one that matters: it is platform-specific, the image
+# installs its own, and sending it makes the build minutes slower for nothing.
+
+node_modules
+**/node_modules
+
+# Build output. The image builds its own.
+apps/web/build
+apps/web/.svelte-kit
+
+# .NET — the API image has its own context and its own ignore file.
+**/bin
+**/obj
+
+.git
+.github
+.idea
+.vscode
+.playwright
+.impeccable
+**/.impeccable
+
+# Documentation and screenshots: 3 MB of PNG that never reaches the image.
+docs
+*.md
+!README.md
+
+# Never. `.env` holds the pairing code and the database password.
+.env
+.env.*
+!.env.example
+deploy/.env
