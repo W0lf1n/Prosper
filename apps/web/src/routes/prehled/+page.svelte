@@ -93,7 +93,6 @@
 	);
 	const currency = $derived(viewAccount?.currency ?? 'CZK');
 	const viewRows = $derived(view === 'all' ? [] : rows.filter((t) => t.accountId === view));
-	const dayRows = $derived(view === 'all' ? rows : viewRows);
 
 	const currencyGroups = $derived.by(() => {
 		if (view !== 'all') return [];
@@ -112,9 +111,14 @@
 		summariseMonth({ month, txns: viewRows, categories: allCategories, today: today() })
 	);
 
-	const coverage = $derived(monthCoverage({ month, txns: dayRows, today: today() }));
+	/* Days without an expense are a fact about the person, not about an
+	   account: a day euros left on holiday was not a quiet day at home. So the
+	   ring reads the whole ledger whatever chip is chosen (Q66). It used to
+	   follow the chip — and the chip opens on whichever account the keypad was
+	   last on — so the figure changed between visits without anyone touching it. */
+	const coverage = $derived(monthCoverage({ month, txns: rows, today: today() }));
 	const streak = $derived(
-		month === monthKey(today()) ? quietStreak({ txns: dayRows, today: today() }) : null
+		month === monthKey(today()) ? quietStreak({ txns: rows, today: today() }) : null
 	);
 
 	function streakLine(days: number): string {
@@ -592,16 +596,20 @@
 
 		{#if view !== 'all'}
 			<section class="card split-card">
-				<h2 class="label">
-					<Explainer term="Rozdělení příjmu">
-						<p>
-							Z každé koruny příjmu: 10 % dávání, 10 % spoření, 10 % dluhy, 70 % život. Kruh je tvůj
-							měsíc; čísla vpravo říkají, o kolik se každý díl liší od předlohy. Měří se proti
-							příjmu, ne proti výdajům — proto může něco zbýt. A zbytek je taky výsledek.
-						</p>
-					</Explainer>
-					· 10 / 10 / 10 / 70
-				</h2>
+				<div class="card__head">
+					<h2 class="label">
+						<Explainer term="Rozdělení příjmu">
+							<p>
+								Z každé koruny příjmu: 10 % dávání, 10 % spoření, 10 % dluhy, 70 % život. Kruh je
+								tvůj měsíc; čísla vpravo říkají, o kolik se každý díl liší od předlohy. Měří se
+								proti příjmu, ne proti výdajům — proto může něco zbýt. A zbytek je taky výsledek.
+								Plánovač vedle spočítá částky dopředu, z příjmu, který teprve přijde.
+							</p>
+						</Explainer>
+						· 10 / 10 / 10 / 70
+					</h2>
+					<a class="link" href={resolve('/rozdeleni')}>Naplánovat</a>
+				</div>
 
 				{#if split.hasIncome}
 					<div class="split">

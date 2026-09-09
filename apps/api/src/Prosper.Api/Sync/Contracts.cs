@@ -50,6 +50,6 @@ public static class SyncLimits
     public static readonly HashSet<string> Entities =
     [
         "txn", "account", "category", "goal", "monthTarget",
-        "reconciliation", "dayMark", "holding", "valuation", "schedule"
+        "reconciliation", "dayMark", "holding", "valuation", "schedule", "plan"
     ];
 }

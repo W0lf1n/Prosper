@@ -24,7 +24,7 @@
  * Pure (§11.6). No Dexie, no fetch, no DOM.
  */
 
-import { ZERO, minor, percentOf, sum, type Minor } from './money';
+import { ZERO, minor, mulRatio, percentOf, roundToUnit, sum, type Minor } from './money';
 import type { BucketTotal } from './checks';
 import type { SpendType } from './types';
 
@@ -161,6 +161,19 @@ export function targetSlices(): { cls: ProsperityClass; label: string; percent: 
 		label: CLASS_LABEL[cls],
 		percent: TARGET_SHARE[cls]
 	}));
+}
+
+/**
+ * A share of the income, in whole units of currency — what the book would
+ * put on one class from a stated income (Q67, Q69). Whole units because a
+ * standing order is not set in haléře. Zero without an income.
+ */
+export function shareAmount(income: Minor, share: number): Minor {
+	if (!Number.isInteger(share) || share < 0 || share > 100) {
+		throw new RangeError(`shareAmount: not a whole percent: ${share}`);
+	}
+	if (income <= 0) return ZERO;
+	return roundToUnit(mulRatio(income, share, 100));
 }
 
 /** One line of Czech naming the single thing most worth fixing. */

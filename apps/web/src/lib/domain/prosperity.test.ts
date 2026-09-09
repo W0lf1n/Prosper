@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classOf, prosperitySplit, targetSlices, verdict } from './prosperity';
+import { classOf, prosperitySplit, shareAmount, targetSlices, verdict } from './prosperity';
 import { minor } from './money';
 import type { BucketTotal } from './checks';
 import type { Category, SpendType } from './types';
@@ -169,5 +169,20 @@ describe('the target', () => {
 	it('is the book: 10 / 10 / 10 / 70', () => {
 		expect(targetSlices().map((s) => s.percent)).toEqual([10, 10, 10, 70]);
 		expect(targetSlices().reduce((total, s) => total + s.percent, 0)).toBe(100);
+	});
+});
+
+describe('shareAmount — the book’s figure from a stated income', () => {
+	it('is a share of the income in whole koruny, half away from zero', () => {
+		expect(shareAmount(minor(4500000), 10)).toBe(450000);
+		expect(shareAmount(minor(4567890), 10)).toBe(456800);
+		expect(shareAmount(minor(4567890), 70)).toBe(3197500);
+	});
+
+	it('is nothing without an income, and refuses a share that is not a whole percent', () => {
+		expect(shareAmount(minor(0), 10)).toBe(0);
+		expect(shareAmount(minor(-100), 10)).toBe(0);
+		expect(() => shareAmount(minor(100), 12.5)).toThrow(RangeError);
+		expect(() => shareAmount(minor(100), 101)).toThrow(RangeError);
 	});
 });

@@ -103,7 +103,8 @@ const TABLES: Record<SyncedEntity, string> = {
 	dayMark: 'dayMarks',
 	holding: 'holdings',
 	valuation: 'valuations',
-	schedule: 'schedules'
+	schedule: 'schedules',
+	plan: 'plans'
 };
 
 /**

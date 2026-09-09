@@ -13,16 +13,16 @@
 
 ---
 
-## State, 2026-09-06
+## State, 2026-09-09
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 509 pass, 24 files              |
+| `pnpm test`                | 534 pass, 25 files              |
 | `pnpm check`               | 0 errors, 0 warnings, 437 files |
 | `pnpm lint`                | eslint passes; see the note     |
 | `pnpm budget`              | 87.5 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v13** · **6**                 |
+| Schema · backup format     | **v14** · **7**                 |
 
 **Note on `pnpm lint`:** on a checkout made with `core.autocrlf=true` every
 file has CRLF endings and Prettier's check fails on all of them, touched or

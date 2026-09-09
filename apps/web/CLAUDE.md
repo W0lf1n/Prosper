@@ -136,13 +136,15 @@ bend.
 | `/zapis`                                                         | Zápis. The keypad, full-screen, no bar; `✕` returns where it came from                         |
 | `/vypis`                                                         | Výpis — reverse chronological, running balance, a card per day                                 |
 | `/prehled`                                                       | Přehled — Měsíc \| Platby behind one segmented pill, the month switcher above                  |
+| `/rozdeleni`                                                     | Rozdělení příjmu — a plan of income and expense lines, what comes back, _pro mě_ against the book; saved by name (Q69) |
 | `/cil`                                                           | The goal — the why, this month's figure, the record of months                                  |
 | `/jmeni`                                                         | Holdings and the `celkem` total — and the only place one is edited                             |
 | `/nastaveni`                                                     | The last tab, a hub: five rows with live summaries (`lib/ui/settings.ts`), each a page         |
 | `/nastaveni/ucty` · `/kategorie` · `/vzhled` · `/sync` · `/data` | Accounts · categories with the icon/colour editor · theme · sync · backup, export, Začít znovu |
 
 The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/cil` and
-`/jmeni` keep Domů lit; anything under `/nastaveni` keeps Nastavení lit.
+`/jmeni` keep Domů lit; `/rozdeleni` keeps Přehled lit; anything under
+`/nastaveni` keeps Nastavení lit.
 `/mesic` and `/platby` are `+page.ts` redirects into `/prehled`, `/ja` into
 `/nastaveni` (Q61), and `/tape` into `/vypis` (Q65).
 
@@ -150,7 +152,7 @@ The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/ci
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-four files, **509
+Vitest, node environment, `requireAssertions: true`. Twenty-five files, **534
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -183,7 +185,7 @@ force-close → reopen → reconnect → verify.
 
 ## Data layer
 
-`lib/db/schema.ts` holds the `migrations` array, currently at **v13**. Add a new
+`lib/db/schema.ts` holds the `migrations` array, currently at **v14**. Add a new
 entry; never edit an existing one, even in development — a released version is
 already on the phone. `schema.test.ts` builds a database at the _old_ version
 and opens it with the current code: a migration that has only ever run against

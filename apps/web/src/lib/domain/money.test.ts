@@ -15,6 +15,7 @@ import {
 	neg,
 	parseAmount,
 	percentOf,
+	roundToUnit,
 	split,
 	sub,
 	sum,
@@ -247,5 +248,19 @@ describe('other currencies (Q49)', () => {
 					.maximumFractionDigits
 			).toBe(2);
 		}
+	});
+});
+
+describe('roundToUnit()', () => {
+	it('rounds haléře to the nearest whole koruna, half away from zero', () => {
+		expect(roundToUnit(minor(123450))).toBe(123500);
+		expect(roundToUnit(minor(123449))).toBe(123400);
+		expect(roundToUnit(minor(-50))).toBe(-100);
+		expect(roundToUnit(minor(-49))).toBe(0);
+	});
+
+	it('leaves a whole amount alone', () => {
+		expect(roundToUnit(minor(0))).toBe(0);
+		expect(roundToUnit(minor(4500000))).toBe(4500000);
 	});
 });

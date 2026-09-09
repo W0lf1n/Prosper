@@ -14,8 +14,9 @@
 	interface Props {
 		title: string;
 		/** Where the chevron goes: Domů for a detail screen opened from its
-		    cards, the Nastavení hub for one of its five pages. */
-		back?: '/' | '/nastaveni';
+		    cards, Přehled for the planner it opens, the Nastavení hub for one
+		    of its five pages. */
+		back?: '/' | '/prehled' | '/nastaveni';
 		/** A control for the trailing edge — a 40 px round button. */
 		trail?: Snippet;
 	}

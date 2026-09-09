@@ -416,6 +416,52 @@ export interface DayMark {
 	updatedAt: IsoDateTime;
 }
 
+export type PlanLineKind = 'income' | 'expense';
+
+/**
+ * One line of a plan — Q69.
+ *
+ * A plan is the month's shape decided before the month: what comes in, what
+ * is committed, and what that leaves. A line is one of either. `amount` is a
+ * magnitude, never signed — `kind` says which way it goes — and lives in the
+ * plan's account currency.
+ */
+export interface PlanLine {
+	id: string;
+	kind: PlanLineKind;
+	name: string;
+	/** A positive magnitude in the plan's currency. */
+	amount: Minor;
+	/**
+	 * Which class the book files an expense under — the `spendType` a bucket
+	 * carries, so a plan and a month measure with the same ruler. An income
+	 * line carries `need` and nothing reads it.
+	 */
+	spendType: SpendType;
+	/**
+	 * The part of an expense somebody else pays back every month — the
+	 * roommate's half of the mortgage. The whole amount still leaves; this is
+	 * what comes back, so the line costs `amount - paidBack`. Zero on most
+	 * lines and on every income.
+	 */
+	paidBack: Minor;
+}
+
+/**
+ * A saved plan — Q69, schema v14.
+ *
+ * Nothing in the ledger points at a plan and a plan points at nothing in the
+ * ledger except the account whose currency it counts in; it is a sheet of
+ * paper with a name, kept so it can be opened again next payday.
+ */
+export interface Plan extends Synced {
+	id: string;
+	name: string;
+	accountId: string;
+	lines: PlanLine[];
+	createdAt: IsoDateTime;
+}
+
 export type SyncedEntity =
 	| 'txn'
 	| 'account'
@@ -426,7 +472,8 @@ export type SyncedEntity =
 	| 'dayMark'
 	| 'holding'
 	| 'valuation'
-	| 'schedule';
+	| 'schedule'
+	| 'plan';
 
 /** Client-only. Never synced, never sent. Populated from P2 onwards. */
 export interface OutboxEntry {

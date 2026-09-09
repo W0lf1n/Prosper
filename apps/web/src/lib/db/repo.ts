@@ -26,6 +26,7 @@ import {
 	type DueItem
 } from '$lib/domain/recurring';
 import { newDeviceId, uuidv7 } from '$lib/domain/ids';
+import { cleanLines, defaultPlanName } from '$lib/domain/plans';
 import { ADJUSTMENT_PAYEE, reconcileDelta } from '$lib/domain/reconcile';
 import { MAX_SHARES, isOpenShare, sharesOf } from '$lib/domain/receivables';
 import { checkRow } from '$lib/domain/rows';
@@ -38,6 +39,8 @@ import type {
 	Goal,
 	Holding,
 	MonthTarget,
+	Plan,
+	PlanLine,
 	Reconciliation,
 	Schedule,
 	ScheduleShare,
@@ -849,6 +852,74 @@ export async function archiveSchedule(id: string): Promise<void> {
 	await updateSchedule(id, { isArchived: true });
 }
 
+// ── plans (Q69) ─────────────────────────────────────────────────────────────
+
+export interface NewPlan {
+	name: string;
+	accountId: string;
+	lines: PlanLine[];
+}
+
+/**
+ * A plan is saved as it was typed, less the lines nobody filled in
+ * (`cleanLines`). A plan with no name is still a plan — it takes the month's
+ * name, so nothing on the screen is ever blocked on a title (rule 7).
+ */
+export async function createPlan(input: NewPlan): Promise<Plan> {
+	const database = db();
+	const { updatedAt, deviceId } = await stamp();
+	const plan: Plan = {
+		id: uuidv7(),
+		name: input.name.trim() || defaultPlanName(today()),
+		accountId: input.accountId,
+		lines: cleanLines(input.lines),
+		createdAt: updatedAt,
+		updatedAt,
+		deviceId,
+		isDeleted: false
+	};
+	await database.plans.put(plan);
+	await enqueue('plan', plan.id, plan);
+	return plan;
+}
+
+export async function updatePlan(
+	id: string,
+	patch: Partial<Pick<Plan, 'name' | 'accountId' | 'lines'>>
+): Promise<Plan | undefined> {
+	const database = db();
+	const existing = await database.plans.get(id);
+	if (!existing) return undefined;
+	const next: Plan = {
+		...existing,
+		...(patch.accountId === undefined ? {} : { accountId: patch.accountId }),
+		...(patch.name === undefined ? {} : { name: patch.name.trim() || existing.name }),
+		...(patch.lines === undefined ? {} : { lines: cleanLines(patch.lines) }),
+		...(await stamp())
+	};
+	await database.plans.put(next);
+	await enqueue('plan', next.id, next);
+	return next;
+}
+
+/** Soft, like everything else. `restorePlan` is the undo. */
+export async function deletePlan(id: string): Promise<void> {
+	await setPlanDeleted(id, true);
+}
+
+export async function restorePlan(id: string): Promise<void> {
+	await setPlanDeleted(id, false);
+}
+
+async function setPlanDeleted(id: string, isDeleted: boolean): Promise<void> {
+	const database = db();
+	const existing = await database.plans.get(id);
+	if (!existing || existing.isDeleted === isDeleted) return;
+	const next: Plan = { ...existing, isDeleted, ...(await stamp()) };
+	await database.plans.put(next);
+	await enqueue('plan', next.id, next);
+}
+
 /** The watermark only ever moves forward. */
 async function settle(schedule: Schedule, month: string): Promise<void> {
 	if (schedule.lastPostedMonth && schedule.lastPostedMonth >= month) return;
@@ -1406,6 +1477,7 @@ export async function seedOutbox(local?: ReadonlySet<string>): Promise<number> {
 	await queue('valuation', await database.valuations.toArray());
 	await queue('schedule', await database.schedules.toArray());
 	await queue('reconciliation', await database.reconciliations.toArray());
+	await queue('plan', await database.plans.toArray());
 
 	// Day marks are keyed by their date rather than an id.
 	for (const mark of await database.dayMarks.toArray()) {
@@ -1445,6 +1517,7 @@ export async function ledgerKeys(): Promise<Set<string>> {
 	await collect('valuation', database.valuations.toCollection().primaryKeys());
 	await collect('schedule', database.schedules.toCollection().primaryKeys());
 	await collect('reconciliation', database.reconciliations.toCollection().primaryKeys());
+	await collect('plan', database.plans.toCollection().primaryKeys());
 	await collect('dayMark', database.dayMarks.toCollection().primaryKeys());
 
 	return keys;
@@ -1587,6 +1660,7 @@ export interface ResetResult {
 	valuations: number;
 	schedules: number;
 	reconciliations: number;
+	plans: number;
 }
 
 /**
@@ -1628,7 +1702,8 @@ export async function resetLedger(): Promise<ResetResult> {
 		holdings: 0,
 		valuations: 0,
 		schedules: 0,
-		reconciliations: 0
+		reconciliations: 0,
+		plans: 0
 	};
 
 	await database.transaction(
@@ -1642,11 +1717,16 @@ export async function resetLedger(): Promise<ResetResult> {
 			database.valuations,
 			database.schedules,
 			database.reconciliations,
+			database.plans,
 			database.outbox
 		],
 		async () => {
 			result.txns = await tombstone('txn', await database.txns.toArray(), stamped, (row) =>
 				database.txns.put(row)
+			);
+			// A plan is a decision about a month, like a goal, and goes with it.
+			result.plans = await tombstone('plan', await database.plans.toArray(), stamped, (row) =>
+				database.plans.put(row)
 			);
 			result.goals = await tombstone('goal', await database.goals.toArray(), stamped, (row) =>
 				database.goals.put(row)
@@ -1730,8 +1810,9 @@ async function tombstone<T extends Versioned>(
  *   4 → schedules · 5 → reconciliations
  *   6 → `shares` on txns and schedules (Q47) — an older build would read only
  *       the legacy single-share fields and lose every second payer on import
+ *   7 → plans (Q69)
  */
-export const BACKUP_VERSION = 6;
+export const BACKUP_VERSION = 7;
 
 export interface Backup {
 	format: 'finance-backup';
@@ -1747,6 +1828,8 @@ export interface Backup {
 	valuations: Valuation[];
 	schedules: Schedule[];
 	reconciliations: Reconciliation[];
+	/** Absent in a file older than format 7. */
+	plans?: Plan[];
 }
 
 /**
@@ -1772,7 +1855,8 @@ export async function exportBackup(): Promise<Backup> {
 		holdings: await database.holdings.toArray(),
 		valuations: await database.valuations.toArray(),
 		schedules: await database.schedules.toArray(),
-		reconciliations: await database.reconciliations.toArray()
+		reconciliations: await database.reconciliations.toArray(),
+		plans: await database.plans.toArray()
 	};
 }
 
@@ -1843,6 +1927,7 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 	const valuations = admit<Valuation>('valuation', backup.valuations);
 	const schedules = admit<Schedule>('schedule', backup.schedules);
 	const reconciliations = admit<Reconciliation>('reconciliation', backup.reconciliations);
+	const plans = admit<Plan>('plan', backup.plans);
 	const dayMarks = admit<DayMark>('dayMark', backup.dayMarks);
 
 	if (refused.length > 0) {
@@ -1873,6 +1958,7 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 			database.valuations,
 			database.schedules,
 			database.reconciliations,
+			database.plans,
 			database.outbox
 		],
 		async () => {
@@ -1929,6 +2015,12 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 				reconciliations,
 				(id) => database.reconciliations.get(id),
 				(row) => database.reconciliations.put(row)
+			);
+			await mergeRows(
+				'plan',
+				plans,
+				(id) => database.plans.get(id),
+				(row) => database.plans.put(row)
 			);
 			for (const mark of dayMarks) {
 				await database.dayMarks.put(mark);

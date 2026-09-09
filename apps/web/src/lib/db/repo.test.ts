@@ -18,12 +18,14 @@ import {
 	BACKUP_VERSION,
 	catchUpGoalTargets,
 	confirmScheduled,
+	createPlan,
 	createAccount,
 	createGoal,
 	createHolding,
 	createSchedule,
 	createTransfer,
 	createTxn,
+	deletePlan,
 	deleteTxn,
 	ensureSeeded,
 	exportBackup,
@@ -33,11 +35,13 @@ import {
 	recordValuation,
 	refreshSyncEnabled,
 	resetLedger,
+	restorePlan,
 	restoreTxn,
 	setCollapsedMonths,
 	setMeta,
 	settleReceivable,
 	unsettleReceivable,
+	updatePlan,
 	updateAccount,
 	type Backup
 } from './repo';
@@ -93,6 +97,7 @@ describe('exportBackup', () => {
 				'goals',
 				'holdings',
 				'monthTargets',
+				'plans',
 				'reconciliations',
 				'schedules',
 				'txns',
@@ -762,5 +767,90 @@ describe('catchUpGoalTargets', () => {
 
 	it('has nothing to do without a goal', async () => {
 		expect(await catchUpGoalTargets()).toBe(0);
+	});
+});
+
+describe('plans (Q69)', () => {
+	const lines = () => [
+		{
+			id: 'l1',
+			kind: 'income' as const,
+			name: 'Výplata',
+			amount: 4000000 as Minor,
+			spendType: 'need' as const,
+			paidBack: 0 as Minor
+		},
+		{
+			id: 'l2',
+			kind: 'expense' as const,
+			name: 'Hypotéka',
+			amount: 2800000 as Minor,
+			spendType: 'debt' as const,
+			paidBack: 1400000 as Minor
+		},
+		{
+			id: 'l3',
+			kind: 'expense' as const,
+			name: '',
+			amount: 0 as Minor,
+			spendType: 'need' as const,
+			paidBack: 0 as Minor
+		}
+	];
+
+	it('saves a plan as typed, less the empty line, and names one nobody named', async () => {
+		const plan = await createPlan({ name: '  ', accountId, lines: lines() });
+
+		expect(plan.name).toMatch(/^Plán · /);
+		expect(plan.lines.map((l) => l.name)).toEqual(['Výplata', 'Hypotéka']);
+		expect(plan.isDeleted).toBe(false);
+		expect(await db.plans.get(plan.id)).toMatchObject({ name: plan.name });
+	});
+
+	it('updates in place, keeps the name when the patch blanks it, and deletes softly with an undo', async () => {
+		const plan = await createPlan({ name: 'Září', accountId, lines: lines() });
+
+		const renamed = await updatePlan(plan.id, { name: 'Říjen' });
+		expect(renamed?.name).toBe('Říjen');
+		const blanked = await updatePlan(plan.id, { name: '   ', lines: [] });
+		expect(blanked?.name).toBe('Říjen');
+		expect(blanked?.lines).toEqual([]);
+		expect(blanked!.updatedAt >= plan.updatedAt).toBe(true);
+
+		await deletePlan(plan.id);
+		expect((await db.plans.get(plan.id))?.isDeleted).toBe(true);
+		await restorePlan(plan.id);
+		expect((await db.plans.get(plan.id))?.isDeleted).toBe(false);
+	});
+
+	it('travels in the backup, merges last-write-wins, and refuses a broken line', async () => {
+		const plan = await createPlan({ name: 'Září', accountId, lines: lines() });
+		const backup = await exportBackup();
+		expect(backup.plans?.map((p) => p.id)).toEqual([plan.id]);
+
+		const newer = {
+			...plan,
+			name: 'Září, opraveno',
+			updatedAt: '2099-01-01T00:00:00.000Z'
+		};
+		const broken = {
+			...plan,
+			id: 'plan-broken',
+			lines: [{ ...plan.lines[0]!, amount: 12.5 as Minor }]
+		};
+		const result = await importBackup({ ...backup, plans: [newer, broken] });
+
+		expect(result.skipped).toBe(1);
+		expect((await db.plans.get(plan.id))?.name).toBe('Září, opraveno');
+		expect(await db.plans.get('plan-broken')).toBeUndefined();
+	});
+
+	it('goes with the ledger on Začít znovu', async () => {
+		await createPlan({ name: 'Září', accountId, lines: lines() });
+
+		const result = await resetLedger();
+
+		expect(result.plans).toBe(1);
+		expect((await db.plans.toArray()).every((p) => p.isDeleted)).toBe(true);
 	});
 });

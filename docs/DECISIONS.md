@@ -2749,3 +2749,165 @@ hue is the danger red, on purpose: a toast is the moment a mis-tap is still
 one tap from undone, and the colour says which way it went before the figure
 is read. `--out` stays the ink everywhere else; the philosophy in `tokens.css`
 records the exception.
+
+### Q66 — Dny bez výdaje reads the whole ledger, whatever chip is chosen · answered 2026-09-09
+
+**Question.** The ring on `/prehled` showed a different figure from one visit
+to the next with nothing typed in between. Why?
+
+**What was happening.** The card followed the account chip, and the chip
+opens on whichever account was last active — which is the account the keypad
+was last switched to. Record a beer in euros, switch back to the koruna
+account on Zápis or not, and Přehled opened on a different account each time,
+counting only that account's expense days. On the euro account nearly every
+day of the month reads as quiet, because most of life is paid in koruny; the
+streak did the same, walking back to the euro account's first row rather than
+the ledger's. Nothing was wrong with the arithmetic. The figure was answering
+a question nobody asked.
+
+**Ruling.** A day without an expense is a fact about the person, not about an
+account. A day euros left on holiday was not a quiet day at home, and a
+holiday wallet is not a frugal month. So `monthCoverage` and `quietStreak` on
+`/prehled` are fed **every live row** across every account, and the chip
+changes nothing about them. The chip still governs everything that is a sum
+of money — the net, the split, the buckets, the trends — because those are
+per-currency and never added across (Q49). Days are not money, and a count of
+days is safe to take across currencies.
+
+`domain/coverage.ts` did not change; it never knew about accounts. The
+page's `dayRows` derivation, which chose between the chip's rows and all of
+them, is gone.
+
+### Q67 — Rozdělení příjmu, planned: `/rozdeleni` · answered 2026-09-09
+
+**Asked for.** A planner: put in the month's income, read what goes to
+Spoření and the rest.
+
+**Which law.** Targeting, and the book's actual instruction. `/prehled` has
+measured the 10/10/10/70 split since P5 — but it looks *back*, at the shape
+a month ended up with. The book says the shape is decided **before** the
+month starts. The measurement had a screen; the decision did not.
+
+**What it is.** `/rozdeleni`, a detail screen reached from the split card on
+`/prehled` (_Naplánovat_), with Přehled kept lit in the bar and the chevron
+returning there. One field — the month's income in the active account's
+currency — and under it the four classes as rows: dot, name, the class's
+one-line note, the amount and the percentage. A hint under the list says the
+number that matters most in a sentence: three standing orders straight after
+payday, and what is left on the current account for the month.
+
+**The arithmetic** is `planSplit()` in `domain/prosperity.ts`, beside the
+measurement it mirrors. The three decisions come out in **whole units of
+currency** — a standing order is not set in haléře — through
+`money.roundToUnit()`, new and tested, half away from zero like `mulRatio`.
+Living takes whatever remains, so the four amounts add back to the income
+exactly. A plan that does not add up is not a plan.
+
+**Pre-filled, never written.** The field opens with this month's earnings on
+the active account (`summariseMonth().earned`, so a SMĚNA leg does not
+inflate it), or failing that the declared recurring income for that account,
+and says which under the field. Typing anything replaces it and the hint goes
+quiet. Nothing on the screen writes to the ledger: it is a calculator with the
+book's numbers in it, and the outputs are the figures to set the orders by.
+Whether a plan should be *kept* — stored, compared against the month as it
+happens, carried into the goal — is a question for after the fourteen days,
+and is not answered here.
+
+**The gate.** `PROJECT-PLAN.md` §11 holds features behind fourteen days of
+real use. This one was asked for directly and is a screen over a rule that
+already existed, with no schema change and nothing written; it went in on
+that basis, and is noted here so the exception is on record rather than
+quiet.
+
+### Q68 — Every row of the plan can be moved, in koruny or in percent · answered 2026-09-09
+
+**Asked for.** On `/rozdeleni`, adjust the amount and the percentage of each
+class, not only read the book's four.
+
+**The rule a row keeps.** A row is set one of two ways, and remembers which
+was typed last: a **share** — a whole percent, 0 to 100 — follows the income,
+so 15 % on Spoření is 6 750 Kč of 45 000 and 9 000 Kč of 60 000; an
+**amount** stays where it was put, and its percentage is only ever read off
+it. A row set as an amount wears a small _pevně_ badge, because the
+difference matters the moment the income changes and is invisible otherwise.
+`PlanRule` and `PlanRules` in `domain/prosperity.ts`; `planSplit(income,
+rules)` with `DEFAULT_PLAN_RULES` as the book's plan.
+
+**Adding up.** When every row is a share and the shares make 100, living
+absorbs the rounding and the four amounts meet the income to the haléř, as
+before. Any other set of rules stands exactly as written, and the plan says
+what it misses: a total line under the list — _Rozděleno_ with the sum, and
+a badge that reads _sedí_, _zbývá X_ (flag) or _o X víc_ (danger) — and a
+hint that says which way it is out. The page never moves a row on its own to
+make the sum come right; that would be the app deciding the plan.
+
+**The fields.** Two per row, the amount and the percent, right-aligned with
+the unit inside the field. Each keeps its own text while it is being typed
+in and takes the plan's figure back on blur, so "4500" becomes "4 500" on the
+way out and a share typed on one row moves the amounts on the others without
+fighting the one under the thumb. A percent is accepted only as a whole
+number — the book speaks in whole percents, and a standing order in tenths of
+a percent is not a thing anybody sets. _Vrátit předlohu_ appears the moment
+the rules differ from 10 / 10 / 10 / 70 and puts them back.
+
+Still nothing is written; the rules live in the page and go when it does.
+Keeping a plan is the same open question as under Q67.
+
+### Q69 — A plan of one's own: lines, what comes back, and a name to keep it under · answered 2026-09-09 · supersedes the screen of Q67/Q68
+
+**Asked for.** "What can I achieve with this?" — the four-row split answered
+the book's question but not Petr's. His: plan the income into categories of
+his own, so he can see how much money is actually *for him*. The mortgage is
+28 000 and the roommate pays 14 000 of it. And a save button with a title, so
+a plan can be opened again.
+
+**What it is now.** `/rozdeleni` is a plan on paper. **Příjmy** are lines
+with a name and an amount; **Výdaje** are lines with a name, an amount, a
+*druh* (the same `spendType` a bucket carries — nutné, chtěné, dávání,
+spoření, dluh) and **vrací mi**, the part somebody pays back every month.
+Under them, **Pro mě**: income minus what the month costs *you*, as one big
+figure and as a per-day figure over the current month's days, with the
+facts under it — přijde, odejde, z toho mi vrátí ostatní, stojí mě to. Then
+**Podle knihy**: the four classes as the plan fills them, each with its
+share of the income and its distance from 10 / 10 / 10 / 70, the three
+decisions each showing the book's own figure for this income, and a verdict
+line naming the one most worth fixing. Život counts only what the plan has
+committed to living; *pro mě* is the remainder, and is the point.
+
+**A line costs what it costs you.** `lineNet()` in `domain/plans.ts`: an
+expense commits `amount - paidBack`, never below zero; the whole amount
+still leaves the account and *Odejde* says so. This is the same idea a
+declared schedule carries as its shares (Q46, Q47), which is why **Načíst z
+pravidelných plateb** exists: every live standing order for the account
+becomes a line, with its bucket's class and its shares already on it
+(`linesFromSchedules`). A plan starts with the roommate on it.
+
+**Saved, named, reopened.** A plan is a row in a new table — `plans`,
+schema **v14**, backup format **7**, the `plan` entity on the wire in
+`packages/contracts`, `SyncLimits.Entities` on the server and the sync
+engine's table map — so it syncs, backs up and merges like everything
+else, and goes with the ledger on Začít znovu. `createPlan`, `updatePlan`,
+`deletePlan` / `restorePlan` in `repo.ts`; the row guard knows the shape.
+A plan with no name takes the month's (`defaultPlanName` → "Plán · září
+2026"), so nothing blocks the save (rule 7); lines nobody filled in are
+dropped on the way in (`cleanLines`); the delete is soft with Zpět on the
+toast. The list at the top shows every plan with its *pro mě* figure, the
+open one marked; `?plan=<id>` in the address is which one is open, so a
+reload lands on it and Zpět still goes to Přehled. The draft itself lives
+on the page, like an unsaved sheet.
+
+**What went.** The editable per-class percentages of Q68. A plan of lines
+*is* the adjustment: fifteen percent on Spoření is a line that says so. The
+book's four shares stay the fixed ruler, which is what a ruler is for.
+`shareAmount()` survives in `prosperity.ts` as the source of the book's
+figures; `planSplit` and `PlanRules` are gone.
+
+**Deploy note.** The server rejects an entity it does not know, and the
+client drops a rejected row from the outbox for good — so the API goes out
+before the client does, or a plan saved in between never reaches the other
+phone. `DEPLOYMENT.md` already orders the containers that way.
+
+**Open.** Comparing a plan against the month as it happens — the line for
+Potraviny against the bucket's actual — is the Training-law feature this
+table was built to carry. Not built; it waits for the fourteen days, and
+for the question of which plan is *the* plan for a month.

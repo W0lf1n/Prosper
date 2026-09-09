@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-09-07 · schema v13 · 510 web tests · 56 API tests
+**Last revised:** 2026-09-09 · schema v14 · 534 web tests · 56 API tests
 
 ---
 
@@ -90,8 +90,8 @@ apps/web/src/
 │                  app.css also owns the shared primitives: page, card, row,
 │                  circle, meter, badge, seg, btn, field, toggle, facts, tile.
 │                  One definition each, no per-route copies.
-├─ routes/         / · /zapis · /vypis · /prehled · /cil · /jmeni · /nastaveni
-│                  (/nastaveni is the last tab, a hub over /ucty · /kategorie ·
+├─ routes/         / · /zapis · /vypis · /prehled · /rozdeleni · /cil · /jmeni ·
+│                  /nastaveni (the last tab, a hub over /ucty · /kategorie ·
 │                  /vzhled · /sync · /data; /mesic, /platby, /ja and /tape redirect)
 └─ service-worker.ts
 ```
@@ -122,6 +122,7 @@ The runbook is `docs/DEPLOYMENT.md`.
 | `receivables.ts`  | Money owed to you                                               |
 | `goals.ts`        | Targeting — validation, pace, required monthly, the record      |
 | `prosperity.ts`   | The 10/10/10/70 split, measured against income                  |
+| `plans.ts`        | A plan for the month — lines, what comes back, pro mě, the book’s figures |
 | `holdings.ts`     | Stated values, staleness, the wealth total                      |
 | `recurring.ts`    | Declared schedules — due dates, catch-up, the year net of shares |
 | `trends.ts`       | Month over month per bucket, against what it usually costs      |

@@ -126,6 +126,15 @@ const SCHEDULE_SHARE: Shape = { id: string, who: string, amount: money };
 
 const POCKET: Shape = { id: string, name: string, amount: money };
 
+const PLAN_LINE: Shape = {
+	id: string,
+	kind: nonEmpty,
+	name: string,
+	amount: money,
+	spendType: optional(string),
+	paidBack: optional(money)
+};
+
 const SHAPES: Record<SyncedEntity, Shape> = {
 	txn: {
 		...SYNCED,
@@ -228,6 +237,13 @@ const SHAPES: Record<SyncedEntity, Shape> = {
 		statementBalance: money,
 		computedBalance: money,
 		adjustmentTxnId: optional(nullable(string))
+	},
+	plan: {
+		...SYNCED,
+		name: string,
+		accountId: optional(string),
+		lines: listOf(PLAN_LINE),
+		createdAt: optional(string)
 	},
 	// Keyed by its date, and carries no `id` or `isDeleted` — the one row shape
 	// that is not `Synced`.

@@ -105,7 +105,12 @@
 	const tabs: { path: Destination; label: string; icon: IconName; also: string[] }[] = [
 		{ path: '/', label: 'Domů', icon: 'home', also: ['/cil', '/jmeni'] },
 		{ path: '/vypis', label: 'Výpis', icon: 'tape', also: ['/tape'] },
-		{ path: '/prehled', label: 'Přehled', icon: 'month', also: ['/mesic', '/platby'] },
+		{
+			path: '/prehled',
+			label: 'Přehled',
+			icon: 'month',
+			also: ['/mesic', '/platby', '/rozdeleni']
+		},
 		{ path: '/nastaveni', label: 'Nastavení', icon: 'settings', also: [] }
 	];
 

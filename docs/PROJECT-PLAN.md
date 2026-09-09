@@ -680,11 +680,13 @@ _vše_ lays the currencies side by side and never adds them up.
 **Měsíc** is the workbook's `SUMA` sheet, rebuilt, in this order: the net with
 _Přišlo_ and _Odešlo_ as two tiles and the one-off figure separated from the
 running cost; **Dny bez výdaje** — a ring of days that cost nothing against
-days _elapsed_, and the current run; the **Kontrola** card listing the month's
-findings, each with its fix where one exists; **Dluží mi** — everything
-outstanding, with a one-tap _Přijato_; **Rozdělení příjmu** — the 10/10/10/70
-split as one ring with the remainder in its centre and, beside it, each class
-with its share and its distance from the mark; and **Kam to šlo**, buckets
+days _elapsed_, and the current run, counted over **every account** whatever
+chip is chosen, because a day is not a sum of money (Q66); the **Kontrola**
+card listing the month's findings, each with its fix where one exists; **Dluží
+mi** — everything outstanding, with a one-tap _Přijato_; **Rozdělení příjmu**
+— the 10/10/10/70 split as one ring with the remainder in its centre and,
+beside it, each class with its share and its distance from the mark, and a
+_Naplánovat_ link to the planner at `/rozdeleni`; and **Kam to šlo**, buckets
 ranked by spend, each with its circle and a meter in its own colour, and each
 opening — one at a time — to the rows that make it up, newest first (Q63). The second
 ring — the book's shape — went with this edition; the label carries the four
@@ -695,6 +697,31 @@ card as Domů, the **net year** with the month's figures under it, **Odchází**
 every declared outflow with its day, its bucket, its mode as a badge, and either
 the payments left or the share somebody pays back — and **Přichází**, money that
 turns up every month on its own, declared the same way on an income category.
+
+### `/rozdeleni` — Rozdělení příjmu: a plan for the month
+
+The shape of the income decided before the month starts, which is the book's
+instruction; `/prehled` measures the shape a month ended up with (Q67, Q69).
+A detail screen off the split card — Přehled stays lit, the chevron returns
+there.
+
+A plan is lines. **Příjmy**: a name and an amount each. **Výdaje**: a name,
+an amount, a _druh_ — the same `spendType` a bucket carries — and _vrací mi_,
+the part somebody pays back every month; the line costs `amount - paidBack`
+and the whole amount still leaves. _Načíst z pravidelných plateb_ turns every
+live standing order for the account into a line, class and shares included.
+**Pro mě** is income minus what the month costs you, as one figure and per
+day, with _přijde · odejde · z toho mi vrátí ostatní · stojí mě to_ under it.
+**Podle knihy** reads the lines in the four classes against 10 / 10 / 10 / 70,
+the three decisions each with the book's figure for this income, and a verdict
+line. Život is only what the plan has committed to living; _pro mě_ is the
+rest.
+
+A plan is saved under a name (or the month's, when none is given) into the
+`plans` table — schema v14, backup format 7, synced as `plan` — and reopened
+from the list at the top, which shows each plan's _pro mě_. `?plan=<id>` is
+which one is open. Deleting is soft, with Zpět on the toast. The draft is not
+kept: leave without saving and it is gone. `domain/plans.ts`.
 
 ### `/cil` — Cíl
 

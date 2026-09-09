@@ -121,6 +121,31 @@ const ROWS: Record<SyncedEntity, Record<string, unknown>> = {
 		adjustmentTxnId: null,
 		...synced
 	},
+	plan: {
+		id: 'p1',
+		name: 'Září',
+		accountId: 'a1',
+		lines: [
+			{
+				id: 'l1',
+				kind: 'income',
+				name: 'Výplata',
+				amount: 4000000,
+				spendType: 'need',
+				paidBack: 0
+			},
+			{
+				id: 'l2',
+				kind: 'expense',
+				name: 'Hypotéka',
+				amount: 2800000,
+				spendType: 'debt',
+				paidBack: 1400000
+			}
+		],
+		createdAt: synced.updatedAt,
+		...synced
+	},
 	dayMark: { date: '2026-08-20', deviceId: synced.deviceId, updatedAt: synced.updatedAt }
 };
 

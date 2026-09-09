@@ -12,16 +12,17 @@
 
 /** The entity kinds a row can carry. Mirrors `SyncedEntity` in the web app. */
 export const SYNCED_ENTITIES = [
-	'txn',
-	'account',
-	'category',
-	'goal',
-	'monthTarget',
-	'reconciliation',
-	'dayMark',
-	'holding',
-	'valuation',
-	'schedule'
+  "txn",
+  "account",
+  "category",
+  "goal",
+  "monthTarget",
+  "reconciliation",
+  "dayMark",
+  "holding",
+  "valuation",
+  "schedule",
+  "plan",
 ] as const;
 
 export type SyncedEntity = (typeof SYNCED_ENTITIES)[number];
@@ -35,16 +36,16 @@ export type SyncedEntity = (typeof SYNCED_ENTITIES)[number];
  * state neither device ever held.
  */
 export interface SyncRow {
-	entity: SyncedEntity;
-	/** The client-generated UUIDv7. The server never assigns one. */
-	id: string;
-	/** ISO datetime from the authoring device's clock. The LWW key. */
-	updatedAt: string;
-	/** Ties `updatedAt` collisions, by plain string compare. */
-	deviceId: string;
-	isDeleted: boolean;
-	/** The whole row as the client stores it, minus nothing. */
-	payload: unknown;
+  entity: SyncedEntity;
+  /** The client-generated UUIDv7. The server never assigns one. */
+  id: string;
+  /** ISO datetime from the authoring device's clock. The LWW key. */
+  updatedAt: string;
+  /** Ties `updatedAt` collisions, by plain string compare. */
+  deviceId: string;
+  isDeleted: boolean;
+  /** The whole row as the client stores it, minus nothing. */
+  payload: unknown;
 }
 
 /**
@@ -55,63 +56,63 @@ export interface SyncRow {
  * outbox entries to stop retrying.
  */
 export interface SyncRejection {
-	entity: SyncedEntity;
-	id: string;
-	reason: 'malformed' | 'unknown-entity' | 'conflict' | 'too-large';
-	detail: string;
+  entity: SyncedEntity;
+  id: string;
+  reason: "malformed" | "unknown-entity" | "conflict" | "too-large";
+  detail: string;
 }
 
 // ── POST /api/v1/pair ───────────────────────────────────────────────────────
 
 export interface PairRequest {
-	/** The code shown on an already-paired device, or set on the server. */
-	code: string;
-	/** Free text, so a device list is readable. */
-	deviceName: string;
+  /** The code shown on an already-paired device, or set on the server. */
+  code: string;
+  /** Free text, so a device list is readable. */
+  deviceName: string;
 }
 
 export interface PairResponse {
-	deviceId: string;
-	/** Bearer token. Device-bound, no expiry short enough to matter offline. */
-	token: string;
+  deviceId: string;
+  /** Bearer token. Device-bound, no expiry short enough to matter offline. */
+  token: string;
 }
 
 // ── POST /api/v1/sync/push ──────────────────────────────────────────────────
 
 export interface PushRequest {
-	changes: SyncRow[];
+  changes: SyncRow[];
 }
 
 export interface PushResponse {
-	/** How many rows were stored or won their merge. */
-	applied: number;
-	/** How many were older than what the server already held. LWW, not an error. */
-	superseded: number;
-	rejected: SyncRejection[];
-	/** Where the server's log now ends. Not a pull cursor — see `pull`. */
-	serverCursor: number;
+  /** How many rows were stored or won their merge. */
+  applied: number;
+  /** How many were older than what the server already held. LWW, not an error. */
+  superseded: number;
+  rejected: SyncRejection[];
+  /** Where the server's log now ends. Not a pull cursor — see `pull`. */
+  serverCursor: number;
 }
 
 // ── GET /api/v1/sync/pull ───────────────────────────────────────────────────
 
 export interface PullQuery {
-	/** Exclusive. `0` is "everything you have". */
-	since: number;
-	limit: number;
+  /** Exclusive. `0` is "everything you have". */
+  since: number;
+  limit: number;
 }
 
 export interface PullResponse {
-	changes: SyncRow[];
-	/** Feed this back as `since` next time. */
-	cursor: number;
-	hasMore: boolean;
+  changes: SyncRow[];
+  /** Feed this back as `since` next time. */
+  cursor: number;
+  hasMore: boolean;
 }
 
 // ── GET /api/v1/health ──────────────────────────────────────────────────────
 
 export interface HealthResponse {
-	ok: boolean;
-	version: string;
+  ok: boolean;
+  version: string;
 }
 
 // ── shared limits ───────────────────────────────────────────────────────────
@@ -133,11 +134,11 @@ export const PULL_PAGE_SIZE = 500;
  * gone, it stays gone — the winner decides every other field.
  */
 export function mergeDecision(
-	incoming: Pick<SyncRow, 'updatedAt' | 'deviceId'>,
-	existing: Pick<SyncRow, 'updatedAt' | 'deviceId'> | null
-): 'apply' | 'superseded' {
-	if (existing === null) return 'apply';
-	if (incoming.updatedAt > existing.updatedAt) return 'apply';
-	if (incoming.updatedAt < existing.updatedAt) return 'superseded';
-	return incoming.deviceId > existing.deviceId ? 'apply' : 'superseded';
+  incoming: Pick<SyncRow, "updatedAt" | "deviceId">,
+  existing: Pick<SyncRow, "updatedAt" | "deviceId"> | null,
+): "apply" | "superseded" {
+  if (existing === null) return "apply";
+  if (incoming.updatedAt > existing.updatedAt) return "apply";
+  if (incoming.updatedAt < existing.updatedAt) return "superseded";
+  return incoming.deviceId > existing.deviceId ? "apply" : "superseded";
 }

@@ -23,6 +23,7 @@ import type {
 	MetaEntry,
 	MonthTarget,
 	OutboxEntry,
+	Plan,
 	Reconciliation,
 	Schedule,
 	Txn,
@@ -380,6 +381,18 @@ export const migrations: Migration[] = [
 					if (typeof row.color !== 'string' || !row.color) row.color = fallback.color;
 				});
 		}
+	},
+	{
+		/**
+		 * `plans` — a saved plan for the month, Rozdělení příjmu (Q69,
+		 * 2026-09-09). A new table and nothing else, so only it is listed;
+		 * Dexie carries the rest forward. Indexed on the account it counts in
+		 * and on `updatedAt`, which is the order the list shows them in.
+		 */
+		version: 14,
+		stores: {
+			plans: 'id, accountId, updatedAt'
+		}
 	}
 ];
 
@@ -393,6 +406,7 @@ export class FinanceDb extends Dexie {
 	holdings!: EntityTable<Holding, 'id'>;
 	valuations!: EntityTable<Valuation, 'id'>;
 	schedules!: EntityTable<Schedule, 'id'>;
+	plans!: EntityTable<Plan, 'id'>;
 	dayMarks!: EntityTable<DayMark, 'date'>;
 	outbox!: EntityTable<OutboxEntry, 'seq'>;
 	meta!: EntityTable<MetaEntry, 'key'>;

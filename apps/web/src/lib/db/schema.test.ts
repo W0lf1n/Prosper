@@ -562,3 +562,32 @@ describe('v12 → v13 — Category.icon and Category.color', () => {
 		upgraded.close();
 	});
 });
+
+describe('v13 → v14 — plans', () => {
+	it('adds the table and leaves everything else where it was', async () => {
+		const name = `mig-plans-${Date.now()}`;
+		const old = await openAtVersion(name, 13);
+		await old.table('goals').put({
+			id: 'g1',
+			name: 'Rezerva',
+			why: 'Klid.',
+			targetAmount: 10000000,
+			targetDate: '2027-06-30',
+			linkedAccountId: null,
+			categoryId: null,
+			startDate: '2026-01-01',
+			startAmount: 0,
+			isPinned: false,
+			...SYNCED
+		});
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		await upgraded.open();
+		expect(upgraded.verno).toBe(14);
+		expect(upgraded.tables.map((t) => t.name)).toContain('plans');
+		expect(await upgraded.plans.count()).toBe(0);
+		expect((await upgraded.goals.get('g1'))?.name).toBe('Rezerva');
+		upgraded.close();
+	});
+});

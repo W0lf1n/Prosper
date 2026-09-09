@@ -111,6 +111,15 @@ export function split(a: Minor, parts: number): Minor[] {
 	return Array.from({ length: parts }, (_, i) => minor(sign * (base + (i < remainder ? 1 : 0))));
 }
 
+/**
+ * Round to the nearest whole unit of the currency — 1 234,50 → 1 235,00 —
+ * half away from zero. For figures a person will act on by hand: a standing
+ * order is not set in haléře.
+ */
+export function roundToUnit(a: Minor): Minor {
+	return mulRatio(mulRatio(a, 1, 100), 100, 1);
+}
+
 /** Percentage of `whole` that `part` represents, rounded to a whole percent. */
 export function percentOf(part: Minor, whole: Minor): number {
 	if (whole === 0) return 0;
