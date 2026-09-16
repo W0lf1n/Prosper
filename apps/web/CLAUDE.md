@@ -233,7 +233,11 @@ after the first seed, and its `resetDemo` clears every table in one
 transaction and reloads (not `db.delete()`: a delete needs every connection
 closed, and Dexie re-opens one for any live query the moment it is closed).
 Domů wears a badge, the sync room is not listed, and Začít znovu has no phrase
-in front of it. Nothing else branches on the flag; in the real build it is a
+in front of it. It installs as _Prosper demo_ with a ribboned icon:
+`app.html` picks `manifest-demo.webmanifest` and `icon-demo-180.png` through
+`%sveltekit.env.PUBLIC_DEMO_SUFFIX%`, which the Dockerfile sets beside
+`VITE_DEMO`, and the service worker precaches only its own set. Nothing else
+branches on the flag; in the real build it is a
 literal `false`, nothing behind it runs, and the seeder chunk is never fetched
 — only `deploy/docker-compose.demo.yml` sets it.
 

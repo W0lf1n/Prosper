@@ -27,7 +27,9 @@ COPY . .
 # `docker-compose.demo.yml` is the only thing that sets it.
 ARG VITE_DEMO=
 ENV VITE_DEMO=$VITE_DEMO
-RUN pnpm build
+# The demo also installs under its own name and icon: `app.html` picks the
+# manifest and the touch icon by this suffix, substituted at build time.
+RUN PUBLIC_DEMO_SUFFIX=$([ "$VITE_DEMO" = 1 ] && echo -demo) pnpm build
 
 # ── serve ───────────────────────────────────────────────────────────────────
 # nginx rather than a Node process. There is no server-side anything to run:

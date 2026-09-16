@@ -16,7 +16,14 @@ import { build, files, prerendered, version } from '$service-worker';
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 const CACHE = `prosper-${version}`;
-const PRECACHE = [...build, ...files, ...prerendered];
+/* Both icon sets and both manifests sit in `static/`; each build caches only
+   its own (Q74). `__DEMO__` is the build-time literal from `vite.config.ts`. */
+const OWN_FILES = files.filter((file) =>
+	__DEMO__
+		? !/\/(?:icon(?:-maskable)?-\d+\.png|manifest\.webmanifest)$/.test(file)
+		: !file.includes('-demo')
+);
+const PRECACHE = [...build, ...OWN_FILES, ...prerendered];
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(

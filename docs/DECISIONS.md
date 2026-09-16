@@ -3077,6 +3077,16 @@ any live query the moment it is closed, and the first attempt sat blocked for
 ever — from the screen and from the layout load alike, because the sync
 status module has a live query open before the load runs.)
 
+**It installs as its own app.** `static/manifest-demo.webmanifest` names it
+_Prosper demo_ and points at `icon-demo-*.png` — the real icon with an amber
+DEMO ribbon across the bottom, inside the maskable safe zone, rendered once
+from `icon.svg` and committed. `app.html` picks manifest and touch icon by
+`%sveltekit.env.PUBLIC_DEMO_SUFFIX%`, which the Dockerfile sets to `-demo`
+alongside `VITE_DEMO=1` and which is empty otherwise, so the real app's HTML
+is byte-for-byte what it was. The service worker precaches only its own
+build's icon set and manifest. On a phone with both installed, the home screen
+tells them apart at a glance, and so does the badge on Domů once it is open.
+
 **The wipe is a hard delete, on purpose.** Rule 2 protects a person's ledger
 and the tombstones a second device needs. The demo has neither: a soft wipe
 would leave a hundred tombstones behind every visitor and a growing database

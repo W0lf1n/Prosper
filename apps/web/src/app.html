@@ -26,9 +26,20 @@
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 		<meta name="apple-mobile-web-app-title" content="Prosper" />
-		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<!--
+		  `PUBLIC_DEMO_SUFFIX` is `-demo` in the demo build and empty otherwise
+		  (Q74): the demo installs as "Prosper demo" with a ribbon on its icon,
+		  so the two are never confused on one phone. Substituted at build time.
+		-->
+		<link
+			rel="manifest"
+			href="%sveltekit.assets%/manifest%sveltekit.env.PUBLIC_DEMO_SUFFIX%.webmanifest"
+		/>
 		<link rel="icon" href="%sveltekit.assets%/icon.svg" type="image/svg+xml" />
-		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-180.png" />
+		<link
+			rel="apple-touch-icon"
+			href="%sveltekit.assets%/icon%sveltekit.env.PUBLIC_DEMO_SUFFIX%-180.png"
+		/>
 		<script>
 			// Applied before first paint so a dark-mode launch never flashes paper white.
 			try {

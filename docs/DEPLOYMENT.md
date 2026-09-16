@@ -671,8 +671,9 @@ demo right after the real app, from the same commit. Take the line out of
 `.env` and the demo stops being touched; `docker compose -f docker-compose.demo.yml down`
 in `deploy/` removes it.
 
-**Install it on the demo phone** like the real one, from the demo domain.
-The badge on Domů says _ukázka_, so the two are never confused on one phone.
+**Install it on the demo phone** like the real one, from the demo domain. It
+lands on the home screen as _Prosper demo_ with a DEMO ribbon on its icon,
+and Domů says _ukázka_, so the two are never confused on one phone.
 
 ---
 
