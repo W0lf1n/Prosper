@@ -341,3 +341,16 @@ export function categoryOrder(txns: readonly Txn[], allIds: readonly string[]): 
 	}
 	return [...recent, ...allIds.filter((id) => !recent.includes(id))];
 }
+
+/**
+ * The rows the bank has only blocked so far — `isProvisional` and alive —
+ * newest first, so the one just typed is the one under the thumb (Q75).
+ * Absent is false: a row from an older build is not a hold.
+ */
+export function openHolds(txns: readonly Txn[]): Txn[] {
+	return txns
+		.filter((t) => !t.isDeleted && t.isProvisional === true)
+		.sort((a, b) =>
+			a.date === b.date ? (a.createdAt < b.createdAt ? 1 : -1) : a.date < b.date ? 1 : -1
+		);
+}

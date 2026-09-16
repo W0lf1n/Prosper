@@ -3105,3 +3105,34 @@ demo imports on launch) — the generator is one function and easier to keep
 honest against the seed than a JSON file nobody re-exports. And a demo API,
 for showing sync: the day the demo needs to show pairing, it is a second
 `.env` and the full compose file, not a change to the app.
+
+### Q75 — Blokace on Domů: the holds the bank has not posted, in the same deck · answered 2026-09-16
+
+**Asked for.** A card on Domů like _K potvrzení_, but for the rows marked
+_blokace_ — and nothing at all when there is none.
+
+**Answer.** `HoldCard` under the dues: one slide per row whose amount the
+bank has only blocked so far (`openHolds` in `domain/ledger.ts` — live,
+`isProvisional`, newest first, absent is false), on the active account like
+everything else on Domů. Each slide has the row and two pills. **Zaúčtováno**
+says the figure stood: the flag comes off and nothing else moves. **Jiná
+částka** — or tapping the row — opens a sheet that shows what the bank is
+holding and takes what actually settled; the amount and the flag change in
+one write. The toast carries Zpět, which puts the flag and the old amount
+back. With no hold open the card is not rendered, so a month without a card
+payment never sees it.
+
+**One deck, two cards.** The swiping, the dots and the position came out of
+`DueCard` into `Deck.svelte`, a component generic over its items with a
+`slide` snippet, so the two cards share one definition of what a deck is
+(rule 8) and a third — receivables, say — would be a snippet and a label.
+`Deck` draws the slides and the dots; the card around it, the label, the
+`1 z 3` counter (bound through `position`) and any pill under the dots stay
+the caller's.
+
+**Why this and not the tape.** The badge on Výpis already says which rows
+are holds, and the edit sheet already clears the flag — but that is a search
+through the tape for a word. Tracking is about the balance being right today,
+and a hold is the one kind of row whose figure is known to be wrong soon: the
+card puts the question where the day starts, next to the dues, and answers it
+in one tap.

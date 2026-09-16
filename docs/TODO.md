@@ -17,7 +17,7 @@
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 543 pass, 26 files              |
+| `pnpm test`                | 545 pass, 26 files              |
 | `pnpm check`               | 0 errors, 0 warnings, 437 files |
 | `pnpm lint`                | eslint passes; see the note     |
 | `pnpm budget`              | 90.6 kB of 150 kB brotli        |

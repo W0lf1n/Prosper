@@ -13,7 +13,7 @@
 	import { liveQuery } from 'dexie';
 	import { resolve } from '$app/paths';
 	import { db } from '$lib/db/schema';
-	import { confirmScheduled, deleteTxn, skipScheduled } from '$lib/db/repo';
+	import { confirmScheduled, deleteTxn, skipScheduled, updateTxn } from '$lib/db/repo';
 	import { IS_DEMO } from '$lib/demo';
 	import { homeCurrency, liveAccounts } from '$lib/domain/accounts';
 	import { summariseMonth } from '$lib/domain/checks';
@@ -21,7 +21,7 @@
 	import { formatDayHeading, formatMonthHeading, monthKey, today } from '$lib/domain/datetime';
 	import { goalStatus, pickPrimary, type GoalStatus } from '$lib/domain/goals';
 	import { readHoldings, wealthTotal } from '$lib/domain/holdings';
-	import { balancesByCurrency } from '$lib/domain/ledger';
+	import { balancesByCurrency, openHolds } from '$lib/domain/ledger';
 	import { ZERO, formatMoney, type Minor } from '$lib/domain/money';
 	import { dueGroups, type DueGroup } from '$lib/domain/recurring';
 	import type {
@@ -35,6 +35,7 @@
 		Valuation
 	} from '$lib/domain/types';
 	import DueCard from '$lib/ui/DueCard.svelte';
+	import HoldCard from '$lib/ui/HoldCard.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import { categoryStyle, colorVar } from '$lib/ui/palette';
@@ -90,6 +91,9 @@
 				(!group.item.schedule.accountId || group.item.schedule.accountId === data.accountId)
 		)
 	);
+
+	/** The rows the bank has only blocked so far, on this account (Q75). */
+	const holds = $derived(openHolds(accountTxns));
 
 	/** Goals live in the home currency, so the card speaks only there (Q49). */
 	const goal = $derived.by<GoalStatus | null>(() => {
@@ -185,6 +189,23 @@
 		await skipScheduled(group.item);
 		toast.show(`„${group.item.schedule.payee}“ tenhle měsíc přeskočeno`);
 	}
+
+	/** The bank posted it: the flag comes off, the amount corrected if it moved. */
+	async function settleHold(txn: Txn, amount: Minor | null) {
+		const settled = await updateTxn(txn.id, {
+			isProvisional: false,
+			...(amount !== null && amount !== txn.amount ? { amount } : {})
+		});
+		if (!settled) return;
+		navigator.vibrate?.(12);
+		toast.money(settled.amount, {
+			message: `${txn.payee || 'záznam'} · zaúčtováno`,
+			code: currency,
+			undo: async () => {
+				await updateTxn(txn.id, { isProvisional: true, amount: txn.amount });
+			}
+		});
+	}
 </script>
 
 <svelte:head>
@@ -219,6 +240,8 @@
 		onconfirm={confirmDue}
 		onskip={skipDue}
 	/>
+
+	<HoldCard {holds} categories={liveCategories} code={currency} onsettle={settleHold} />
 
 	{#if currency === home}
 		{#if goal}

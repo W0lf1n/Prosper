@@ -576,6 +576,11 @@ already on Domů, so the slot went to Nastavení (Q61).
 │ │             ● ○ ○               │  │
 │ │ [ Potvrdit všechny ]            │  │
 │ └────────────────────────────────┘  │
+│ ┌ Blokace ────────────────── ● ┐  │  ← only while a hold is open (Q75)
+│ │ ┌ (⋯) Shell · OSTATNÍ · předevčírem┐│  │  ← the same deck; the bank has not posted it
+│ │ │ [ Zaúčtováno ] [ Jiná částka ]││  │
+│ │ └──────────────────────────────┘│  │
+│ └────────────────────────────────┘  │
 │ ┌ Cíl · Rezerva ── měsíc splněn ─┐  │  → /cil
 │ │ 5 000,00 Kč    z 5 000,00 Kč   │  │
 │ │ ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ │  │
@@ -596,7 +601,8 @@ Everything that used to be a glyph in a header slab is a card here: what the
 standing orders are waiting on — a deck of slides, one per due payment, swiped
 sideways under a `1 z 3` counter and a row of dots, with Potvrdit and Přeskočit
 on each (`ui/DueCard.svelte`, Q71; tapping the row first when the amount needs
-correcting);
+correcting); the holds the bank has not posted yet, in the same deck, each
+settled as it stood or at the figure that arrived (`ui/HoldCard.svelte`, Q75);
 the goal's month, with its meter and a badge when the month is met or behind;
 the wealth total with its two halves; and the last three rows of the ledger
 across every account, each with its bucket's circle.

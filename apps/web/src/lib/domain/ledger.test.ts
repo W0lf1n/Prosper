@@ -6,6 +6,7 @@ import {
 	buildTape,
 	categoryOrder,
 	categoryRanking,
+	openHolds,
 	recentPayees,
 	suggestPayees
 } from './ledger';
@@ -342,5 +343,48 @@ describe('suggestPayees()', () => {
 		);
 		expect(suggestPayees(many, 'kaf')).toHaveLength(8);
 		expect(suggestPayees(many, 'kaf', 3)).toHaveLength(3);
+	});
+});
+
+describe('openHolds — the rows the bank has only blocked (Q75)', () => {
+	const hold = (over: Partial<Txn>): Txn => ({
+		id: over.id ?? 'h',
+		accountId: 'acc',
+		date: '2026-09-14',
+		amount: minor(-152000),
+		categoryId: 'cat',
+		payee: 'Shell',
+		note: null,
+		transferPairId: null,
+		source: 'manual',
+		isCleared: false,
+		createdAt: '2026-09-14T10:00:00.000Z',
+		isOneOff: false,
+		isProvisional: true,
+		shares: [],
+		scheduleId: null,
+		updatedAt: '2026-09-14T10:00:00.000Z',
+		deviceId: 'd',
+		isDeleted: false,
+		...over
+	});
+
+	it('keeps only live provisional rows, and treats an absent flag as false', () => {
+		const rows = [
+			hold({ id: 'open' }),
+			hold({ id: 'posted', isProvisional: false }),
+			hold({ id: 'gone', isDeleted: true }),
+			hold({ id: 'old-build', isProvisional: undefined as unknown as boolean })
+		];
+		expect(openHolds(rows).map((t) => t.id)).toEqual(['open']);
+	});
+
+	it('puts the newest first, by date and then by when it was typed', () => {
+		const rows = [
+			hold({ id: 'a', date: '2026-09-10' }),
+			hold({ id: 'b', date: '2026-09-14', createdAt: '2026-09-14T08:00:00.000Z' }),
+			hold({ id: 'c', date: '2026-09-14', createdAt: '2026-09-14T09:00:00.000Z' })
+		];
+		expect(openHolds(rows).map((t) => t.id)).toEqual(['c', 'b', 'a']);
 	});
 });

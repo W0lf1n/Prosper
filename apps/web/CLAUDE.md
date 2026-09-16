@@ -152,7 +152,7 @@ The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/ci
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-six files, **543
+Vitest, node environment, `requireAssertions: true`. Twenty-six files, **545
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
