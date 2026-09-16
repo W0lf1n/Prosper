@@ -38,6 +38,7 @@ function txn(date: string, amount: number, categoryId: string, patch: Partial<Tx
 		isCleared: false,
 		createdAt: `${date}T10:00:00.000Z`,
 		isOneOff: false,
+		isProvisional: false,
 		shares: [],
 		scheduleId: null,
 		...SYNCED,

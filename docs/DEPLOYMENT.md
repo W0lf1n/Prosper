@@ -1,6 +1,6 @@
 # Deployment — running Prosper on a VPS
 
-**Revised:** 2026-08-28
+**Revised:** 2026-09-16
 **Audience:** whoever is holding the SSH key
 
 > This is the rest of P2, and none of it is application code. `TODO.md` §4.1 is
@@ -438,6 +438,18 @@ copy does not exist yet.
 ## Updating
 
 ```bash
+sudo /srv/prosper/deploy/deploy.sh
+```
+
+That is the whole update: fetch, reset the checkout to `origin/master`, build
+both images, start the containers, and wait for `/api/v1/health` to answer from
+the new build. It takes a commit id to deploy an older one, and it refuses
+anything that is not on `origin/master`. **Deploying from GitHub** below is the
+same script, run by a workflow instead of a person.
+
+By hand, it is:
+
+```bash
 cd /srv/prosper && sudo git pull && cd deploy && docker compose build --pull && docker compose up -d
 ```
 
@@ -467,6 +479,146 @@ whose display mode, icons and colours were baked in at install; Chrome
 re-reads the manifest on its own within a day or so of a change and rebuilds
 the WebAPK quietly, or the app can be removed and installed again to have it
 at once. The switch to fullscreen (Q64) is one of these.
+
+---
+
+## Deploying from GitHub
+
+Once this is set up, **a push to master is a release**: the `CI` workflow runs,
+and when it is green the `Deploy` workflow (`.github/workflows/deploy.yml`)
+opens one SSH connection to the box and sends the commit id. Nothing is built
+on GitHub and nothing is uploaded — the box builds from source exactly as
+`deploy.sh` does by hand, because it _is_ `deploy.sh`.
+
+What keeps that connection from being a shell on the server (Q72):
+
+- **An account that can do one thing.** `prosper-deploy` has a locked password
+  and a key that carries a forced `command=`: whatever the client asks for,
+  `/usr/local/bin/prosper-deploy` runs instead, and it accepts a commit id or
+  `master` and nothing else.
+- **One sudoers line.** The account may run `/srv/prosper/deploy/deploy.sh` as
+  root and nothing else — which is why the checkout must be owned by root and
+  writable by nobody else. An account that could edit that script could edit
+  what runs as root.
+- **A commit that is not on `origin/master` is refused.** The key cannot deploy
+  a branch, and cannot deploy a commit it made up.
+- **The host key is pinned** in a secret. A changed host key stops the
+  deployment; it does not send the key somewhere else.
+
+### On the box, once
+
+The account:
+
+```bash
+sudo useradd --create-home --shell /bin/bash --comment "GitHub Actions deploy" prosper-deploy && sudo passwd --lock prosper-deploy
+```
+
+The forced command, installed outside the repository so the account cannot
+reach it through the checkout:
+
+```bash
+sudo install -m 755 -o root -g root /srv/prosper/deploy/prosper-deploy /usr/local/bin/prosper-deploy
+```
+
+The one thing it may run as root:
+
+```bash
+printf 'prosper-deploy ALL=(root) NOPASSWD: /srv/prosper/deploy/deploy.sh, /srv/prosper/deploy/deploy.sh *\n' | sudo tee /etc/sudoers.d/prosper-deploy >/dev/null && sudo chmod 440 /etc/sudoers.d/prosper-deploy && sudo visudo -c
+```
+
+And the reason that line is safe: the checkout is root's, and nothing in it is
+writable by anyone else. The `find` must print nothing:
+
+```bash
+sudo chown -R root:root /srv/prosper && sudo find /srv/prosper -perm -o+w -not -type l
+```
+
+Re-run the `install` line whenever `deploy/prosper-deploy` changes in the
+repository — the copy in `/usr/local/bin` is the one that runs, and a
+`git pull` does not touch it.
+
+### The key
+
+Generate it on your own machine, not on the box. The private half goes to
+GitHub and nowhere else:
+
+```bash
+ssh-keygen -t ed25519 -N '' -C prosper-deploy -f ~/.ssh/prosper-deploy
+```
+
+Install the public half on the box with the forced command and every
+forwarding switched off. Paste the one line of `~/.ssh/prosper-deploy.pub`
+where `PUBKEY` is:
+
+```bash
+sudo install -d -m 700 -o prosper-deploy -g prosper-deploy /home/prosper-deploy/.ssh
+```
+
+```bash
+echo 'command="/usr/local/bin/prosper-deploy",no-agent-forwarding,no-port-forwarding,no-pty,no-user-rc,no-X11-forwarding PUBKEY' | sudo tee /home/prosper-deploy/.ssh/authorized_keys >/dev/null
+```
+
+```bash
+sudo chown prosper-deploy:prosper-deploy /home/prosper-deploy/.ssh/authorized_keys && sudo chmod 600 /home/prosper-deploy/.ssh/authorized_keys
+```
+
+Prove it from your machine before GitHub ever tries. This deploys the newest
+master:
+
+```bash
+ssh -i ~/.ssh/prosper-deploy -o IdentitiesOnly=yes -o BatchMode=yes prosper-deploy@YOUR.DOMAIN master
+```
+
+And this must be refused — the wrapper says so on stderr and nothing runs:
+
+```bash
+ssh -i ~/.ssh/prosper-deploy -o IdentitiesOnly=yes -o BatchMode=yes prosper-deploy@YOUR.DOMAIN 'cat /etc/passwd'
+```
+
+### The three secrets
+
+In the repository on GitHub: _Settings › Secrets and variables › Actions_. The
+workflow runs in an environment called `production`, so they can live on the
+environment instead — which is also where a required reviewer goes, if a
+deployment should ever wait for a tap.
+
+| Secret               | Value                                                              |
+| -------------------- | ------------------------------------------------------------------ |
+| `DEPLOY_HOST`        | `YOUR.DOMAIN` — the box, as the workflow will address it           |
+| `DEPLOY_SSH_KEY`     | The whole of `~/.ssh/prosper-deploy` — the private key, every line |
+| `DEPLOY_KNOWN_HOSTS` | The box's host key line, from the command below                    |
+
+The host key line, run on the box:
+
+```bash
+printf '%s %s\n' YOUR.DOMAIN "$(sudo cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"
+```
+
+Then push to master, or run _Deploy_ by hand from the Actions tab. The run's
+log is `deploy.sh`'s log: the commit it moved from and to, the build, and the
+health line.
+
+### When it does not
+
+**The workflow fails at "The three secrets are set".** It names the one that is
+missing.
+
+**`Permission denied (publickey)`.** The public half on the box does not match
+the private half in the secret, or the `authorized_keys` mode is wrong. On the
+box:
+
+```bash
+sudo journalctl -u ssh -n 30 --no-pager | grep -i -E 'prosper-deploy|refused|denied|invalid'
+```
+
+**`Host key verification failed`.** `DEPLOY_KNOWN_HOSTS` does not match the
+box — a reinstall, or the hostname in it differs from `DEPLOY_HOST`.
+
+**`refused: … is not on origin/master`.** The box's `origin` does not have the
+commit yet, or _Deploy_ was dispatched with a commit from a branch.
+
+**`sudo: a password is required`.** The sudoers line is missing or names a
+different path; `sudo visudo -c` reads it back.
 
 ---
 

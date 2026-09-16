@@ -584,10 +584,47 @@ describe('v13 → v14 — plans', () => {
 
 		const upgraded = new FinanceDb(name);
 		await upgraded.open();
-		expect(upgraded.verno).toBe(14);
+		expect(upgraded.verno).toBe(SCHEMA_VERSION);
 		expect(upgraded.tables.map((t) => t.name)).toContain('plans');
 		expect(await upgraded.plans.count()).toBe(0);
 		expect((await upgraded.goals.get('g1'))?.name).toBe('Rezerva');
+		upgraded.close();
+	});
+});
+
+describe('v14 → v15 — Txn.isProvisional', () => {
+	it('backfills false rather than leaving the field absent, and keeps a true one', async () => {
+		const name = `mig-provisional-${Date.now()}`;
+		const old = await openAtVersion(name, 14);
+		const row = {
+			accountId: 'acc',
+			date: '2026-09-15',
+			amount: -150000,
+			categoryId: 'cat',
+			payee: 'Shell',
+			note: null,
+			transferPairId: null,
+			source: 'manual',
+			isCleared: false,
+			createdAt: '2026-09-15T10:00:00.000Z',
+			isOneOff: false,
+			shares: [],
+			scheduleId: null,
+			...SYNCED
+		};
+		await old.table('txns').bulkPut([
+			{ ...row, id: 't1' },
+			{ ...row, id: 't2', isProvisional: true }
+		]);
+		old.close();
+
+		const upgraded = new FinanceDb(name);
+		const plain = await upgraded.txns.get('t1');
+		// `undefined` is falsy, so a reader would cope — but the standing rule
+		// is that a row's shape is the row's shape, not a guard in every reader.
+		expect(plain).toHaveProperty('isProvisional');
+		expect(plain?.isProvisional).toBe(false);
+		expect((await upgraded.txns.get('t2'))?.isProvisional).toBe(true);
 		upgraded.close();
 	});
 });

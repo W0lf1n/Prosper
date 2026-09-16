@@ -21,6 +21,7 @@ function txn(date: string, patch: Partial<Txn> = {}): Txn {
 		isCleared: false,
 		createdAt: `${date}T10:00:00.000Z`,
 		isOneOff: false,
+		isProvisional: false,
 		shares: [],
 		scheduleId: null,
 		...SYNCED,

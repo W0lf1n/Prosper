@@ -29,6 +29,7 @@ function txn(date: string, amount: number, extra: Partial<Txn> = {}): Txn {
 		source: 'manual',
 		isCleared: false,
 		isOneOff: false,
+		isProvisional: false,
 		shares: [],
 		scheduleId: null,
 		createdAt: `2026-08-01T10:00:${seq.slice(-2)}.000Z`,

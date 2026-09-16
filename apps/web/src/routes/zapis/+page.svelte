@@ -92,6 +92,7 @@
 	let date = $state(stickyDate ?? today());
 	let dateSheetOpen = $state(false);
 	let isOneOff = $state(false);
+	let isProvisional = $state(false);
 	let checksExpanded = $state(false);
 	let owedSheetOpen = $state(false);
 	let owedInput = $state('');
@@ -168,6 +169,9 @@
 			categoryId,
 			payee,
 			isOneOff,
+			/* The switch lives under Výdaj only; set there and the direction
+			   flipped, it must not ride onto an income row. */
+			isProvisional: direction === 'out' && isProvisional,
 			shares: direction === 'out' && owedAmount ? [{ who: owedBy, amount: owedAmount }] : []
 		});
 
@@ -400,24 +404,45 @@
 
 		{#if direction === 'out'}
 			<div class="props">
-				<div class="prop">
-					<button
-						type="button"
-						class="toggle"
-						role="switch"
-						aria-checked={isOneOff}
-						aria-label="Mimořádný výdaj"
-						onclick={() => (isOneOff = !isOneOff)}
-					></button>
-					<span class="prop__name" class:prop__name--on={isOneOff}>
-						<Explainer term="mimořádný výdaj" title="Mimořádný výdaj">
-							<p>
-								Výdaj mimo běžný chod měsíce — pračka, servis auta, letenka. Ze zůstatku odejde jako
-								každý jiný. Jen se nepočítá do toho, co měsíc obvykle stojí, takže ti jedna pračka
-								nezkazí srovnání s ostatními měsíci.
-							</p>
-						</Explainer>
-					</span>
+				<div class="props__flags">
+					<div class="prop">
+						<button
+							type="button"
+							class="toggle"
+							role="switch"
+							aria-checked={isOneOff}
+							aria-label="Mimořádný výdaj"
+							onclick={() => (isOneOff = !isOneOff)}
+						></button>
+						<span class="prop__name" class:prop__name--on={isOneOff}>
+							<Explainer term="mimořádný výdaj" title="Mimořádný výdaj">
+								<p>
+									Výdaj mimo běžný chod měsíce — pračka, servis auta, letenka. Ze zůstatku odejde
+									jako každý jiný. Jen se nepočítá do toho, co měsíc obvykle stojí, takže ti jedna
+									pračka nezkazí srovnání s ostatními měsíci.
+								</p>
+							</Explainer>
+						</span>
+					</div>
+					<div class="prop">
+						<button
+							type="button"
+							class="toggle"
+							role="switch"
+							aria-checked={isProvisional}
+							aria-label="Částka se ještě může změnit"
+							onclick={() => (isProvisional = !isProvisional)}
+						></button>
+						<span class="prop__name" class:prop__name--on={isProvisional}>
+							<Explainer term="částka se může změnit" title="Částka se ještě může změnit">
+								<p>
+									Banka zatím částku jen zablokovala, nebo se účet ještě dopočítá — tankování,
+									hotel, záloha. Zapiš, co vidíš teď, ať v zůstatku nechybí. Až přijde konečná
+									částka, na výpisu ji přepíšeš a přepínač vypneš.
+								</p>
+							</Explainer>
+						</span>
+					</div>
 				</div>
 				<button type="button" class="prop prop--owed" onclick={() => (owedSheetOpen = true)}>
 					{#if owedAmount === null}
@@ -786,11 +811,18 @@
 		padding: 0 var(--space-1);
 	}
 
+	/* The two switches stack on the left; dluží mi keeps the right edge. */
+	.props__flags {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
 	.prop {
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		min-height: 44px;
+		min-height: 40px;
 		color: var(--ink-2);
 		font-size: var(--text-md);
 	}

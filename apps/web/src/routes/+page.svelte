@@ -280,7 +280,12 @@
 					</span>
 					<span class="row__body">
 						<span class="row__title">{rowTitle(txn)}</span>
-						<span class="row__sub">{rowSub(txn)}</span>
+						<span class="row__sub">
+							{#if txn.isProvisional}
+								<span class="badge badge--tiny recent__flag">předběžně</span>
+							{/if}
+							{rowSub(txn)}
+						</span>
 					</span>
 					<span class="row__amount" class:row__amount--in={txn.amount > 0}>
 						{formatMoney(txn.amount, { sign: 'always', code })}
@@ -294,6 +299,13 @@
 <TabBar />
 
 <style>
+	/* The sub-line is text and ends in an ellipsis; the badge goes first, so
+	   it is the bucket that gets cut, never the flag. */
+	.recent__flag {
+		margin-right: 4px;
+		vertical-align: middle;
+	}
+
 	.top {
 		display: flex;
 		align-items: center;

@@ -1,6 +1,6 @@
 # TODO — what is left
 
-**Revised:** 2026-09-06
+**Revised:** 2026-09-16
 **Audience:** Petr (decisions), Claude Code (implementation)
 
 > The only file in `docs/` that carries a backlog. Everything else describes the
@@ -13,16 +13,16 @@
 
 ---
 
-## State, 2026-09-09
+## State, 2026-09-16
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 534 pass, 25 files              |
+| `pnpm test`                | 536 pass, 25 files              |
 | `pnpm check`               | 0 errors, 0 warnings, 437 files |
 | `pnpm lint`                | eslint passes; see the note     |
-| `pnpm budget`              | 87.5 kB of 150 kB brotli        |
+| `pnpm budget`              | 90.6 kB of 150 kB brotli        |
 | `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v14** · **7**                 |
+| Schema · backup format     | **v15** · **7**                 |
 
 **Note on `pnpm lint`:** on a checkout made with `core.autocrlf=true` every
 file has CRLF endings and Prettier's check fails on all of them, touched or
@@ -229,6 +229,11 @@ What is genuinely left needs a box, not a keyboard:
   dump nobody has restored is a hypothesis.
 - **The domain** (`DECISIONS.md`, Q0 — Domain). Nothing in the repository
   hard-codes one; it is typed once into the host vhost.
+- **The deploy account and the three secrets** (`DEPLOYMENT.md` › _Deploying
+  from GitHub_, Q72). The `Deploy` workflow exists and runs after every green
+  CI on master; until the account, the key and the secrets exist it fails at
+  its first step and names the missing secret, and updating stays `deploy.sh`
+  by hand.
 
 ### 4.2 P3 — the Training law
 

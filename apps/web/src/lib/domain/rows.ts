@@ -149,6 +149,7 @@ const SHAPES: Record<SyncedEntity, Shape> = {
 		isCleared: optional(bool),
 		createdAt: optional(string),
 		isOneOff: optional(bool),
+		isProvisional: optional(bool),
 		shares: optional(listOf(TXN_SHARE)),
 		scheduleId: optional(nullable(string)),
 		...LEGACY_OWED,

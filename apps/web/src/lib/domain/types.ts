@@ -163,6 +163,20 @@ export interface Txn extends Synced {
 	 */
 	isOneOff: boolean;
 	/**
+	 * The amount is not final yet — DECISIONS Q70, schema v15.
+	 *
+	 * A card payment the bank has only blocked so far, a bill still being
+	 * totted up, a deposit: the row is written the moment the money moves, so
+	 * the balance is right today, and the flag says the figure on it is the
+	 * one known today rather than the one that will settle. The tape marks it;
+	 * the edit sheet corrects the amount and clears the flag. Nothing computes
+	 * with it — a provisional koruna weighs the same as any other.
+	 *
+	 * Rows written by older builds may lack it. Every reader treats absent as
+	 * false, which `undefined` already is in a condition.
+	 */
+	isProvisional: boolean;
+	/**
 	 * Who pays parts of this back — empty on most rows (Q25, Q47).
 	 *
 	 * Until v9 this was a single `owedAmount` / `owedBy` / `settledByTxnId`

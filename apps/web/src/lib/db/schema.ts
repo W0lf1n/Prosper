@@ -393,6 +393,28 @@ export const migrations: Migration[] = [
 		stores: {
 			plans: 'id, accountId, updatedAt'
 		}
+	},
+	{
+		/**
+		 * `Txn.isProvisional` — an amount the bank has only blocked so far
+		 * (Q70, 2026-09-16).
+		 *
+		 * No index changes, so `txns` is not restated — IndexedDB could not
+		 * index a boolean anyway. Backfilled to `false` rather than left
+		 * absent, for the standing reason (v5, v7, v8, v9, v10, v12, v13): an
+		 * absent field is a guard in every reader for ever. A row that already
+		 * carries the flag (a merge from a newer device) is left alone.
+		 */
+		version: 15,
+		stores: {},
+		upgrade: async (tx: Transaction) => {
+			await tx
+				.table('txns')
+				.toCollection()
+				.modify((row: { isProvisional?: unknown }) => {
+					if (typeof row.isProvisional !== 'boolean') row.isProvisional = false;
+				});
+		}
 	}
 ];
 

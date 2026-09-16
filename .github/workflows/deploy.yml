@@ -1,0 +1,101 @@
+# Ships master to the VPS, once CI has passed on it.
+#
+# Not a push trigger: `workflow_run` fires when the CI workflow finishes, and
+# the job proceeds only if that run succeeded, so a commit that fails a test is
+# never the one on the phone. The manual trigger is for a re-run (fresh base
+# images, a box restored from backup) and takes an optional commit.
+#
+# What it does is one SSH command: the commit id, to an account whose key can
+# do nothing else (`deploy/prosper-deploy`). Building happens on the box, from
+# source, as it always has. There is no registry and nothing is uploaded.
+# Setting up the account and the three secrets is in `docs/DEPLOYMENT.md`
+# under "Deploying from GitHub".
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit to deploy (40 hex digits), or empty for the newest master
+        required: false
+        default: ''
+
+# Two deployments never overlap, and a queued one is not cancelled: the box
+# must end up on the newest commit, not on whichever one was left running.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy to the VPS
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    env:
+      # Read by the shell as variables, never interpolated into a script, so a
+      # value with a quote in it cannot become a command.
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+      REQUESTED: ${{ inputs.commit }}
+    steps:
+      - name: Which commit
+        id: which
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+            sha="$WORKFLOW_RUN_SHA"
+          else
+            sha="${REQUESTED:-master}"
+          fi
+          case "$sha" in
+            master) ;;
+            *)
+              if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+                echo "::error::$sha is not a commit id"
+                exit 1
+              fi
+              ;;
+          esac
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying $sha"
+
+      - name: The three secrets are set
+        run: |
+          for name in DEPLOY_HOST DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [ -z "$(printenv "$name")" ]; then
+              echo "::error::secret $name is not set; see docs/DEPLOYMENT.md, Deploying from GitHub"
+              exit 1
+            fi
+          done
+
+      - name: The key and the host
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Pinned, not trusted on first use: a host key that changed is a
+          # deployment that stops, not one that goes somewhere else.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          SHA: ${{ steps.which.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "prosper-deploy@$DEPLOY_HOST" "$SHA"
+
+      - name: Forget the key
+        if: always()
+        run: rm -f ~/.ssh/deploy

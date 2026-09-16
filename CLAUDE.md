@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-09-09 · schema v14 · 534 web tests · 56 API tests
+**Last revised:** 2026-09-16 · schema v15 · 536 web tests · 56 API tests
 
 ---
 
@@ -101,9 +101,11 @@ apps/web/src/
 `apps/web/src/lib/sync/` is the client half.
 
 `deploy/` is the VPS: `docker-compose.yml` for all three containers, both nginx
-configs, and `backup.sh`. The web image is `apps/web/Dockerfile` and builds from
-the **repository root**, because the client imports a sibling workspace package.
-The runbook is `docs/DEPLOYMENT.md`.
+configs, `backup.sh`, and the update as one command — `deploy.sh`, which the
+`Deploy` workflow (`.github/workflows/deploy.yml`) reaches through
+`prosper-deploy`, the forced SSH command (Q72). The web image is
+`apps/web/Dockerfile` and builds from the **repository root**, because the
+client imports a sibling workspace package. The runbook is `docs/DEPLOYMENT.md`.
 
 ### The domain layer
 

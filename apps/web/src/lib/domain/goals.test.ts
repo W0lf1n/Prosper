@@ -57,6 +57,7 @@ function txn(amount: number, date: string, categoryId: string | null = SAVE): Tx
 		source: 'manual',
 		isCleared: false,
 		isOneOff: false,
+		isProvisional: false,
 		shares: [],
 		scheduleId: null,
 		createdAt: `${date}T10:00:00.000Z`,

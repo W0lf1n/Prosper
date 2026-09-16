@@ -14,3 +14,4 @@ Dockerfile    text eol=lf
 .dockerignore text eol=lf
 *.yml         text eol=lf
 *.yaml        text eol=lf
+deploy/prosper-deploy text eol=lf

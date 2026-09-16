@@ -60,6 +60,7 @@ nothing.
 | Every day is materialised in the tape, including the ones nothing happened on. A day with no expense reads `bez výdaje`, as a statement rather than a hole.                                     | `domain/ledger.ts` → `buildTape`    |
 | A forgotten day is fixed by typing the row with its date, days later if need be. Nothing has to be cleared first.                                                                              | `/` → the date sheet                |
 | The month says how many days cost nothing — a figure off the ledger alone, with no second signal to maintain.                                                                                  | `domain/coverage.ts`                |
+| A payment the bank has only blocked is written at once, with the figure known today, and flagged _předběžně_ until it settles — the balance is right now, not after the statement.             | `Txn.isProvisional` — Q70           |
 
 **The original spreadsheet had no dates at all** — only which month sheet a row
 sat on. Tracking was, strictly speaking, impossible. That single observation
@@ -311,6 +312,7 @@ interface Txn extends Synced {
 	createdAt: string;
 
 	isOneOff: boolean; // DEVIATION — DECISIONS.md Q22
+	isProvisional: boolean; // the bank has only blocked it so far — DECISIONS.md Q70
 	shares: TxnShare[]; // who pays parts back — DECISIONS.md Q25, Q47
 	scheduleId: string | null; // DECISIONS.md Q40 — null for anything hand-typed
 }
@@ -567,9 +569,12 @@ already on Domů, so the slot went to Nastavení (Q61).
 │           Zůstatek měsíce          │
 │           +3 500,00 Kč             │  ← the month's net, 44 px
 │      [↑ 50 000,00] [↓ 46 500,00]   │
-│ ┌ K potvrzení ─────────────── ● ┐  │  ← only while a confirm schedule is due
-│ │ (⌂) Internet · BYDLENÍ · dnes  │  │
-│ │ [ Potvrdit ] [ Přeskočit ]     │  │
+│ ┌ K potvrzení ─────────── 1 z 3 ┐  │  ← only while a confirm schedule is due
+│ │ ┌ (⌂) Internet · BYDLENÍ · dnes┐│  │  ← one slide per due, swiped sideways (Q71)
+│ │ │ [ Potvrdit ] [ Přeskočit ]   ││  │
+│ │ └──────────────────────────────┘│  │
+│ │             ● ○ ○               │  │
+│ │ [ Potvrdit všechny ]            │  │
 │ └────────────────────────────────┘  │
 │ ┌ Cíl · Rezerva ── měsíc splněn ─┐  │  → /cil
 │ │ 5 000,00 Kč    z 5 000,00 Kč   │  │
@@ -588,8 +593,10 @@ The month's standing is the first thing visible, every launch — the answer to
 month (Q49); the two pills under it are what came in and what went out.
 
 Everything that used to be a glyph in a header slab is a card here: what the
-standing orders are waiting on, with Potvrdit and Přeskočit under each row
-(`ui/DueCard.svelte`, tapping the row first when the amount needs correcting);
+standing orders are waiting on — a deck of slides, one per due payment, swiped
+sideways under a `1 z 3` counter and a row of dots, with Potvrdit and Přeskočit
+on each (`ui/DueCard.svelte`, Q71; tapping the row first when the amount needs
+correcting);
 the goal's month, with its meter and a badge when the month is met or behind;
 the wealth total with its two halves; and the last three rows of the ledger
 across every account, each with its bucket's circle.
@@ -607,6 +614,7 @@ across every account, each with its bucket's circle.
 │ [(🛒) POTRAVINY] [(🍴) JÍDLO] [(⌂)…│  ← ranked, every bucket, search at the end
 │ [ dnes ] [ komu / za co          ] │
 │ (○) mimořádný výdaj     dluží mi › │
+│ (○) částka se může změnit          │  ← the bank has only blocked it (Q70)
 │ ● Spíš JÍDLO?             [JÍDLO]  │  ← live check, one-tap fix
 │      1        2        3           │
 │      4        5        6           │  ← 56 px keys, transparent, lit on press
@@ -625,9 +633,10 @@ makes, so every other screen follows (Q50). The currency beside the amount is
 text, not a control: the rail is the switch (Q56).
 
 Below the amount: the bucket rail (every category, most-used first, a coloured
-circle on each), the date pill and the payee field, the two rare properties on
-an outflow, and the live check strip with its one-tap fix. Nothing here blocks a
-save; the pill dims and reads _Vyber kategorii_ until there is a bucket.
+circle on each), the date pill and the payee field, the three rare properties on
+an outflow — one-off, provisional, and who pays part back — and the live check
+strip with its one-tap fix. Nothing here blocks a save; the pill dims and reads
+_Vyber kategorii_ until there is a bucket.
 
 The search pill at the rail's end opens the whole list in a sheet, and the
 list ends in a row that makes a bucket: whatever was typed into the search is
@@ -664,6 +673,11 @@ statement's figure under it, and computes the difference as you type.
 its receivable: mark it received, change the share, change who owes it, add a
 second person, or clear it. Přehled keeps the list of everything outstanding —
 that is the report — but the action lives where the app shows you the debt.
+
+**A provisional amount is on the row too** (Q70). A payment the bank has only
+blocked wears a `předběžně` badge on its sub-line, here and in Domů's last
+rows; the same sheet carries the switch, so the day the bank settles, the
+amount is overwritten and the switch turned off in one save.
 
 **A difference is offered as a row to write, never as a balance to overwrite.**
 The adjustment is one-off by construction. The quieter second option — record
@@ -999,10 +1013,11 @@ Prosper/
 │  └─ api/                          # ASP.NET Core 10 + EF Core + Postgres 16
 │     ├─ src/Prosper.Api/           #   pairing, push, pull, health
 │     └─ tests/Prosper.Api.Tests/   #   50 tests, SQLite in memory
-├─ deploy/                          # compose, both nginx configs, backup.sh
+├─ deploy/                          # compose, both nginx configs, backup.sh, deploy.sh
 ├─ packages/contracts/              # the sync protocol, shared with the client
 ├─ scripts/check-bundle.mjs         # the 150 kB budget, enforced
 ├─ .github/workflows/ci.yml         # lint · check · test · build · budget · api
+├─ .github/workflows/deploy.yml     # master → the VPS, once CI is green (Q72)
 ├─ docs/
 │  ├─ PROJECT-PLAN.md               # this file — the app as it stands
 │  ├─ TODO.md                       # the only backlog

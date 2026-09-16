@@ -152,7 +152,7 @@ The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/ci
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-five files, **534
+Vitest, node environment, `requireAssertions: true`. Twenty-five files, **536
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -185,7 +185,7 @@ force-close → reopen → reconnect → verify.
 
 ## Data layer
 
-`lib/db/schema.ts` holds the `migrations` array, currently at **v14**. Add a new
+`lib/db/schema.ts` holds the `migrations` array, currently at **v15**. Add a new
 entry; never edit an existing one, even in development — a released version is
 already on the phone. `schema.test.ts` builds a database at the _old_ version
 and opens it with the current code: a migration that has only ever run against

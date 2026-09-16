@@ -275,6 +275,8 @@ export interface NewTxn {
 	note?: string | null;
 	source?: TxnSource;
 	isOneOff?: boolean;
+	/** The amount is the one known today, not the one that will settle (Q70). */
+	isProvisional?: boolean;
 	/** Who pays parts of this back. Empty for most rows. */
 	shares?: NewShare[];
 	/** Set only by the recurring catch-up. Everything typed by hand leaves it null. */
@@ -295,6 +297,7 @@ export async function createTxn(input: NewTxn): Promise<Txn> {
 		source: input.source ?? 'manual',
 		isCleared: false,
 		isOneOff: input.isOneOff ?? false,
+		isProvisional: input.isProvisional ?? false,
 		shares: normalizeShares(input.shares),
 		scheduleId: input.scheduleId ?? null,
 		createdAt: updatedAt,
@@ -311,7 +314,15 @@ export async function createTxn(input: NewTxn): Promise<Txn> {
 export type TxnPatch = Partial<
 	Pick<
 		Txn,
-		'amount' | 'date' | 'categoryId' | 'payee' | 'note' | 'isCleared' | 'isOneOff' | 'shares'
+		| 'amount'
+		| 'date'
+		| 'categoryId'
+		| 'payee'
+		| 'note'
+		| 'isCleared'
+		| 'isOneOff'
+		| 'isProvisional'
+		| 'shares'
 	>
 >;
 
@@ -660,6 +671,7 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 		source: 'manual' as const,
 		isCleared: false,
 		isOneOff: false,
+		isProvisional: false,
 		shares: [],
 		scheduleId: null,
 		createdAt: updatedAt,

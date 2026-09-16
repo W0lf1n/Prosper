@@ -31,6 +31,7 @@ const ROWS: Record<SyncedEntity, Record<string, unknown>> = {
 		source: 'manual',
 		isCleared: false,
 		isOneOff: false,
+		isProvisional: false,
 		shares: [{ id: 's1', who: 'Alex', amount: 12000, settledByTxnId: null }],
 		scheduleId: null,
 		createdAt: '2026-09-05T10:00:00.000Z',
@@ -176,7 +177,9 @@ describe('checkRow — what passes', () => {
 		expect(checkRow('account', without(ROWS.account, 'pockets'))).toBeNull();
 		expect(checkRow('category', without(ROWS.category, 'icon', 'color'))).toBeNull();
 		expect(checkRow('schedule', without(ROWS.schedule, 'accountId', 'shares'))).toBeNull();
-		expect(checkRow('txn', without(ROWS.txn, 'scheduleId', 'shares', 'isOneOff'))).toBeNull();
+		expect(
+			checkRow('txn', without(ROWS.txn, 'scheduleId', 'shares', 'isOneOff', 'isProvisional'))
+		).toBeNull();
 		expect(checkRow('goal', without(ROWS.goal, 'startAmount', 'isPinned', 'startDate'))).toBeNull();
 	});
 

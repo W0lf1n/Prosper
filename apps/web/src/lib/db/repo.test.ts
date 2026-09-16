@@ -43,6 +43,7 @@ import {
 	unsettleReceivable,
 	updatePlan,
 	updateAccount,
+	updateTxn,
 	type Backup
 } from './repo';
 import { FinanceDb, setDb } from './schema';
@@ -639,6 +640,30 @@ describe('transfers — two accounts, one movement (Q49)', () => {
 			{ accountId }
 		);
 		expect(posted.accountId).toBe(revolut.id);
+	});
+});
+
+describe('a provisional amount (Q70)', () => {
+	it('is off unless asked for, and is cleared the way it was set', async () => {
+		const plain = await createTxn({ accountId, amount: -10000 as Minor });
+		expect(plain.isProvisional).toBe(false);
+
+		const blocked = await createTxn({
+			accountId,
+			amount: -150000 as Minor,
+			isProvisional: true
+		});
+		expect(blocked.isProvisional).toBe(true);
+
+		// The bank settled: the amount is corrected and the flag comes off in
+		// the same write, which is what the edit sheet does.
+		const settled = await updateTxn(blocked.id, {
+			amount: -148200 as Minor,
+			isProvisional: false
+		});
+		expect(settled?.isProvisional).toBe(false);
+		expect(settled?.amount).toBe(-148200);
+		expect((await db.txns.get(blocked.id))?.isProvisional).toBe(false);
 	});
 });
 

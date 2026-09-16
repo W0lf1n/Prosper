@@ -2911,3 +2911,85 @@ phone. `DEPLOYMENT.md` already orders the containers that way.
 Potraviny against the bucket's actual — is the Training-law feature this
 table was built to carry. Not built; it waits for the fourteen days, and
 for the question of which plan is *the* plan for a month.
+
+---
+
+## The 2026-09-16 pass — a deck of dues, an amount that is not final, and a deploy from GitHub
+
+### Q70 — An amount the bank has only blocked so far: `Txn.isProvisional` · answered 2026-09-16
+
+**Asked for.** A switch on Zápis to mark a value as "this may change": a card
+payment the bank books first and settles later, a hotel hold, a fuel pump's
+pre-authorisation, a bill still being totted up.
+
+**Answer.** A boolean on the row, schema **v15**, backfilled to `false` like
+every flag before it, `optional(bool)` at the two doors in `rows.ts`. It
+serves Tracking: the row is typed the moment the money moves, with the figure
+known at that moment, so the balance is right today and nothing waits for a
+statement. The switch sits under Výdaj on Zápis beside _mimořádný výdaj_ —
+the two switches now stack on the left and _dluží mi_ keeps the right edge —
+with an explainer in the same voice. The tape and Domů's last rows carry a
+`předběžně` badge on the sub-line. The edit sheet has the same switch, so the
+day the bank settles is the day the amount is overwritten and the switch
+turned off in one write; `updateTxn` takes both in one patch.
+
+**Nothing computes with it.** A provisional koruna weighs what any koruna
+weighs, in the balance, in the month and in every check. A check that
+softened on the flag would be a check a switch could silence, and rule 7 is
+about a check getting out of the way, not about it being told to.
+
+**What was not built.** A list of rows still waiting for a final figure, and
+a nudge when one is older than the bank's usual settlement window. Both are
+Training-law material and wait for the fourteen days; the badge is enough to
+ask the tape the question by eye.
+
+### Q71 — The dues are a deck, not a column · answered 2026-09-16
+
+**Asked for.** Three standing orders due on the same morning stacked
+_K potvrzení_ into a column of three rows and three pairs of pills that pushed
+the goal and the wealth off Domů. Wanted: a stack to swipe through, and a
+decision per payment.
+
+**Answer.** `DueCard` is a deck: one slide per due schedule, native
+`scroll-snap`, each slide a well inside the card — recessed, `--ground-2`,
+rule 16 — and 28 px narrower than the card so the next one shows its edge,
+the same rail the accounts ride on Zápis. The head reads `1 z 3`; a row of
+dots under the deck says where you are and takes a tap; _Potvrdit všechny_
+stays under the dots. Each slide carries its own Potvrdit / Přeskočit, and
+tapping the row still opens the sheet to correct the amount. A confirmed slide
+leaves the deck and the browser re-snaps to its neighbour, so confirming
+three is three taps and no swiping. With one due there is nothing to swipe to:
+the slide takes the whole width and the counter gives way to the amber dot.
+Přehled › Platby shows the same deck.
+
+**No dependency.** The swiping is CSS and the index is a scroll listener that
+picks the slide nearest the left edge. A carousel library would be the second
+runtime dependency in the app, for something the browser does on its own.
+
+### Q72 — A push to master deploys itself · answered 2026-09-16
+
+**Asked for.** GitHub Actions that puts a new version on the VPS, the way the
+Aspire app does it: a locked account, a forced SSH command, one sudoers line.
+
+**Answer.** `.github/workflows/deploy.yml` runs when the `CI` workflow finishes
+green on master — `workflow_run`, gated on `conclusion == 'success'`, so a
+commit that fails a test is never the one on the phone — or by hand with an
+optional commit id. It does one thing: SSH to `prosper-deploy@host` with the
+commit id as the command. On the box the account's key carries a forced
+`command=`, `deploy/prosper-deploy`, so the request cannot be anything but a
+commit id or `master`; the wrapper hands it to `deploy/deploy.sh` through the
+single sudoers line the account has; and the script refuses any commit that
+is not already on `origin/master`. Building stays on the box, from source, as
+it always has. There is no registry, nothing is uploaded, and the three
+secrets are the host, the private key and the pinned host key.
+`DEPLOYMENT.md` › _Deploying from GitHub_ is the one-time setup, and `deploy.sh`
+is also what a person runs now, instead of the four-command dance.
+
+**Every push to master is a release**, on purpose. The app already updates the
+phone on its own (Q62), so the only question was whether the box lagged the
+repository, and now it does not. The API is recreated before the client, which
+is the order Q69 asked for.
+
+**Not run yet.** The account, the key and the secrets do not exist on
+2026-09-16; until they do the workflow fails at its first step and names the
+missing secret. `TODO.md` §4.1 carries it.

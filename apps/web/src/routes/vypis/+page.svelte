@@ -151,6 +151,7 @@
 	let editCategory = $state('');
 	let editPayee = $state('');
 	let editNote = $state('');
+	let editProvisional = $state(false);
 	let editError = $state('');
 	let pickingCategory = $state(false);
 
@@ -207,6 +208,7 @@
 		editCategory = txn.categoryId ?? '';
 		editPayee = txn.payee;
 		editNote = txn.note ?? '';
+		editProvisional = txn.isProvisional === true;
 		editShares = sharesOf(txn).map((share) => ({
 			id: share.id,
 			amount: formatMoney(share.amount, { currency: false, sign: 'never' }),
@@ -287,6 +289,8 @@
 			categoryId: editCategory || null,
 			payee: editPayee,
 			note: editNote,
+			/* The switch is shown under an expense only; an income never carries it. */
+			isProvisional: amount < 0 && editProvisional,
 			shares
 		});
 		editing = null;
@@ -420,6 +424,9 @@
 								<span class="row__body">
 									<span class="row__title">{row.txn.payee || bucketName(row.txn)}</span>
 									<span class="row__sub">
+										{#if row.txn.isProvisional}
+											<span class="badge badge--tiny row__flag">předběžně</span>
+										{/if}
 										<span class:row__none={!row.txn.categoryId && !row.txn.transferPairId}>
 											{bucketName(row.txn)}
 										</span>
@@ -514,6 +521,25 @@
 		</label>
 
 		{#if editing && editing.amount < 0 && editing.transferPairId === null}
+			<div class="prop">
+				<button
+					type="button"
+					class="toggle"
+					role="switch"
+					aria-checked={editProvisional}
+					aria-label="Částka se ještě může změnit"
+					onclick={() => (editProvisional = !editProvisional)}
+				></button>
+				<span class="prop__name" class:prop__name--on={editProvisional}>
+					Částka se ještě může změnit
+				</span>
+			</div>
+			{#if editProvisional}
+				<p class="field__hint">
+					Banka ji zatím jen zablokovala. Až se usadí, přepiš ji nahoře a přepínač vypni.
+				</p>
+			{/if}
+
 			<fieldset class="owed well">
 				<legend class="field__label">Dluží mi</legend>
 
@@ -710,6 +736,26 @@
 
 	.row__owed {
 		color: var(--flag);
+	}
+
+	/* The sub-line is text and ends in an ellipsis; the badge goes first, so
+	   it is the bucket that gets cut, never the flag. */
+	.row__flag {
+		margin-right: 4px;
+		vertical-align: middle;
+	}
+
+	.prop {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-height: 40px;
+		color: var(--ink-2);
+		font-size: var(--text-md);
+	}
+
+	.prop__name--on {
+		color: var(--ink);
 	}
 
 	.row__amount--in {

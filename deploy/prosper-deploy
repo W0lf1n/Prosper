@@ -1,0 +1,32 @@
+#!/bin/sh
+# The only thing the `prosper-deploy` SSH key can do.
+#
+# Installed at /usr/local/bin/prosper-deploy and named as the forced
+# `command=` on that key in authorized_keys. Whatever the client asked for
+# arrives here as $SSH_ORIGINAL_COMMAND and nothing else ever runs: not a
+# shell, not a copy, not a port forward (the key's other options say so).
+#
+# The one accepted request is a commit to deploy: forty hex digits, or the
+# word `master`. It is handed to deploy.sh through the single sudoers line the
+# account has. Anything else is refused, and the refusal lands in the SSH log.
+set -eu
+
+REQUEST=${SSH_ORIGINAL_COMMAND:-master}
+
+# `prosper-deploy <commit>` and `<commit>` are the same request: a hand test
+# from the box tends to type the first, the workflow sends the second.
+set -- $REQUEST
+[ "${1:-}" = prosper-deploy ] && shift
+WANT=$(printf '%s' "${1:-master}" | tr -d "'\"")
+
+case $WANT in
+	master) ;;
+	*)
+		if ! printf '%s' "$WANT" | grep -Eq '^[0-9a-f]{40}$'; then
+			echo "prosper-deploy: refused: $WANT is not a commit" >&2
+			exit 64
+		fi
+		;;
+esac
+
+exec sudo -n /srv/prosper/deploy/deploy.sh "$WANT"
