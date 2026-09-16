@@ -2,7 +2,7 @@
 # The deployment as one command: what `DEPLOYMENT.md` › Updating does by hand,
 # made safe to run unattended.
 #
-#     sudo /srv/prosper/deploy/deploy.sh <commit>
+#     sudo /opt/prosper/deploy/deploy.sh <commit>
 #
 # Runs as root, because compose does. In normal use it is called by
 # `prosper-deploy`, the forced command on the GitHub Actions key, and it is the
@@ -17,7 +17,7 @@
 # has been pushed to master and has passed CI there.
 set -eu
 
-ROOT=${PROSPER_ROOT:-/srv/prosper}
+ROOT=${PROSPER_ROOT:-/opt/prosper}
 WANT=${1:-master}
 
 log() { printf '%s deploy: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"; }

@@ -29,4 +29,4 @@ case $WANT in
 		;;
 esac
 
-exec sudo -n /srv/prosper/deploy/deploy.sh "$WANT"
+exec sudo -n /opt/prosper/deploy/deploy.sh "$WANT"

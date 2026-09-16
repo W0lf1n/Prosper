@@ -106,13 +106,13 @@ curl -fsSL https://get.docker.com | sudo sh
 ### 1. Get the repository onto the box
 
 ```bash
-sudo git clone https://github.com/W0lf1n/Prosper.git /srv/prosper
+sudo git clone https://github.com/W0lf1n/Prosper.git /opt/prosper
 ```
 
 ### 2. Write the two secrets
 
 ```bash
-cd /srv/prosper/deploy && cp .env.example .env
+cd /opt/prosper/deploy && cp .env.example .env
 ```
 
 Then fill in `.env`. Neither value has a default and compose refuses to start
@@ -150,7 +150,7 @@ the phone can quietly eat one.
 ### 3. Start the three containers
 
 ```bash
-cd /srv/prosper/deploy && docker compose up -d --build
+cd /opt/prosper/deploy && docker compose up -d --build
 ```
 
 The first build takes a few minutes — a pnpm install and a `dotnet publish`.
@@ -170,7 +170,7 @@ database](#the-sync-database)** is what happened and how to look at it.
 ### 4. Give the domain to nginx
 
 ```bash
-sudo cp /srv/prosper/deploy/nginx/prosper.conf.example /etc/nginx/sites-available/prosper.conf
+sudo cp /opt/prosper/deploy/nginx/prosper.conf.example /etc/nginx/sites-available/prosper.conf
 ```
 
 ```bash
@@ -210,13 +210,13 @@ sudo crontab -e
 ```
 
 ```
-17 3 * * *  /srv/prosper/deploy/backup.sh >> /var/log/prosper-backup.log 2>&1
+17 3 * * *  /opt/prosper/deploy/backup.sh >> /var/log/prosper-backup.log 2>&1
 ```
 
 Then run it once by hand, now, rather than finding out at 03:17:
 
 ```bash
-sudo /srv/prosper/deploy/backup.sh
+sudo /opt/prosper/deploy/backup.sh
 ```
 
 And restore from it once, on purpose, into a throwaway database. A dump nobody
@@ -307,17 +307,17 @@ names a column you can see in the table.
 anything below the API. This is:
 
 ```bash
-cd /srv/prosper/deploy && docker compose exec db psql -U prosper -d prosper -c '\dt'
+cd /opt/prosper/deploy && docker compose exec db psql -U prosper -d prosper -c '\dt'
 ```
 
 Three tables and you are done. After a device has paired and synced:
 
 ```bash
-cd /srv/prosper/deploy && docker compose exec db psql -U prosper -d prosper -c 'select "Entity", count(*) from changes group by "Entity" order by 2 desc;'
+cd /opt/prosper/deploy && docker compose exec db psql -U prosper -d prosper -c 'select "Entity", count(*) from changes group by "Entity" order by 2 desc;'
 ```
 
 ```bash
-cd /srv/prosper/deploy && docker compose exec db psql -U prosper -d prosper -c 'select "Id", "Name", "PairedAt", "LastSeenAt" from devices;'
+cd /opt/prosper/deploy && docker compose exec db psql -U prosper -d prosper -c 'select "Id", "Name", "PairedAt", "LastSeenAt" from devices;'
 ```
 
 `LastSeenAt` moving is the shortest proof that sync is running rather than
@@ -373,7 +373,7 @@ Destructive in a way nothing else in this runbook is — the volume _is_ the
 second copy:
 
 ```bash
-cd /srv/prosper/deploy && docker compose down -v
+cd /opt/prosper/deploy && docker compose down -v
 ```
 
 `-v` drops `pgdata`. The next `up` recreates the role, the database and the
@@ -438,7 +438,7 @@ copy does not exist yet.
 ## Updating
 
 ```bash
-sudo /srv/prosper/deploy/deploy.sh
+sudo /opt/prosper/deploy/deploy.sh
 ```
 
 That is the whole update: fetch, reset the checkout to `origin/master`, build
@@ -450,7 +450,7 @@ same script, run by a workflow instead of a person.
 By hand, it is:
 
 ```bash
-cd /srv/prosper && sudo git pull && cd deploy && docker compose build --pull && docker compose up -d
+cd /opt/prosper && sudo git pull && cd deploy && docker compose build --pull && docker compose up -d
 ```
 
 `--pull` is not decoration. Without it, `build` reuses whatever `node:22-alpine`,
@@ -496,7 +496,7 @@ What keeps that connection from being a shell on the server (Q72):
   and a key that carries a forced `command=`: whatever the client asks for,
   `/usr/local/bin/prosper-deploy` runs instead, and it accepts a commit id or
   `master` and nothing else.
-- **One sudoers line.** The account may run `/srv/prosper/deploy/deploy.sh` as
+- **One sudoers line.** The account may run `/opt/prosper/deploy/deploy.sh` as
   root and nothing else — which is why the checkout must be owned by root and
   writable by nobody else. An account that could edit that script could edit
   what runs as root.
@@ -517,20 +517,20 @@ The forced command, installed outside the repository so the account cannot
 reach it through the checkout:
 
 ```bash
-sudo install -m 755 -o root -g root /srv/prosper/deploy/prosper-deploy /usr/local/bin/prosper-deploy
+sudo install -m 755 -o root -g root /opt/prosper/deploy/prosper-deploy /usr/local/bin/prosper-deploy
 ```
 
 The one thing it may run as root:
 
 ```bash
-printf 'prosper-deploy ALL=(root) NOPASSWD: /srv/prosper/deploy/deploy.sh, /srv/prosper/deploy/deploy.sh *\n' | sudo tee /etc/sudoers.d/prosper-deploy >/dev/null && sudo chmod 440 /etc/sudoers.d/prosper-deploy && sudo visudo -c
+printf 'prosper-deploy ALL=(root) NOPASSWD: /opt/prosper/deploy/deploy.sh, /opt/prosper/deploy/deploy.sh *\n' | sudo tee /etc/sudoers.d/prosper-deploy >/dev/null && sudo chmod 440 /etc/sudoers.d/prosper-deploy && sudo visudo -c
 ```
 
 And the reason that line is safe: the checkout is root's, and nothing in it is
 writable by anyone else. The `find` must print nothing:
 
 ```bash
-sudo chown -R root:root /srv/prosper && sudo find /srv/prosper -perm -o+w -not -type l
+sudo chown -R root:root /opt/prosper && sudo find /opt/prosper -perm -o+w -not -type l
 ```
 
 Re-run the `install` line whenever `deploy/prosper-deploy` changes in the
@@ -627,7 +627,7 @@ different path; `sudo visudo -c` reads it back.
 **`curl localhost:8080/api/v1/health` hangs or 502s.**
 
 ```bash
-cd /srv/prosper/deploy && docker compose ps && docker compose logs --tail=50 api
+cd /opt/prosper/deploy && docker compose ps && docker compose logs --tail=50 api
 ```
 
 The usual cause is Postgres refusing the password — which means `.env` was
@@ -653,7 +653,7 @@ because of the `real_ip` block in `deploy/nginx/app.conf`. The container's own
 access log is the check:
 
 ```bash
-cd /srv/prosper/deploy && docker compose logs --tail=20 web
+cd /opt/prosper/deploy && docker compose logs --tail=20 web
 ```
 
 Public addresses in the first column mean it is working. A `172.` on every line

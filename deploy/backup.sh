@@ -2,7 +2,7 @@
 # Nightly dump of the sync database — `PROJECT-PLAN.md` §14.
 #
 #     sudo crontab -e
-#     17 3 * * *  /srv/prosper/deploy/backup.sh >> /var/log/prosper-backup.log 2>&1
+#     17 3 * * *  /opt/prosper/deploy/backup.sh >> /var/log/prosper-backup.log 2>&1
 #
 # **This is the second copy, not the first.** The first copy of the ledger is
 # IndexedDB on the phone, and the JSON export in Settings is the one backup that
