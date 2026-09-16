@@ -66,6 +66,8 @@
 	--danger: #e23b4a;
 
 	--in-wash: rgb(0 168 126 / 12%);
+	/* The ink at 8 %: the wash behind a chip whose meaning has no hue (Q73). */
+	--ink-wash: rgb(25 28 31 / 8%);
 	--flag-wash: rgb(236 126 0 / 12%);
 	--danger-wash: rgb(226 59 74 / 10%);
 
@@ -278,6 +280,7 @@
 	--dark-in: #19c48f;
 
 	--dark-in-wash: rgb(25 196 143 / 14%);
+	--dark-ink-wash: rgb(255 255 255 / 8%);
 	--dark-flag-wash: rgb(236 126 0 / 16%);
 	--dark-danger-wash: rgb(226 59 74 / 16%);
 
@@ -320,6 +323,7 @@
 		--in: var(--dark-in);
 
 		--in-wash: var(--dark-in-wash);
+		--ink-wash: var(--dark-ink-wash);
 		--flag-wash: var(--dark-flag-wash);
 		--danger-wash: var(--dark-danger-wash);
 
@@ -369,6 +373,7 @@
 	--in: var(--dark-in);
 
 	--in-wash: var(--dark-in-wash);
+	--ink-wash: var(--dark-ink-wash);
 	--flag-wash: var(--dark-flag-wash);
 	--danger-wash: var(--dark-danger-wash);
 

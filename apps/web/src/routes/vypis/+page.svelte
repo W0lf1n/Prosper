@@ -425,7 +425,7 @@
 									<span class="row__title">{row.txn.payee || bucketName(row.txn)}</span>
 									<span class="row__sub">
 										{#if row.txn.isProvisional}
-											<span class="badge badge--tiny row__flag">předběžně</span>
+											<span class="badge badge--tiny row__flag">blokace</span>
 										{/if}
 										<span class:row__none={!row.txn.categoryId && !row.txn.transferPairId}>
 											{bucketName(row.txn)}
@@ -527,12 +527,10 @@
 					class="toggle"
 					role="switch"
 					aria-checked={editProvisional}
-					aria-label="Částka se ještě může změnit"
+					aria-label="Blokovaná částka"
 					onclick={() => (editProvisional = !editProvisional)}
 				></button>
-				<span class="prop__name" class:prop__name--on={editProvisional}>
-					Částka se ještě může změnit
-				</span>
+				<span class="prop__name" class:prop__name--on={editProvisional}> Blokovaná částka </span>
 			</div>
 			{#if editProvisional}
 				<p class="field__hint">

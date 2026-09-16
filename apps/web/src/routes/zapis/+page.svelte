@@ -44,7 +44,7 @@
 	import type { Account, Category, Txn } from '$lib/domain/types';
 	import CategoryPicker from '$lib/ui/CategoryPicker.svelte';
 	import type { CategoryInput } from '$lib/ui/CategorySheet.svelte';
-	import Explainer from '$lib/ui/Explainer.svelte';
+
 	import Icon from '$lib/ui/Icon.svelte';
 	import Keypad from '$lib/ui/Keypad.svelte';
 	import Sheet from '$lib/ui/Sheet.svelte';
@@ -97,6 +97,79 @@
 	let owedSheetOpen = $state(false);
 	let owedInput = $state('');
 	let owedBy = $state('');
+
+	// ── the flags (Q73) ──────────────────────────────────────────────────────
+	//
+	// Three chips and one hint line. The line belongs to the last change —
+	// that chip's sentence, in that chip's colour, for three seconds — and
+	// then goes quiet: the chips themselves say what is on, and a summary
+	// under them said it twice. One line, never two, and its height is
+	// reserved so nothing below it ever jumps.
+	type FlagKey = 'oneOff' | 'approx' | 'owed';
+	const FLAG_COPY: Record<FlagKey, { on: string; off: string; color: string }> = {
+		oneOff: {
+			on: 'Nepočítá se do běžného měsíčního průměru.',
+			off: 'Počítá se do průměru.',
+			color: 'var(--flag)'
+		},
+		approx: {
+			on: 'Banka částku zatím jen blokuje; po zaúčtování ji upravíš.',
+			off: 'Částka je zaúčtovaná.',
+			color: 'var(--ink)'
+		},
+		owed: {
+			on: 'Výdaj zůstane v přehledu jako pohledávka.',
+			off: 'Bez pohledávky.',
+			color: 'var(--signal)'
+		}
+	};
+	const HINT_REST_MS = 3000;
+	let lastChanged = $state<{ key: FlagKey; on: boolean } | null>(null);
+	let restTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => () => clearTimeout(restTimer));
+
+	function announce(key: FlagKey, on: boolean) {
+		lastChanged = { key, on };
+		clearTimeout(restTimer);
+		restTimer = setTimeout(() => (lastChanged = null), HINT_REST_MS);
+		navigator.vibrate?.(8);
+	}
+
+	function setOneOff(on: boolean) {
+		if (on === isOneOff) return;
+		isOneOff = on;
+		announce('oneOff', on);
+	}
+
+	function setApprox(on: boolean) {
+		if (on === isProvisional) return;
+		isProvisional = on;
+		announce('approx', on);
+	}
+
+	/* The owed chip is on once the sheet holds an amount. Tapping it opens the
+	   sheet either way — to set, or to correct — and the sheet's left pill is
+	   what turns it off. */
+	function clearOwed() {
+		const wasOn = owedAmount !== null;
+		owedInput = '';
+		owedBy = '';
+		owedSheetOpen = false;
+		if (wasOn) announce('owed', false);
+	}
+
+	function keepOwed() {
+		owedSheetOpen = false;
+		if (owedAmount !== null) announce('owed', true);
+	}
+
+	const hint = $derived.by(() => {
+		if (!lastChanged) return { text: '', color: 'var(--ink-3)' };
+		const copy = FLAG_COPY[lastChanged.key];
+		return lastChanged.on
+			? { text: copy.on, color: copy.color }
+			: { text: copy.off, color: 'var(--ink-3)' };
+	});
 
 	$effect(() => {
 		stickyDate = date;
@@ -226,7 +299,7 @@
 		const fix = finding.fix;
 		if (!fix) return;
 		if (fix.kind === 'set-category') categoryId = fix.categoryId;
-		if (fix.kind === 'mark-one-off') isOneOff = true;
+		if (fix.kind === 'mark-one-off') setOneOff(true);
 		checksExpanded = false;
 	}
 
@@ -403,55 +476,58 @@
 		</datalist>
 
 		{#if direction === 'out'}
-			<div class="props">
-				<div class="props__flags">
-					<div class="prop">
-						<button
-							type="button"
-							class="toggle"
-							role="switch"
-							aria-checked={isOneOff}
-							aria-label="Mimořádný výdaj"
-							onclick={() => (isOneOff = !isOneOff)}
-						></button>
-						<span class="prop__name" class:prop__name--on={isOneOff}>
-							<Explainer term="mimořádný výdaj" title="Mimořádný výdaj">
-								<p>
-									Výdaj mimo běžný chod měsíce — pračka, servis auta, letenka. Ze zůstatku odejde
-									jako každý jiný. Jen se nepočítá do toho, co měsíc obvykle stojí, takže ti jedna
-									pračka nezkazí srovnání s ostatními měsíci.
-								</p>
-							</Explainer>
-						</span>
-					</div>
-					<div class="prop">
-						<button
-							type="button"
-							class="toggle"
-							role="switch"
-							aria-checked={isProvisional}
-							aria-label="Částka se ještě může změnit"
-							onclick={() => (isProvisional = !isProvisional)}
-						></button>
-						<span class="prop__name" class:prop__name--on={isProvisional}>
-							<Explainer term="částka se může změnit" title="Částka se ještě může změnit">
-								<p>
-									Banka zatím částku jen zablokovala, nebo se účet ještě dopočítá — tankování,
-									hotel, záloha. Zapiš, co vidíš teď, ať v zůstatku nechybí. Až přijde konečná
-									částka, na výpisu ji přepíšeš a přepínač vypneš.
-								</p>
-							</Explainer>
-						</span>
-					</div>
-				</div>
-				<button type="button" class="prop prop--owed" onclick={() => (owedSheetOpen = true)}>
-					{#if owedAmount === null}
-						dluží mi ›
-					{:else}
-						<span class="prop__value">dluží mi {formatMoney(owedAmount, { code: currency })}</span>
+			<div class="flags" role="group" aria-label="Vlastnosti záznamu">
+				<button
+					type="button"
+					class="flag flag--one-off"
+					aria-pressed={isOneOff}
+					aria-label="Mimořádný výdaj"
+					onclick={() => setOneOff(!isOneOff)}
+				>
+					{#if isOneOff}
+						<span class="flag__dot" aria-hidden="true"
+							><Icon name="check" size={10} stroke={3} /></span
+						>
 					{/if}
+					mimořádný
+				</button>
+				<button
+					type="button"
+					class="flag flag--approx"
+					aria-pressed={isProvisional}
+					aria-label="Blokovaná částka"
+					onclick={() => setApprox(!isProvisional)}
+				>
+					{#if isProvisional}
+						<span class="flag__dot" aria-hidden="true"
+							><Icon name="check" size={10} stroke={3} /></span
+						>
+					{/if}
+					blokace
+				</button>
+				<button
+					type="button"
+					class="flag flag--owed"
+					aria-pressed={owedAmount !== null}
+					aria-label="Dluží mi"
+					onclick={() => (owedSheetOpen = true)}
+				>
+					{#if owedAmount !== null}
+						<span class="flag__dot" aria-hidden="true"
+							><Icon name="check" size={10} stroke={3} /></span
+						>
+					{/if}
+					dluží mi
 				</button>
 			</div>
+			<p
+				class="flags__hint"
+				class:flags__hint--shown={hint.text !== ''}
+				style="--hint-c: {hint.color}"
+				aria-live="polite"
+			>
+				{hint.text}
+			</p>
 		{/if}
 
 		{#if topFinding}
@@ -535,20 +611,10 @@
 		{/if}
 
 		<div class="actions actions--fill">
-			<button
-				type="button"
-				class="btn btn--lg"
-				onclick={() => {
-					owedInput = '';
-					owedBy = '';
-					owedSheetOpen = false;
-				}}
-			>
-				Zrušit
+			<button type="button" class="btn btn--lg" onclick={clearOwed}>
+				{owedAmount !== null ? 'Bez pohledávky' : 'Zrušit'}
 			</button>
-			<button type="button" class="btn btn--primary" onclick={() => (owedSheetOpen = false)}>
-				Hotovo
-			</button>
+			<button type="button" class="btn btn--primary" onclick={keepOwed}>Hotovo</button>
 		</div>
 	</div>
 </Sheet>
@@ -802,42 +868,93 @@
 
 	/* ── properties ──────────────────────────────────────────────────────── */
 
-	.props {
+	/* Three chips on one line, 36 px tall inside a 44 px row. A chip is a
+	   toggle that reads as a tag: hairline when off, and when on its own
+	   colour as text, border and wash — amber for mimořádný, the ink for a
+	   figure that is only an estimate, the accent for what comes back. */
+	.flags {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-2);
-		min-height: 44px;
-		padding: 0 var(--space-1);
+		gap: var(--space-3);
+		min-height: 36px;
+		margin-top: var(--space-2);
 	}
 
-	/* The two switches stack on the left; dluží mi keeps the right edge. */
-	.props__flags {
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-	}
-
-	.prop {
-		display: flex;
+	.flag {
+		--c: var(--ink);
+		--wash: var(--ink-wash);
+		--dot-ink: var(--surface);
+		position: relative;
+		flex: none;
+		display: inline-flex;
 		align-items: center;
-		gap: 10px;
-		min-height: 40px;
+		gap: 6px;
+		height: 36px;
+		padding: 0 12px;
+		border: 1px solid var(--hairline-2);
+		border-radius: var(--radius-full);
 		color: var(--ink-2);
-		font-size: var(--text-md);
-	}
-
-	.prop__name--on {
-		color: var(--ink);
-	}
-
-	.prop--owed {
-		text-align: right;
-	}
-
-	.prop__value {
-		color: var(--in);
+		font-size: var(--text-sm);
 		font-weight: 600;
+		white-space: nowrap;
+		transition:
+			background var(--transition),
+			color var(--transition),
+			border-color var(--transition);
+	}
+
+	/* The thumb gets 44; the eye keeps 36. */
+	.flag::before {
+		content: '';
+		position: absolute;
+		inset: -4px 0;
+	}
+
+	.flag:active {
+		background: var(--wash);
+	}
+
+	.flag[aria-pressed='true'] {
+		color: var(--c);
+		border-color: var(--c);
+		background: var(--wash);
+	}
+
+	.flag--one-off[aria-pressed='true'] {
+		--c: var(--flag);
+		--wash: var(--flag-wash);
+	}
+
+	.flag--owed[aria-pressed='true'] {
+		--c: var(--signal);
+		--wash: var(--signal-wash);
+		--dot-ink: var(--signal-ink);
+	}
+
+	.flag__dot {
+		display: grid;
+		place-items: center;
+		width: 14px;
+		height: 14px;
+		border-radius: var(--radius-full);
+		background: var(--c);
+		color: var(--dot-ink);
+	}
+
+	/* The hint line: reserved even when empty, so the keypad never moves. */
+	.flags__hint {
+		min-height: 18px;
+		margin: var(--space-1) 0 0;
+		padding: 0 var(--space-1);
+		font-size: var(--text-xs);
+		line-height: 1.5;
+		color: var(--hint-c, var(--ink-3));
+		opacity: 0;
+		transition: opacity var(--dur-base) var(--ease-out);
+	}
+
+	.flags__hint--shown {
+		opacity: 1;
 	}
 
 	/* ── checks ──────────────────────────────────────────────────────────── */

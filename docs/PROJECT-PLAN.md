@@ -60,7 +60,7 @@ nothing.
 | Every day is materialised in the tape, including the ones nothing happened on. A day with no expense reads `bez výdaje`, as a statement rather than a hole.                                     | `domain/ledger.ts` → `buildTape`    |
 | A forgotten day is fixed by typing the row with its date, days later if need be. Nothing has to be cleared first.                                                                              | `/` → the date sheet                |
 | The month says how many days cost nothing — a figure off the ledger alone, with no second signal to maintain.                                                                                  | `domain/coverage.ts`                |
-| A payment the bank has only blocked is written at once, with the figure known today, and flagged _předběžně_ until it settles — the balance is right now, not after the statement.             | `Txn.isProvisional` — Q70           |
+| A payment the bank has only blocked is written at once, with the figure known today, and flagged _blokace_ until it settles — the balance is right now, not after the statement.             | `Txn.isProvisional` — Q70           |
 
 **The original spreadsheet had no dates at all** — only which month sheet a row
 sat on. Tracking was, strictly speaking, impossible. That single observation
@@ -613,8 +613,8 @@ across every account, each with its bucket's circle.
 │                                    │
 │ [(🛒) POTRAVINY] [(🍴) JÍDLO] [(⌂)…│  ← ranked, every bucket, search at the end
 │ [ dnes ] [ komu / za co          ] │
-│ (○) mimořádný výdaj     dluží mi › │
-│ (○) částka se může změnit          │  ← the bank has only blocked it (Q70)
+│ [✓ mimořádný] [blokace] [dluží mi]  │  ← three chips, one line (Q73)
+│ Nepočítá se do běžného průměru.    │  ← the hint line, reserved, last change
 │ ● Spíš JÍDLO?             [JÍDLO]  │  ← live check, one-tap fix
 │      1        2        3           │
 │      4        5        6           │  ← 56 px keys, transparent, lit on press
@@ -634,9 +634,11 @@ text, not a control: the rail is the switch (Q56).
 
 Below the amount: the bucket rail (every category, most-used first, a coloured
 circle on each), the date pill and the payee field, the three rare properties on
-an outflow — one-off, provisional, and who pays part back — and the live check
-strip with its one-tap fix. Nothing here blocks a save; the pill dims and reads
-_Vyber kategorii_ until there is a bucket.
+an outflow as one row of chips — one-off, provisional, and who pays part back —
+with a hint line under them that speaks for the last change for three seconds
+and then goes quiet (Q73), and the live check strip with its one-tap fix.
+Nothing here blocks a save; the pill dims and reads _Vyber kategorii_ until
+there is a bucket.
 
 The search pill at the rail's end opens the whole list in a sheet, and the
 list ends in a row that makes a bucket: whatever was typed into the search is
@@ -675,7 +677,7 @@ second person, or clear it. Přehled keeps the list of everything outstanding �
 that is the report — but the action lives where the app shows you the debt.
 
 **A provisional amount is on the row too** (Q70). A payment the bank has only
-blocked wears a `předběžně` badge on its sub-line, here and in Domů's last
+blocked wears a `blokace` badge on its sub-line, here and in Domů's last
 rows; the same sheet carries the switch, so the day the bank settles, the
 amount is overwritten and the switch turned off in one save.
 

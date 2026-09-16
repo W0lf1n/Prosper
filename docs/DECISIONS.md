@@ -2929,7 +2929,7 @@ known at that moment, so the balance is right today and nothing waits for a
 statement. The switch sits under Výdaj on Zápis beside _mimořádný výdaj_ —
 the two switches now stack on the left and _dluží mi_ keeps the right edge —
 with an explainer in the same voice. The tape and Domů's last rows carry a
-`předběžně` badge on the sub-line. The edit sheet has the same switch, so the
+`blokace` badge on the sub-line. The edit sheet has the same switch, so the
 day the bank settles is the day the amount is overwritten and the switch
 turned off in one write; `updateTxn` takes both in one patch.
 
@@ -2993,3 +2993,49 @@ is the order Q69 asked for.
 **Not run yet.** The account, the key and the secrets do not exist on
 2026-09-16; until they do the workflow fails at its first step and names the
 missing secret. `TODO.md` §4.1 carries it.
+
+### Q73 — The three rare properties are three chips and one hint line · answered 2026-09-16 · from the `design_handoff_zapis_flags` handoff
+
+**Asked for.** Two toggle rows and a loose link on the right of Zápis were
+too much for three things most entries never touch. Three layouts were
+weighed — a row of chips, a `···` button opening a sheet, and the check strip
+offering a flag only when it is likely — and the chip row won: one line, no
+extra tap, a primitive-shaped control. Petr then had it designed properly;
+the handoff (`design_handoff_zapis_flags`, round 3 of it the spec) is kept
+outside the repository, like a design file rather than a source.
+
+**Answer.** Under the date pill and the payee field: `[ mimořádný ] [ blokace ]
+[ dluží mi ]`, three `aria-pressed` buttons 36 px tall in a 44 px row, with
+a `::before` that gives the thumb the missing 8 px. Off is a hairline and the
+second ink. On is the chip's own colour as text, border and wash — because the
+three mean different things: **amber** (`--flag`) for a one-off, the **ink**
+for an amount that is only an estimate (an expense has no hue, so the chip
+goes white in the dark and black by day, on a new `--ink-wash` token), and the
+**accent** (`--signal`) for what somebody pays back — each with a 14 px check
+dot in the same colour. Under the row, **one hint line**, 18 px, always
+rendered so the keypad never moves. It belongs to the last change: the chip's
+sentence in the chip's colour for three seconds, its negated sentence in the
+mute ink when a chip goes off, then quiet. The handoff had a rest state here —
+a summary of what is on, `Mimo průměr · odhad částky` — and it went the same
+day, on Petr's question: the chips already say what is on, in colour and with
+a dot, and a line under them said it twice. One line, never two. The sentences
+replaced the two explainer popovers, which had nothing left to explain.
+
+**Dluží mi is a chip with a sheet behind it.** Tapping it opens the same sheet
+as before, to set or to correct; the chip is on once the sheet holds an
+amount, and the sheet's left pill — *Bez pohledávky* once something is in it —
+is what turns it off. The check strip's *označit jako mimořádný* fix goes
+through the same setter, so it announces like a tap would.
+
+**The middle chip reads _blokace_**, not the handoff's _≈ částka_: it is the
+word a Czech bank statement uses for a card hold, and _přibližná_ or _částka
+se může změnit_ describe the symptom rather than the thing. The badge on the
+tape and the label in the edit sheet follow it, and the two hint sentences
+speak of a hold and of posting (_zaúčtování_).
+
+**Two deviations from the handoff.** It presses with `scale(0.95)`; in this
+app press is luminance and nothing scales (rule 16), so a chip darkens by its
+wash under the thumb. And it sets a `≈` glyph in a mono face; with the chip
+reading _blokace_ the glyph has nothing to say and went, which also spares a
+second font family for one character. The other sentences are the handoff's
+placeholder copy, kept until real use says otherwise.

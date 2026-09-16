@@ -282,7 +282,7 @@
 						<span class="row__title">{rowTitle(txn)}</span>
 						<span class="row__sub">
 							{#if txn.isProvisional}
-								<span class="badge badge--tiny recent__flag">předběžně</span>
+								<span class="badge badge--tiny recent__flag">blokace</span>
 							{/if}
 							{rowSub(txn)}
 						</span>
