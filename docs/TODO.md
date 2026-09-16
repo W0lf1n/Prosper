@@ -17,7 +17,7 @@
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 536 pass, 25 files              |
+| `pnpm test`                | 543 pass, 26 files              |
 | `pnpm check`               | 0 errors, 0 warnings, 437 files |
 | `pnpm lint`                | eslint passes; see the note     |
 | `pnpm budget`              | 90.6 kB of 150 kB brotli        |
@@ -229,6 +229,9 @@ What is genuinely left needs a box, not a keyboard:
   dump nobody has restored is a hypothesis.
 - **The domain** (`DECISIONS.md`, Q0 — Domain). Nothing in the repository
   hard-codes one; it is typed once into the host vhost.
+- **The demo domain** (`DEPLOYMENT.md` › _The demo_, Q74). An `A` record for
+  `demo.`, the vhost, certbot, and `DEPLOY_DEMO=1` in `deploy/.env`; the code
+  and the compose file are in. Until then the demo image is only built in CI.
 - **The deploy account and the three secrets** (`DEPLOYMENT.md` › _Deploying
   from GitHub_, Q72). The `Deploy` workflow exists and runs after every green
   CI on master; until the account, the key and the secrets exist it fails at

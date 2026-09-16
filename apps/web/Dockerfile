@@ -21,6 +21,12 @@ COPY packages/contracts/package.json packages/contracts/
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+
+# `VITE_DEMO=1` builds the demo (Q74): the same app, opening on a sample
+# ledger and wiping back to it from Settings. Empty for the real one, and
+# `docker-compose.demo.yml` is the only thing that sets it.
+ARG VITE_DEMO=
+ENV VITE_DEMO=$VITE_DEMO
 RUN pnpm build
 
 # ── serve ───────────────────────────────────────────────────────────────────

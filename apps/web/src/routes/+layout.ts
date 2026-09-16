@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { IS_DEMO } from '$lib/demo';
 import type { LayoutLoad } from './$types';
 
 /**
@@ -13,7 +14,14 @@ export const load: LayoutLoad = async () => {
 	if (!browser) return { accountId: null };
 
 	const { ensureSeeded, catchUpGoalTargets, catchUpSchedules } = await import('$lib/db/repo');
-	const { accountId } = await ensureSeeded();
+	const { accountId, seeded } = await ensureSeeded();
+
+	// The demo opens on a ledger, not on a blank sheet (Q74) — only when the
+	// database was empty a moment ago. Začít znovu drops it to get back here.
+	if (IS_DEMO && seeded) {
+		const { seedDemo } = await import('$lib/db/demo');
+		await seedDemo(accountId);
+	}
 
 	// Standing orders do not post themselves while the app is closed — there is
 	// no server. They are settled on the way in: `auto` schedules write their

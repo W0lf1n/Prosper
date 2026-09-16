@@ -3039,3 +3039,59 @@ wash under the thumb. And it sets a `≈` glyph in a mono face; with the chip
 reading _blokace_ the glyph has nothing to say and went, which also spares a
 second font family for one character. The other sentences are the handoff's
 placeholder copy, kept until real use says otherwise.
+
+### Q74 — The demo: a second domain, a sample ledger, and a wipe that puts it back · answered 2026-09-16
+
+**Asked for.** A sandbox to show the app with: hand somebody a phone, let
+them tap anything, and when they are done press _Začít znovu_ and have the
+starting data back. No pairing, no server. And the same push to master should
+put the new version on the demo as well as on the real app.
+
+**Answer.** A second domain, `demo.` in front of the real one, serving the
+same web image built with `VITE_DEMO=1`. IndexedDB is per origin, so the
+demo's ledger and the real one cannot meet, even on one phone, without a line
+of code; that is most of why it is a domain and not a switch in Settings. The
+demo compose project (`deploy/docker-compose.demo.yml`) has only the web
+container — no API, no Postgres — so there is nothing to pair with and nothing
+a visitor types can go anywhere. The container's nginx answers 502 on `/api/`,
+which the app already treats as "no server".
+
+**What the flag changes, and only this.** `lib/demo.ts` reads the build-time
+flag, folded by `vite.config.ts` into a literal; no hostname check, no file
+fetched at boot. In the real build it is `false`: Svelte still hoists the
+badge's template and Rollup still emits the seeder as a chunk, but nothing
+behind the flag runs and the chunk is never fetched — the entry route's
+budget is the same to the tenth of a kilobyte. On launch, right after the
+first seed made the account and the buckets, the layout writes the sample
+ledger (`domain/demo.ts`, pure and tested, every date counted back from
+today so the demo is never stale) through `repo.ts` — about a hundred and
+twenty rows over seventy-five days, the salary and the saving each month, the
+rent and Netflix typed for the months before this one and *declared* for this
+one so the deck on Domů has something to ask, one one-off, one hold, one
+shared dinner, a goal with a head start, a holding with three readings. Domů
+wears an _ukázka_ badge; the sync room is not listed in Nastavení; and
+_Začít znovu_ has no phrase and no backup in front of it — it clears every
+table in one transaction, reloads, and the launch path seeds again. (Not
+`db.delete()`: a delete needs every connection closed, Dexie re-opens one for
+any live query the moment it is closed, and the first attempt sat blocked for
+ever — from the screen and from the layout load alike, because the sync
+status module has a live query open before the load runs.)
+
+**The wipe is a hard delete, on purpose.** Rule 2 protects a person's ledger
+and the tombstones a second device needs. The demo has neither: a soft wipe
+would leave a hundred tombstones behind every visitor and a growing database
+under a sandbox. This is the one place in the app that deletes, and it is
+reachable only in the demo build.
+
+**One deployment, both sites.** `DEPLOY_DEMO=1` in `deploy/.env` makes
+`deploy.sh` build and start the demo right after the real app, from the same
+commit, and wait for its `200.html`. The Deploy workflow does not know the
+demo exists; the box does. A box without the line never builds it. CI checks
+the demo compose file parses, and nothing more — the image is the same
+Dockerfile with one argument.
+
+**Not built.** A way to author the sample ledger by hand (a backup file the
+demo imports on launch) — the generator is one function and easier to keep
+honest against the seed than a JSON file nobody re-exports. And a demo API,
+for showing sync: the day the demo needs to show pairing, it is a second
+`.env` and the full compose file, not a change to the app.

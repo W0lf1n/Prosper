@@ -152,7 +152,7 @@ The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/ci
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-five files, **536
+Vitest, node environment, `requireAssertions: true`. Twenty-six files, **543
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -223,6 +223,19 @@ merges, and the pull cursor moves past it.
 `meta` holds device preferences, not ledger data: the device id, the active
 account and the folded months. (`profileName` was written by one build on
 2026-09-05 and read by nothing since — Q55.)
+
+## The demo build
+
+`VITE_DEMO=1` at build time makes the demo (Q74): `lib/demo.ts` exports the
+flag, `domain/demo.ts` describes the sample ledger relative to today and is
+tested, `db/demo.ts` writes it through `repo.ts` from the layout load right
+after the first seed, and its `resetDemo` clears every table in one
+transaction and reloads (not `db.delete()`: a delete needs every connection
+closed, and Dexie re-opens one for any live query the moment it is closed).
+Domů wears a badge, the sync room is not listed, and Začít znovu has no phrase
+in front of it. Nothing else branches on the flag; in the real build it is a
+literal `false`, nothing behind it runs, and the seeder chunk is never fetched
+— only `deploy/docker-compose.demo.yml` sets it.
 
 ## Sync
 

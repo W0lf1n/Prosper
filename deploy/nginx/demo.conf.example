@@ -1,0 +1,38 @@
+# The **host's** nginx vhost for the demo (Q74) — the sandbox a stranger can
+# be handed a phone with. Same shape as `prosper.conf.example`, pointed at the
+# demo's loopback port, and told to keep search engines out.
+#
+#     sudo cp demo.conf.example /etc/nginx/sites-available/prosper-demo.conf
+#     sudo sed -i 's/demo.prosper.example.com/demo.YOUR.DOMAIN/g' /etc/nginx/sites-available/prosper-demo.conf
+#     sudo ln -s /etc/nginx/sites-available/prosper-demo.conf /etc/nginx/sites-enabled/
+#     sudo nginx -t && sudo systemctl reload nginx
+#     sudo certbot --nginx -d demo.YOUR.DOMAIN
+#
+# HTTPS is not optional here either: the demo is meant to be *installed* on
+# the phone it is shown from, and a service worker will not register over
+# plain HTTP.
+
+server {
+	listen 80;
+	listen [::]:80;
+	server_name demo.prosper.example.com;
+
+	# A sandbox is not a site. Nothing here is worth indexing, and a search
+	# result that lands somebody on a ledger full of made-up rows is a
+	# confusing first impression.
+	add_header X-Robots-Tag "noindex, nofollow" always;
+
+	location / {
+		# `PROSPER_DEMO_PORT` in deploy/.env — 8081 unless changed there.
+		proxy_pass http://127.0.0.1:8081;
+
+		proxy_http_version 1.1;
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto $scheme;
+	}
+
+	access_log /var/log/nginx/prosper-demo.access.log;
+	error_log /var/log/nginx/prosper-demo.error.log;
+}

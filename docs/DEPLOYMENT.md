@@ -622,6 +622,60 @@ different path; `sudo visudo -c` reads it back.
 
 ---
 
+## The demo
+
+A second copy of the app on its own domain — `demo.YOUR.DOMAIN` — that opens
+on a sample ledger and wipes back to it from Settings (DECISIONS Q74). It is
+the sandbox for handing somebody a phone: they can tap anything, nothing they
+do reaches your ledger, and _Začít znovu_ puts the sample back in a second.
+
+**What it is.** The same web image built with `VITE_DEMO=1`, as its own
+compose project (`docker-compose.demo.yml`) with only the web container — no
+API, no Postgres. IndexedDB is per origin, so the demo's ledger and yours
+cannot meet even on the same phone; and with nothing behind `/api/` there is
+nothing to pair with, so the sync room is not even listed there.
+
+**Set it up once.** An `A` record for `demo.YOUR.DOMAIN`, then on the box:
+
+```bash
+sudo cp /srv/prosper/deploy/nginx/demo.conf.example /etc/nginx/sites-available/prosper-demo.conf
+```
+
+```bash
+sudo sed -i 's/demo.prosper.example.com/demo.YOUR.DOMAIN/g' /etc/nginx/sites-available/prosper-demo.conf
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/prosper-demo.conf /etc/nginx/sites-enabled/ && sudo nginx -t && sudo systemctl reload nginx
+```
+
+```bash
+sudo certbot --nginx -d demo.YOUR.DOMAIN
+```
+
+Then two lines in `deploy/.env`:
+
+```
+DEPLOY_DEMO=1
+PROSPER_DEMO_PORT=8081
+```
+
+and one deployment:
+
+```bash
+sudo /srv/prosper/deploy/deploy.sh
+```
+
+From then on every deployment — by hand or from GitHub — builds and starts the
+demo right after the real app, from the same commit. Take the line out of
+`.env` and the demo stops being touched; `docker compose -f docker-compose.demo.yml down`
+in `deploy/` removes it.
+
+**Install it on the demo phone** like the real one, from the demo domain.
+The badge on Domů says _ukázka_, so the two are never confused on one phone.
+
+---
+
 ## Troubleshooting
 
 **`curl localhost:8080/api/v1/health` hangs or 502s.**

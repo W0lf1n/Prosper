@@ -86,6 +86,10 @@ jobs:
           PAIRING_CODE: '000000'
         run: docker compose config --quiet
 
+      - name: The demo compose file is valid
+        working-directory: deploy
+        run: docker compose -f docker-compose.demo.yml config --quiet
+
       # Context is the repository root: the client imports `@prosper/contracts`,
       # a sibling workspace package, and pnpm needs the lockfile at the top.
       - name: Build the web image

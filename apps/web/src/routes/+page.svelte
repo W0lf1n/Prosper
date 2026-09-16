@@ -14,6 +14,7 @@
 	import { resolve } from '$app/paths';
 	import { db } from '$lib/db/schema';
 	import { confirmScheduled, deleteTxn, skipScheduled } from '$lib/db/repo';
+	import { IS_DEMO } from '$lib/demo';
 	import { homeCurrency, liveAccounts } from '$lib/domain/accounts';
 	import { summariseMonth } from '$lib/domain/checks';
 	import { capitalize } from '$lib/domain/czech';
@@ -193,6 +194,9 @@
 <main class="page">
 	<header class="top">
 		<span class="month">{capitalize(formatMonthHeading(today()))}</span>
+		{#if IS_DEMO}
+			<span class="badge badge--flag">ukázka</span>
+		{/if}
 	</header>
 
 	<section class="hero">
@@ -309,6 +313,7 @@
 	.top {
 		display: flex;
 		align-items: center;
+		gap: var(--space-2);
 		min-height: 48px;
 	}
 

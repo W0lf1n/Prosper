@@ -9,6 +9,7 @@
 	import { liveQuery } from 'dexie';
 	import { resolve } from '$app/paths';
 	import { db } from '$lib/db/schema';
+	import { IS_DEMO } from '$lib/demo';
 	import { balancesByCurrency } from '$lib/domain/ledger';
 	import type { Account, Category, Txn } from '$lib/domain/types';
 	import { syncStatus } from '$lib/sync/status.svelte';
@@ -62,7 +63,8 @@
 	<h1 class="title">Nastavení</h1>
 
 	<section class="card card--list">
-		{#each rows as row (row.id)}
+		<!-- The demo has no server behind it, so there is no room to pair in (Q74). -->
+		{#each rows.filter((row) => !IS_DEMO || row.id !== 'sync') as row (row.id)}
 			<a class="row row--press" href={resolve(row.href)}>
 				<span class="circle hub__icon"><Icon name={row.icon} size={20} stroke={1.7} /></span>
 				<span class="row__body">

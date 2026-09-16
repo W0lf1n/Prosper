@@ -6,7 +6,9 @@
 	 */
 	import { liveQuery } from 'dexie';
 	import { db, SCHEMA_VERSION } from '$lib/db/schema';
+	import { resetDemo } from '$lib/db/demo';
 	import { exportBackup, importBackup, resetLedger, type Backup } from '$lib/db/repo';
+	import { IS_DEMO } from '$lib/demo';
 	import { summariseMonth } from '$lib/domain/checks';
 	import { RECORDS, counted } from '$lib/domain/czech';
 	import { today } from '$lib/domain/datetime';
@@ -275,16 +277,26 @@
 			zpátky se načíst nedá. Dokud není synchronizace, žije celý sešit jen v tomhle prohlížeči.
 		</p>
 
-		<button
-			type="button"
-			class="btn btn--danger btn--lg btn--block"
-			onclick={() => (resetOpen = true)}
-		>
-			Začít znovu
-		</button>
-		<p class="hint">
-			Smaže celý sešit a nechá ti kategorie a nastavení. Zálohu si to nabídne uložit předtím.
-		</p>
+		{#if IS_DEMO}
+			<!-- The demo's wipe: no phrase, no backup — there is nothing to lose (Q74). -->
+			<button type="button" class="btn btn--danger btn--lg btn--block" onclick={resetDemo}>
+				Začít znovu
+			</button>
+			<p class="hint">
+				Ukázka: smaže všechno, co tu kdo nazkoušel, a nahraje ukázková data znovu. Trvá to vteřinu.
+			</p>
+		{:else}
+			<button
+				type="button"
+				class="btn btn--danger btn--lg btn--block"
+				onclick={() => (resetOpen = true)}
+			>
+				Začít znovu
+			</button>
+			<p class="hint">
+				Smaže celý sešit a nechá ti kategorie a nastavení. Zálohu si to nabídne uložit předtím.
+			</p>
+		{/if}
 	</section>
 </main>
 

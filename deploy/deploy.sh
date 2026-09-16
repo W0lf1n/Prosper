@@ -80,6 +80,29 @@ until BODY=$(curl -fsS --max-time 3 "$HEALTH" 2>/dev/null); do
 done
 log "health: $BODY"
 
+# ── the demo, on a box that runs one ────────────────────────────────────────
+# `DEPLOY_DEMO=1` in deploy/.env: the same commit, built with VITE_DEMO=1, as
+# a second compose project with only the web container (Q74). It follows the
+# real deployment so a push to master moves both.
+DEMO=$(sed -n 's/^DEPLOY_DEMO=//p' .env | tail -n1)
+if [ "${DEMO:-}" = 1 ]; then
+	DEMO_PORT=$(sed -n 's/^PROSPER_DEMO_PORT=//p' .env | tail -n1)
+	DEMO_PORT=${DEMO_PORT:-8081}
+	log "building the demo"
+	docker compose -f docker-compose.demo.yml build --pull --quiet
+	docker compose -f docker-compose.demo.yml up -d --remove-orphans --quiet-pull
+	i=0
+	until curl -fsS --max-time 3 "http://127.0.0.1:$DEMO_PORT/200.html" >/dev/null 2>&1; do
+		i=$((i + 1))
+		if [ "$i" -ge 30 ]; then
+			docker compose -f docker-compose.demo.yml logs --tail=40 web
+			die "the demo did not answer on $DEMO_PORT within 30 s"
+		fi
+		sleep 1
+	done
+	log "demo up on $DEMO_PORT"
+fi
+
 # Layers orphaned by the build just replaced, and nothing that is in use.
 docker image prune -f --filter 'dangling=true' >/dev/null
 
