@@ -15,6 +15,9 @@
  * without either — a desktop, an older iPhone — it does nothing, quietly.
  */
 
+/** Whether the phone has the Vibration API — false on every iPhone. */
+export const vibrates = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+
 let label: HTMLLabelElement | null = null;
 
 function switchLabel(): HTMLLabelElement {
@@ -45,7 +48,7 @@ function switchLabel(): HTMLLabelElement {
 export function haptic(pattern: number | number[] = 8): void {
 	if (typeof navigator === 'undefined' || typeof document === 'undefined') return;
 
-	if (typeof navigator.vibrate === 'function') {
+	if (vibrates) {
 		navigator.vibrate(pattern);
 		return;
 	}

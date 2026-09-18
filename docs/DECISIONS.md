@@ -3170,3 +3170,37 @@ The keys are called synchronously, before the callback, so they always land.
 
 **Not verified on hardware.** A desktop browser has neither path. The first
 real check is Petr's thumb on the phone.
+
+### Q77 — A key registers when the thumb lands, not on `click` · answered 2026-09-18
+
+**Reported.** Typed on the phone, the pad sometimes ignored a digit.
+
+**Cause.** Every key listened for `click`, and a phone only makes a `click`
+out of one finger going down and coming up on the same spot. Two ordinary
+ways of typing fast produce none: a second thumb that lands before the first
+has lifted (a multi-touch sequence fires no click for either finger's
+overlap), and a thumb that drifts a few pixels, which the browser takes for
+the start of a pan and cancels. The 4 px gaps between keys were dead ground
+on top of that. The amount state machine refused nothing — the event never
+arrived.
+
+**Answer.** `Keypad.svelte` acts on `pointerdown`, as the phone's own
+keyboard does; every finger has its own pointer, so overlapping presses all
+count. `.keypad` is `touch-action: none`, so a slide is never a pan, and each
+key's hit area reaches 2 px into the gap through a `::before` — the drawn key
+is unchanged. `click` stays for what has no pointer (Enter, Space, a screen
+reader) and is ignored within 800 ms of a pointer event, which is what makes
+it an echo. Backspace deletes on the way down and the 450 ms hold still
+clears, so `clearedByHold` is gone.
+
+**The tick moved with it, on Android only.** `navigator.vibrate` rides
+Android's sticky activation and fires on the press. iOS honours the switch
+tick only from an event that grants activation, and for a finger that is the
+lift, not the landing — so where `vibrates` is false the tick comes from
+`pointerup`.
+
+**Verified** in a browser with synthetic pointers: overlapping 1-down,
+2-down, 1-up, 2-up with no clicks enters `12`; a press followed by its echo
+click enters one digit; a bare click after the window enters one; a trusted
+tap on backspace deletes exactly one; a 600 ms hold clears. Not yet on
+hardware.
