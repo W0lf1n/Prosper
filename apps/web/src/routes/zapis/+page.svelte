@@ -227,8 +227,16 @@
 		else void goto(resolve('/'));
 	}
 
+	/** On, off, on — milliseconds, as `navigator.vibrate` takes them. */
+	const SAVE_OUT = [12, 60, 22];
+	const SAVE_IN = [10, 50, 10, 50, 22];
+
 	async function save() {
 		if (!canSave || !data.accountId) return;
+
+		/* Before the write, not after it: the iPhone only ticks inside the tap
+		   itself. Two beats where a key is one — three when money comes in. */
+		haptic(direction === 'out' ? SAVE_OUT : SAVE_IN);
 
 		const magnitude = toMinor(amount);
 		const signed = direction === 'out' ? neg(magnitude) : magnitude;
@@ -249,7 +257,6 @@
 			shares: direction === 'out' && owedAmount ? [{ who: owedBy, amount: owedAmount }] : []
 		});
 
-		haptic(direction === 'out' ? 14 : [10, 40, 14]);
 		toast.money(signed, {
 			message: what ? `${bucket} · ${what}` : bucket,
 			code,

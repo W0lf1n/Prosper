@@ -42,8 +42,10 @@ function switchLabel(): HTMLLabelElement {
 
 /**
  * `pattern` is what `navigator.vibrate` takes: milliseconds, or on/off
- * milliseconds alternating. iOS cannot shape its tick, so there a pattern of
- * any length is one tick.
+ * milliseconds alternating. iOS cannot shape its tick, only repeat it: there
+ * every "on" of a pattern is one tick at the moment it would have started.
+ * The first is inside the gesture; the later ones ride on it, which Safari
+ * allows for a moment after a tap and not at all without one.
  */
 export function haptic(pattern: number | number[] = 8): void {
 	if (typeof navigator === 'undefined' || typeof document === 'undefined') return;
@@ -53,5 +55,13 @@ export function haptic(pattern: number | number[] = 8): void {
 		return;
 	}
 
-	switchLabel().click();
+	const tick = switchLabel();
+	tick.click();
+
+	if (typeof pattern === 'number') return;
+	let at = 0;
+	for (let i = 2; i < pattern.length; i += 2) {
+		at += pattern[i - 2] + pattern[i - 1];
+		setTimeout(() => tick.click(), at);
+	}
 }

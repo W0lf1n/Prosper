@@ -3204,3 +3204,25 @@ lift, not the landing — so where `vibrates` is false the tick comes from
 click enters one digit; a bare click after the window enters one; a trusted
 tap on backspace deletes exactly one; a 600 ms hold clears. Not yet on
 hardware.
+
+### Q78 — Uložit has its own beat, and it fires in the tap · answered 2026-09-18
+
+**Asked for.** A haptic on the save button, slightly different from a key's.
+
+**Found.** Zápis already vibrated on save — 14 ms for a výdaj — but after
+the awaited `createTxn`, so the iPhone dropped it (Q76), and on Android 14 ms
+against a key's 8 is a difference nobody's thumb can tell.
+
+**Answer.** `save()` calls `haptic()` first thing after its guard, before the
+write: two beats for a výdaj (`[12, 60, 22]`), three for a příjem
+(`[10, 50, 10, 50, 22]`), where a key is one. A disabled pill never reaches
+it. The tick now says "taken", not "written" — the toast is what says
+written, and a write to IndexedDB does not fail in a way a thumb needs to
+hear about.
+
+**iOS repeats what it cannot shape.** `haptic()` with a pattern now clicks the
+hidden switch once per "on", at the offset it would have started, so the
+iPhone gets two and three ticks too. The first is inside the gesture; the
+later ones come from a timer a few tens of milliseconds behind it, which is
+how `web-haptics` plays its patterns. Not verified on hardware — if Safari
+drops the followers, the iPhone feels one tick and nothing else changes.
