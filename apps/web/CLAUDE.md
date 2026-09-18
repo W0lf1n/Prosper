@@ -130,17 +130,17 @@ bend.
 
 ## Routes
 
-| Route                                                            | Screen                                                                                         |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `/`                                                              | Domů. The launch route: the month's net, the cards                                             |
-| `/zapis`                                                         | Zápis. The keypad, full-screen, no bar; `✕` returns where it came from                         |
-| `/vypis`                                                         | Výpis — reverse chronological, running balance, a card per day                                 |
-| `/prehled`                                                       | Přehled — Měsíc \| Platby behind one segmented pill, the month switcher above                  |
+| Route                                                            | Screen                                                                                                                 |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                              | Domů. The launch route: the month's net, the cards                                                                     |
+| `/zapis`                                                         | Zápis. The keypad, full-screen, no bar; `✕` returns where it came from                                                 |
+| `/vypis`                                                         | Výpis — reverse chronological, running balance, a card per day                                                         |
+| `/prehled`                                                       | Přehled — Měsíc \| Platby behind one segmented pill, the month switcher above                                          |
 | `/rozdeleni`                                                     | Rozdělení příjmu — a plan of income and expense lines, what comes back, _pro mě_ against the book; saved by name (Q69) |
-| `/cil`                                                           | The goal — the why, this month's figure, the record of months                                  |
-| `/jmeni`                                                         | Holdings and the `celkem` total — and the only place one is edited                             |
-| `/nastaveni`                                                     | The last tab, a hub: five rows with live summaries (`lib/ui/settings.ts`), each a page         |
-| `/nastaveni/ucty` · `/kategorie` · `/vzhled` · `/sync` · `/data` | Accounts · categories with the icon/colour editor · theme · sync · backup, export, Začít znovu |
+| `/cil`                                                           | The goal — the why, this month's figure, the record of months                                                          |
+| `/jmeni`                                                         | Holdings and the `celkem` total — and the only place one is edited                                                     |
+| `/nastaveni`                                                     | The last tab, a hub: five rows with live summaries (`lib/ui/settings.ts`), each a page                                 |
+| `/nastaveni/ucty` · `/kategorie` · `/vzhled` · `/sync` · `/data` | Accounts · categories with the icon/colour editor · theme · sync · backup, export, Začít znovu                         |
 
 The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/cil` and
 `/jmeni` keep Domů lit; `/rozdeleni` keeps Přehled lit; anything under

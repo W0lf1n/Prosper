@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { haptic } from '$lib/ui/haptics';
 	/**
 	 * Jmění — everything owned, in one number (`docs/INVESTMENTS.md` I2). A
 	 * detail screen off Já.
@@ -109,14 +110,14 @@
 			return;
 		}
 		await recordValuation({ holdingId: holding.id, value, date: today() });
-		navigator.vibrate?.(12);
+		haptic(12);
 		toast.show(`„${holding.name}“ · ${formatMoney(value)}`);
 	}
 
 	async function saveValuation(value: number, date: string) {
 		if (!valuing) return;
 		await recordValuation({ holdingId: valuing, value: value as Minor, date });
-		navigator.vibrate?.(12);
+		haptic(12);
 		toast.show('Hodnota zapsána');
 		valuing = null;
 	}

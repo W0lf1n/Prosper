@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { haptic } from './haptics';
 
 	interface Props {
 		ondigit: (digit: string) => void;
@@ -20,13 +21,24 @@
 	let holdTimer: ReturnType<typeof setTimeout> | undefined;
 	let clearedByHold = false;
 
+	/** Every key ticks — the pad has no travel, so the phone stands in for it. */
+	function digit(key: string) {
+		haptic();
+		ondigit(key);
+	}
+
+	function comma() {
+		haptic();
+		oncomma();
+	}
+
 	/** Hold backspace to wipe the amount — faster than tapping it away. */
 	function startHold() {
 		clearedByHold = false;
 		holdTimer = setTimeout(() => {
 			clearedByHold = true;
 			onclear();
-			navigator.vibrate?.(15);
+			haptic(15);
 		}, 450);
 	}
 
@@ -40,18 +52,19 @@
 			clearedByHold = false;
 			return;
 		}
+		haptic();
 		onbackspace();
 	}
 </script>
 
 <div class="keypad">
 	{#each keys as key (key)}
-		<button type="button" class="key" onclick={() => ondigit(key)}>{key}</button>
+		<button type="button" class="key" onclick={() => digit(key)}>{key}</button>
 	{/each}
 
-	<button type="button" class="key" onclick={oncomma} aria-label="desetinná čárka">,</button>
+	<button type="button" class="key" onclick={comma} aria-label="desetinná čárka">,</button>
 
-	<button type="button" class="key" onclick={() => ondigit('0')}>0</button>
+	<button type="button" class="key" onclick={() => digit('0')}>0</button>
 
 	<button
 		type="button"

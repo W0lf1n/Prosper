@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { haptic } from '$lib/ui/haptics';
 	/**
 	 * Rozdělení příjmu — the planner (Q69).
 	 *
@@ -256,7 +257,7 @@
 			if (!plan) return;
 			load(plan);
 			remember(plan.id);
-			navigator.vibrate?.(10);
+			haptic(10);
 			toast.show(`„${plan.name}“ uloženo`);
 		} finally {
 			saving = false;

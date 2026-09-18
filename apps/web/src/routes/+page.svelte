@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { haptic } from '$lib/ui/haptics';
 	/**
 	 * Domů — the launch route, since the third edition.
 	 *
@@ -177,7 +178,7 @@
 			accountId: data.accountId,
 			amount: amount ?? undefined
 		});
-		navigator.vibrate?.(12);
+		haptic(12);
 		toast.money(txn.amount, {
 			message: group.item.schedule.payee,
 			code: currency,
@@ -197,7 +198,7 @@
 			...(amount !== null && amount !== txn.amount ? { amount } : {})
 		});
 		if (!settled) return;
-		navigator.vibrate?.(12);
+		haptic(12);
 		toast.money(settled.amount, {
 			message: `${txn.payee || 'záznam'} · zaúčtováno`,
 			code: currency,

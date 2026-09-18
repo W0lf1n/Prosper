@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { haptic } from '$lib/ui/haptics';
 	/**
 	 * Přehled — the month and the standing orders, one screen with a switch.
 	 *
@@ -137,7 +138,7 @@
 
 	async function refile(txnId: string, categoryId: string) {
 		await updateTxn(txnId, { categoryId });
-		navigator.vibrate?.(10);
+		haptic(10);
 	}
 
 	/* A stale reading is a fact about a statement nobody opened, not about the
@@ -315,7 +316,7 @@
 			accountId: data.accountId,
 			amount: amount ?? undefined
 		});
-		navigator.vibrate?.(12);
+		haptic(12);
 		toast.money(txn.amount, {
 			message: group.item.schedule.payee,
 			code: payCurrency,

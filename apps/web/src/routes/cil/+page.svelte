@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { haptic } from '$lib/ui/haptics';
 	/**
 	 * Targeting — the screen (PROJECT-PLAN §2.2). A detail screen off Já.
 	 *
@@ -302,7 +303,7 @@
 			categoryId: putCategoryId
 		});
 		putSheetOpen = false;
-		navigator.vibrate?.(14);
+		haptic(14);
 		toast.money(saved.amount, {
 			message: `${current.goal.name} · odloženo`,
 			undo: () => deleteTxn(saved.id)

@@ -3136,3 +3136,37 @@ through the tape for a word. Tracking is about the balance being right today,
 and a hold is the one kind of row whose figure is known to be wrong soon: the
 card puts the question where the day starts, next to the dues, and answers it
 in one tap.
+
+---
+
+## The 2026-09-18 pass — a key that ticks
+
+### Q76 — Every keypad key ticks, on the iPhone too, and without a package · answered 2026-09-18
+
+**Asked for.** Haptic feedback on the keypad of Zápis, with
+haptics.lochie.me (`web-haptics`, MIT) offered as a starting point.
+
+**Answer.** `lib/ui/haptics.ts` → `haptic(pattern = 8)`, and `Keypad.svelte`
+calls it first thing on every digit, the comma and backspace; the
+hold-to-clear keeps its longer 15 ms. Law 1: the pad has no travel, and a
+key that answers the thumb is a key you do not have to look at.
+
+**How it reaches both phones.** Android has `navigator.vibrate`. iOS Safari
+has never shipped it, but since 17.4 a native `<input type="checkbox" switch>`
+plays the system tick when it toggles, and clicking its label toggles it even
+when both are `display: none`. `haptic()` vibrates where it can and clicks
+that hidden label where it cannot. That is the whole of what `web-haptics`
+does underneath; the rest of the package is presets, PWM intensity and a
+debug audio click the app has no use for. Twenty lines against rule 12 was
+not a contest, so there is still one runtime dependency.
+
+**One caller of the phone.** The twelve `navigator.vibrate?.()` calls across
+the routes now go through `haptic()` with the durations they had, so the
+confirmations reach the iPhone as well. Two limits, both iOS's: a pattern of
+any length is one tick there, and a tick that comes after an `await` — most
+"saved" confirmations — may be dropped, because Safari only honours it inside
+the gesture's own handler. Android's activation is sticky and does not care.
+The keys are called synchronously, before the callback, so they always land.
+
+**Not verified on hardware.** A desktop browser has neither path. The first
+real check is Petr's thumb on the phone.

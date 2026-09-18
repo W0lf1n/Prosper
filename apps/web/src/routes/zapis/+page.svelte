@@ -8,6 +8,7 @@
 </script>
 
 <script lang="ts">
+	import { haptic } from '$lib/ui/haptics';
 	/**
 	 * Zápis — the record screen. Full-screen, no tab bar, the keypad owning
 	 * the bottom of the phone; ✕ returns wherever it was opened from.
@@ -132,7 +133,7 @@
 		lastChanged = { key, on };
 		clearTimeout(restTimer);
 		restTimer = setTimeout(() => (lastChanged = null), HINT_REST_MS);
-		navigator.vibrate?.(8);
+		haptic(8);
 	}
 
 	function setOneOff(on: boolean) {
@@ -248,7 +249,7 @@
 			shares: direction === 'out' && owedAmount ? [{ who: owedBy, amount: owedAmount }] : []
 		});
 
-		navigator.vibrate?.(direction === 'out' ? 14 : [10, 40, 14]);
+		haptic(direction === 'out' ? 14 : [10, 40, 14]);
 		toast.money(signed, {
 			message: what ? `${bucket} · ${what}` : bucket,
 			code,
@@ -341,7 +342,7 @@
 		} finally {
 			switching = false;
 		}
-		navigator.vibrate?.(8);
+		haptic(8);
 	}
 
 	function onRailScroll(event: Event) {
