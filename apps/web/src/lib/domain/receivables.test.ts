@@ -4,6 +4,8 @@ import {
 	netOf,
 	openReceivables,
 	owedByPerson,
+	parsePercent,
+	shareByPercent,
 	sharesOf,
 	totalOwed
 } from './receivables';
@@ -170,5 +172,31 @@ describe('netOf()', () => {
 
 	it('clamps rather than flipping the sign on nonsense shares', () => {
 		expect(netOf(txn(-100000, { shares: [share(500000)] }))).toBe(0);
+	});
+});
+
+describe('a share by percent', () => {
+	it('reads whole and decimal percentages as hundredths', () => {
+		expect(parsePercent('50')).toBe(5000);
+		expect(parsePercent('33,3')).toBe(3330);
+		expect(parsePercent('12,5 %')).toBe(1250);
+		expect(parsePercent('100')).toBe(10000);
+	});
+
+	it('refuses what is not a slice of a whole', () => {
+		expect(parsePercent('')).toBeNull();
+		expect(parsePercent('0')).toBeNull();
+		expect(parsePercent('-10')).toBeNull();
+		expect(parsePercent('101')).toBeNull();
+		expect(parsePercent('abc')).toBeNull();
+		expect(parsePercent('1,234')).toBeNull();
+	});
+
+	it('takes the share in haléře, rounded half away from zero', () => {
+		expect(shareByPercent(minor(-120000), 5000)).toBe(60000);
+		expect(shareByPercent(minor(9999), 5000)).toBe(5000);
+		expect(shareByPercent(minor(1000), 3330)).toBe(333);
+		expect(shareByPercent(minor(-1000), 1250)).toBe(125);
+		expect(shareByPercent(minor(0), 2500)).toBe(0);
 	});
 });

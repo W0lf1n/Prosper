@@ -17,19 +17,81 @@
  * of `-1234.56` — which is the same reason `formatMoney` splits rather than
  * divides. The spreadsheet receives an exact decimal literal.
  *
+ * Since Q81 a cell can carry a style — a fill, a weight, centring — and a
+ * formula, because the export is laid out as Petr's own workbook was, and that
+ * workbook was coloured column by column and totalled by `SUM`. The styles
+ * are collected as they are used and written once each; a formula carries
+ * its result as the cached value, so a reader that never recalculates still
+ * shows the figure the app computed.
+ *
  * Pure (§13.6). No Dexie, no fetch, no DOM.
  */
 
 import type { Minor } from './money';
 
-export type CellValue = string | number | Minor | { money: Minor } | { date: string } | null;
+export type CellValue =
+	| string
+	| number
+	| Minor
+	/** `formula` is written without the leading "=", e.g. `SUM(A3:A40)`. */
+	| { money: Minor; formula?: string }
+	| { date: string }
+	| null;
+
+/**
+ * The workbook's palette, by role — the colours `Výdaje 2026.xlsx` used, so
+ * the export opens looking like the file it replaced. A spreadsheet cannot
+ * read `tokens.css`; these are file-format values, like the manifest's
+ * `theme_color`, and live here and nowhere else.
+ */
+const FILLS = {
+	/** A table's header row. */
+	head: 'FFEFEFEF',
+	/** PŘÍJEM. */
+	income: 'FF93C47D',
+	/** A bucket's total. */
+	bucket: 'FFF4CCCC',
+	/** The `popis` column beside it. */
+	note: 'FFEA9999',
+	/** CELKEM — income less expenses. */
+	net: 'FF6AA84F',
+	/** VÝDAJE. */
+	spend: 'FFEA4335'
+} as const;
+
+export type Fill = keyof typeof FILLS;
+
+export interface CellStyle {
+	fill?: Fill;
+	/** `title` is the bucket names across the top; `quiet` the small grey `popis`. */
+	font?: 'bold' | 'title' | 'quiet';
+	center?: boolean;
+	/**
+	 * Money in General format — "2380", the way the workbook wrote it —
+	 * instead of the grouped "2 380,00". Haléře still show when there are any.
+	 */
+	bare?: boolean;
+}
+
+export interface Styled {
+	value: CellValue;
+	style: CellStyle;
+}
+
+export type Cell = CellValue | Styled;
 
 export interface Sheet {
 	/** Becomes the tab name. Excel forbids []:*?/\ and caps it at 31 characters. */
 	name: string;
-	/** The first row is the header, and is styled bold. */
-	header: readonly string[];
-	rows: readonly (readonly CellValue[])[];
+	/** The first row. A cell given without a style is bold. */
+	header: readonly Cell[];
+	rows: readonly (readonly Cell[])[];
+	/** Column widths in characters, left to right. Unlisted columns keep Excel's. */
+	widths?: readonly number[];
+	/** Rows held in place while the rest scrolls. Default 1, the header. */
+	frozenRows?: number;
+	/** The header row's height in points, for a header meant to be read first. */
+	headerHeight?: number;
 }
 
 // ── the decimal string, built from integer digits ───────────────────────────
@@ -96,48 +158,114 @@ function dateSerial(iso: string): number {
 	return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86_400_000);
 }
 
-const STYLE_DEFAULT = 0;
-const STYLE_HEADER = 1;
-const STYLE_MONEY = 2;
-const STYLE_DATE = 3;
+// ── styles ──────────────────────────────────────────────────────────────────
 
-function cellXml(value: CellValue, column: number, row: number, header: boolean): string {
-	const ref = cellRef(column, row);
-	if (value === null || value === '') return '';
+const FORMAT_GENERAL = 0;
+const FORMAT_MONEY = 4; // #,##0.00, built in
+const FORMAT_DATE = 164; // d/m/yyyy, declared in the stylesheet
 
-	if (header) {
-		return `<c r="${ref}" s="${STYLE_HEADER}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(String(value))}</t></is></c>`;
+const FONTS = ['normal', 'bold', 'title', 'quiet'] as const;
+const FILL_ORDER = Object.keys(FILLS) as Fill[];
+
+/**
+ * The distinct cell formats a workbook uses, in the order first met. Index 0
+ * is the plain cell, so an unstyled workbook writes what it always has.
+ */
+class StyleRegistry {
+	readonly keys: string[] = ['0|0|0|0'];
+
+	id(format: number, style: CellStyle): number {
+		const font = FONTS.indexOf(style.font ?? 'normal');
+		// Fill ids 0 and 1 are Excel's two reserved fills: none and gray125.
+		const fill = style.fill ? FILL_ORDER.indexOf(style.fill) + 2 : 0;
+		const key = `${format}|${font}|${fill}|${style.center ? 1 : 0}`;
+		let index = this.keys.indexOf(key);
+		if (index < 0) index = this.keys.push(key) - 1;
+		return index;
 	}
-	if (typeof value === 'object' && 'money' in value) {
-		return `<c r="${ref}" s="${STYLE_MONEY}"><v>${moneyLiteral(value.money)}</v></c>`;
-	}
-	if (typeof value === 'object' && 'date' in value) {
-		return `<c r="${ref}" s="${STYLE_DATE}"><v>${dateSerial(value.date)}</v></c>`;
-	}
-	if (typeof value === 'number') {
-		return `<c r="${ref}" s="${STYLE_DEFAULT}"><v>${Number.isFinite(value) ? value : 0}</v></c>`;
-	}
-	return `<c r="${ref}" s="${STYLE_DEFAULT}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
 }
 
-function sheetXml(sheet: Sheet): string {
+function isStyled(cell: Cell): cell is Styled {
+	return cell !== null && typeof cell === 'object' && 'style' in cell;
+}
+
+function cellXml(
+	cell: Cell,
+	column: number,
+	row: number,
+	header: boolean,
+	styles: StyleRegistry
+): string {
+	const ref = cellRef(column, row);
+	const value = isStyled(cell) ? cell.value : cell;
+	const style: CellStyle = isStyled(cell) ? cell.style : header ? { font: 'bold' } : {};
+
+	if (value === null || value === '') {
+		// An empty cell is written only when it has a colour to show.
+		return style.fill ? `<c r="${ref}" s="${styles.id(FORMAT_GENERAL, style)}"/>` : '';
+	}
+	if (typeof value === 'object' && 'money' in value) {
+		const id = styles.id(style.bare ? FORMAT_GENERAL : FORMAT_MONEY, style);
+		const formula = value.formula ? `<f>${escapeXml(value.formula)}</f>` : '';
+		return `<c r="${ref}" s="${id}">${formula}<v>${moneyLiteral(value.money)}</v></c>`;
+	}
+	if (typeof value === 'object' && 'date' in value) {
+		return `<c r="${ref}" s="${styles.id(FORMAT_DATE, style)}"><v>${dateSerial(value.date)}</v></c>`;
+	}
+	const id = styles.id(FORMAT_GENERAL, style);
+	if (typeof value === 'number') {
+		return `<c r="${ref}" s="${id}"><v>${Number.isFinite(value) ? value : 0}</v></c>`;
+	}
+	return `<c r="${ref}" s="${id}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
+}
+
+function sheetXml(sheet: Sheet, styles: StyleRegistry, selected: boolean): string {
 	const rows: string[] = [];
 
-	rows.push(`<row r="1">${sheet.header.map((h, i) => cellXml(h, i, 0, true)).join('')}</row>`);
+	const height = sheet.headerHeight ? ` ht="${sheet.headerHeight}" customHeight="1"` : '';
+	const header = sheet.header.map((h, i) => cellXml(h, i, 0, true, styles)).join('');
+	rows.push(`<row r="1"${height}>${header}</row>`);
 	sheet.rows.forEach((row, index) => {
-		const cells = row.map((value, column) => cellXml(value, column, index + 1, false)).join('');
+		const cells = row
+			.map((value, column) => cellXml(value, column, index + 1, false, styles))
+			.join('');
 		rows.push(`<row r="${index + 2}">${cells}</row>`);
 	});
 
 	// A frozen header, because a ledger is read by scrolling.
+	const frozen = sheet.frozenRows ?? 1;
+	const pane =
+		frozen > 0
+			? `<pane ySplit="${frozen}" topLeftCell="A${frozen + 1}" activePane="bottomLeft" state="frozen"/>`
+			: '';
+	const cols = sheet.widths?.length
+		? `<cols>${sheet.widths
+				.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`)
+				.join('')}</cols>`
+		: '';
+
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>${rows.join('')}</sheetData></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView${selected ? ' tabSelected="1"' : ''} workbookViewId="0">${pane}</sheetView></sheetViews>${cols}<sheetData>${rows.join('')}</sheetData></worksheet>`;
 }
 
-/** Excel truncates and rejects; do it here so the file is never the one at fault. */
-function safeSheetName(name: string, index: number): string {
-	const cleaned = name.replace(/[[\]:*?/\\]/g, ' ').trim();
-	return (cleaned || `List ${index + 1}`).slice(0, 31);
+/**
+ * Excel truncates and rejects; do it here so the file is never the one at
+ * fault. Two tabs may not share a name, ignoring case, so a clash — two
+ * accounts whose names agree for the first 31 characters — is numbered.
+ */
+function safeSheetNames(names: readonly string[]): string[] {
+	const taken = new Set<string>();
+	return names.map((name, index) => {
+		const cleaned = name.replace(/[[\]:*?/\\]/g, ' ').trim();
+		const base = (cleaned || `List ${index + 1}`).slice(0, 31);
+		let candidate = base;
+		for (let n = 2; taken.has(candidate.toLowerCase()); n += 1) {
+			const suffix = ` (${n})`;
+			candidate = base.slice(0, 31 - suffix.length) + suffix;
+		}
+		taken.add(candidate.toLowerCase());
+		return candidate;
+	});
 }
 
 // ── ZIP (stored) ────────────────────────────────────────────────────────────
@@ -253,28 +381,69 @@ const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
 
 /**
- * Four formats, and no more.
- *
- * `#,##0.00` on money so a column of amounts lines up the way it does in the
- * app, and a plain date so a ledger sorts chronologically instead of
- * alphabetically. Everything else is General.
+ * Three number formats — General, `#,##0.00` on money so a column of amounts
+ * lines up the way it does in the app, and a plain date so a ledger sorts
+ * chronologically instead of alphabetically — crossed with the fonts, fills
+ * and centring the sheets actually used. A filled cell gets a thin grey
+ * border, because a fill hides the gridline it sits on.
  */
-const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="d/m/yyyy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+function stylesXml(styles: StyleRegistry): string {
+	const fonts = [
+		'<font><sz val="11"/><name val="Calibri"/></font>',
+		'<font><b/><sz val="11"/><name val="Calibri"/></font>',
+		'<font><b/><sz val="12"/><name val="Calibri"/></font>',
+		'<font><sz val="9"/><color rgb="FF666666"/><name val="Calibri"/></font>'
+	];
+	const fills = [
+		'<fill><patternFill patternType="none"/></fill>',
+		'<fill><patternFill patternType="gray125"/></fill>',
+		...FILL_ORDER.map(
+			(fill) =>
+				`<fill><patternFill patternType="solid"><fgColor rgb="${FILLS[fill]}"/><bgColor indexed="64"/></patternFill></fill>`
+		)
+	];
+	const edge = (side: string) => `<${side} style="thin"><color rgb="FFBFBFBF"/></${side}>`;
+	const borders = [
+		'<border><left/><right/><top/><bottom/><diagonal/></border>',
+		`<border>${edge('left')}${edge('right')}${edge('top')}${edge('bottom')}<diagonal/></border>`
+	];
+	const xfs = styles.keys.map((key) => {
+		const [format, font, fill, center] = key.split('|').map(Number);
+		const flags = [
+			format ? ' applyNumberFormat="1"' : '',
+			font ? ' applyFont="1"' : '',
+			fill ? ' applyFill="1" applyBorder="1"' : '',
+			center ? ' applyAlignment="1"' : ''
+		].join('');
+		const align = center ? '<alignment horizontal="center" vertical="center" wrapText="1"/>' : '';
+		return `<xf numFmtId="${format}" fontId="${font}" fillId="${fill}" borderId="${fill ? 1 : 0}" xfId="0"${flags}>${align}</xf>`;
+	});
+
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="${FORMAT_DATE}" formatCode="d/m/yyyy"/></numFmts><fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="${fills.length}">${fills.join('')}</fills><borders count="${borders.length}">${borders.join('')}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+}
+
+export interface XlsxOptions {
+	/** The tab the file opens on, 0-based. Default the first. */
+	activeSheet?: number;
+}
 
 /** The bytes of an .xlsx holding one worksheet per sheet given. */
-export function buildXlsx(sheets: readonly Sheet[]): Uint8Array {
-	const named = sheets.map((sheet, index) => ({
-		...sheet,
-		name: safeSheetName(sheet.name, index)
-	}));
+export function buildXlsx(sheets: readonly Sheet[], options: XlsxOptions = {}): Uint8Array {
+	const active = Math.min(Math.max(options.activeSheet ?? 0, 0), Math.max(sheets.length - 1, 0));
+	const names = safeSheetNames(sheets.map((sheet) => sheet.name));
+	const named = sheets.map((sheet, index) => ({ ...sheet, name: names[index]! }));
+
+	// The sheets are written first: the stylesheet is whatever they used.
+	const styles = new StyleRegistry();
+	const sheetParts = named.map((sheet, i) => sheetXml(sheet, styles, i === active));
 
 	const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${named
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="${active}"/></bookViews><sheets>${named
 		.map(
 			(sheet, i) => `<sheet name="${escapeXml(sheet.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`
 		)
-		.join('')}</sheets></workbook>`;
+		.join('')}</sheets><calcPr calcId="0" fullCalcOnLoad="1"/></workbook>`;
 
 	const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${named
@@ -292,10 +461,10 @@ export function buildXlsx(sheets: readonly Sheet[]): Uint8Array {
 		{ path: '_rels/.rels', bytes: encoder.encode(ROOT_RELS) },
 		{ path: 'xl/workbook.xml', bytes: encoder.encode(workbook) },
 		{ path: 'xl/_rels/workbook.xml.rels', bytes: encoder.encode(workbookRels) },
-		{ path: 'xl/styles.xml', bytes: encoder.encode(STYLES) },
-		...named.map((sheet, i) => ({
+		{ path: 'xl/styles.xml', bytes: encoder.encode(stylesXml(styles)) },
+		...sheetParts.map((xml, i) => ({
 			path: `xl/worksheets/sheet${i + 1}.xml`,
-			bytes: encoder.encode(sheetXml(sheet))
+			bytes: encoder.encode(xml)
 		}))
 	];
 

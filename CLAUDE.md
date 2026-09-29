@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-09-16 · schema v15 · 545 web tests · 56 API tests
+**Last revised:** 2026-09-29 · schema v15 · 572 web tests · 56 API tests
 
 ---
 
@@ -134,6 +134,7 @@ client imports a sibling workspace package. The runbook is `docs/DEPLOYMENT.md`.
 | `reset.ts`        | Starting over — the phrase typed to unlock the wipe              |
 | `rows.ts`         | What a row must look like before it may be written — the guard at the backup and sync doors |
 | `xlsx.ts`         | A spreadsheet, hand-rolled, no dependency                       |
+| `workbook.ts`     | The export in `Výdaje 2026.xlsx`'s shape — months, SUMA, tables |
 
 ---
 

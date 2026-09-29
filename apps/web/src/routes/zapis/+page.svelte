@@ -42,6 +42,7 @@
 	import { addDays, formatDayHeading, today } from '$lib/domain/datetime';
 	import { balanceOf, categoryRanking, suggestPayees } from '$lib/domain/ledger';
 	import { currencySymbol, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
+	import { SHARE_PRESETS, parsePercent, shareByPercent } from '$lib/domain/receivables';
 	import type { Account, Category, Txn } from '$lib/domain/types';
 	import CategoryPicker from '$lib/ui/CategoryPicker.svelte';
 	import type { CategoryInput } from '$lib/ui/CategorySheet.svelte';
@@ -98,6 +99,11 @@
 	let owedSheetOpen = $state(false);
 	let owedInput = $state('');
 	let owedBy = $state('');
+	/** The share as a percentage of the amount, in hundredths — set by a
+	    preset or the typed field, and cleared the moment the koruny are typed
+	    by hand. While it holds, the owed amount follows the keypad. */
+	let owedPercent = $state<number | null>(null);
+	let owedPercentText = $state('');
 
 	// ── the flags (Q73) ──────────────────────────────────────────────────────
 	//
@@ -155,6 +161,8 @@
 		const wasOn = owedAmount !== null;
 		owedInput = '';
 		owedBy = '';
+		owedPercent = null;
+		owedPercentText = '';
 		owedSheetOpen = false;
 		if (wasOn) announce('owed', false);
 	}
@@ -175,6 +183,27 @@
 	$effect(() => {
 		stickyDate = date;
 	});
+
+	/* A percentage is a share of whatever the keypad says now: change the
+	   amount after picking half, and half is still half. */
+	$effect(() => {
+		if (owedPercent === null) return;
+		owedInput = formatMoney(shareByPercent(toMinor(amount), owedPercent), { currency: false });
+	});
+
+	function pickPercent(whole: number) {
+		owedPercent = whole * 100;
+		owedPercentText = '';
+	}
+
+	function typePercent() {
+		owedPercent = parsePercent(owedPercentText);
+	}
+
+	function typeOwed() {
+		owedPercent = null;
+		owedPercentText = '';
+	}
 
 	const owedAmount = $derived.by(() => {
 		if (!owedInput.trim()) return null;
@@ -605,9 +634,53 @@
 		</p>
 
 		<label class="field">
-			<span class="field__label">Částka</span>
-			<input class="field__input" bind:value={owedInput} inputmode="decimal" placeholder="0" />
+			<span class="field__label">
+				Částka
+				{#if hasAmount}
+					<span>z {formatMoney(toMinor(amount), { code: currency })}</span>
+				{/if}
+			</span>
+			<input
+				class="field__input"
+				bind:value={owedInput}
+				oninput={typeOwed}
+				inputmode="decimal"
+				placeholder="0"
+			/>
 		</label>
+
+		<!-- A slice of the whole in one tap: half the dinner, a quarter of the
+		     flat. The typed field takes any other share, decimals included. -->
+		<div class="shares">
+			<div class="seg seg--soft shares__presets" role="group" aria-label="Podíl z částky">
+				{#each SHARE_PRESETS as preset (preset)}
+					<button
+						type="button"
+						class="seg__item"
+						aria-pressed={owedPercent === preset * 100}
+						disabled={!hasAmount}
+						onclick={() => pickPercent(preset)}
+					>
+						{preset} %
+					</button>
+				{/each}
+			</div>
+			<label class="shares__custom">
+				<input
+					class="field__input shares__input"
+					bind:value={owedPercentText}
+					oninput={typePercent}
+					inputmode="decimal"
+					placeholder="jiné"
+					aria-label="Vlastní podíl v procentech"
+					disabled={!hasAmount}
+				/>
+				<span class="shares__unit" aria-hidden="true">%</span>
+			</label>
+		</div>
+		{#if !hasAmount}
+			<p class="field__hint">Procenta se počítají z částky — nejdřív ji naťukej.</p>
+		{/if}
 
 		<label class="field">
 			<span class="field__label">Kdo</span>
@@ -1068,6 +1141,48 @@
 
 	.dates {
 		gap: var(--space-2);
+	}
+
+	/* The percent row belongs to the amount above it, so it sits closer to
+	   that field than the fields sit to each other. The typed share is the
+	   presets' height and shape, so the row reads as one control. */
+	.shares {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin-top: calc(-1 * var(--space-2));
+	}
+
+	.shares__presets {
+		flex: 1;
+	}
+
+	.shares__custom {
+		position: relative;
+		flex: none;
+		width: 96px;
+	}
+
+	.shares__input {
+		min-height: 42px;
+		padding-right: 36px;
+		border-radius: var(--radius-full);
+		text-align: right;
+	}
+
+	.shares__unit {
+		position: absolute;
+		top: 50%;
+		right: var(--space-4);
+		transform: translateY(-50%);
+		color: var(--ink-2);
+		font-size: var(--text-sm);
+		pointer-events: none;
+	}
+
+	.shares__presets .seg__item:disabled,
+	.shares__input:disabled {
+		opacity: 0.4;
 	}
 
 	.date-option {

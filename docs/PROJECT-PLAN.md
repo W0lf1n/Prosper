@@ -1008,6 +1008,7 @@ Prosper/
 │  │  │  ├─ recurring.ts            #   declared schedules, catch-up, cost
 │  │  │  ├─ trends.ts               #   month over month, per bucket
 │  │  │  ├─ xlsx.ts                 #   a spreadsheet, without a dependency
+│  │  │  ├─ workbook.ts             #   the export, in the workbook's shape
 │  │  │  ├─ vocabulary.ts           #   Petr's own words, from the workbook
 │  │  │  └─ checks.ts               #   the four laws, enforced
 │  │  ├─ src/lib/db/                # schema + migrations; the only writer

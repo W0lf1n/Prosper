@@ -21,17 +21,22 @@
 	 * on the 15th. What it changes is the year: the figure under the fields
 	 * switches to what the payment actually costs, which for a shared mortgage
 	 * is a different decision from the one the gross would lead to.
+	 *
+	 * The account is asked for only when there is more than one (Q80): the
+	 * rent leaves the koruna account, the gym abroad leaves the euro one, and
+	 * the currency every figure here is shown in follows the choice.
 	 */
 	import { MODE_LABEL, scheduleSharesOf } from '$lib/domain/recurring';
 	import { MAX_SHARES } from '$lib/domain/receivables';
 	import { formatMoney, parseAmount, neg, abs, type Minor } from '$lib/domain/money';
 	import { monthKey, today } from '$lib/domain/datetime';
-	import type { Category, Schedule } from '$lib/domain/types';
+	import type { Account, Category, Schedule } from '$lib/domain/types';
 
 	import Explainer from './Explainer.svelte';
 	import Sheet from './Sheet.svelte';
 
 	export interface ScheduleInput {
+		accountId: string;
 		payee: string;
 		categoryId: string;
 		amount: number;
@@ -47,15 +52,27 @@
 		/** The schedule being edited, or null to declare a new one. */
 		schedule: Schedule | null;
 		categories: Category[];
-		/** Currency of the account this schedule posts to (Q49). */
-		code?: string;
+		/** The live accounts. The picker shows only when there are two or more. */
+		accounts: Account[];
+		/** Where a new schedule posts unless another account is picked. */
+		defaultAccountId: string | null;
 		onsave: (input: ScheduleInput) => Promise<void>;
 		onarchive: (() => Promise<void>) | null;
 		onclose: () => void;
 	}
 
-	let { open, schedule, categories, code = 'CZK', onsave, onarchive, onclose }: Props = $props();
+	let {
+		open,
+		schedule,
+		categories,
+		accounts,
+		defaultAccountId,
+		onsave,
+		onarchive,
+		onclose
+	}: Props = $props();
 
+	let accountId = $state('');
 	let payee = $state('');
 	let categoryId = $state('');
 	let amountText = $state('');
@@ -78,6 +95,9 @@
 		const id = schedule?.id ?? null;
 		if (id === loaded) return;
 		loaded = id;
+		/* A row an older build wrote without an account posts to the active
+		   one (`confirmScheduled`), so that is what the picker shows for it. */
+		accountId = schedule?.accountId || defaultAccountId || accounts[0]?.id || '';
 		payee = schedule?.payee ?? '';
 		categoryId = schedule?.categoryId ?? categories[0]?.id ?? '';
 		amountText = schedule ? formatMoney(abs(schedule.amount), { currency: false }) : '';
@@ -92,6 +112,10 @@
 		error = '';
 		confirmingArchive = false;
 	});
+
+	const account = $derived(accounts.find((a) => a.id === accountId) ?? null);
+	/** Currency of the account this schedule posts to (Q49). */
+	const code = $derived(account?.currency ?? 'CZK');
 
 	const chosen = $derived(categories.find((c) => c.id === categoryId) ?? null);
 	const isIncome = $derived(chosen?.isIncome ?? false);
@@ -140,6 +164,10 @@
 			error = 'Napiš, co to je.';
 			return;
 		}
+		if (!accountId) {
+			error = 'Vyber účet.';
+			return;
+		}
 		if (!categoryId) {
 			error = 'Vyber kategorii.';
 			return;
@@ -171,6 +199,7 @@
 
 		error = '';
 		await onsave({
+			accountId,
 			payee: trimmed,
 			categoryId,
 			amount: isIncome ? abs(parsed.value) : neg(abs(parsed.value)),
@@ -197,6 +226,17 @@
 				autocomplete="off"
 			/>
 		</label>
+
+		{#if accounts.length > 1}
+			<label class="field">
+				<span class="field__label">Účet</span>
+				<select class="field__input" bind:value={accountId}>
+					{#each accounts as row (row.id)}
+						<option value={row.id}>{row.name} · {row.currency}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 
 		<label class="field">
 			<span class="field__label">Kategorie</span>

@@ -9,15 +9,11 @@
 	import { resetDemo } from '$lib/db/demo';
 	import { exportBackup, importBackup, resetLedger, type Backup } from '$lib/db/repo';
 	import { IS_DEMO } from '$lib/demo';
-	import { summariseMonth } from '$lib/domain/checks';
 	import { RECORDS, counted } from '$lib/domain/czech';
 	import { today } from '$lib/domain/datetime';
-	import { KIND_LABEL } from '$lib/domain/holdings';
-	import type { Minor } from '$lib/domain/money';
-	import { sharesOf } from '$lib/domain/receivables';
-	import { monthlyRows, monthsCovered } from '$lib/domain/trends';
 	import type { Txn } from '$lib/domain/types';
-	import { buildXlsx, type Sheet } from '$lib/domain/xlsx';
+	import { buildWorkbook } from '$lib/domain/workbook';
+	import { buildXlsx } from '$lib/domain/xlsx';
 	import { SYNC_LABEL, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import ResetSheet from '$lib/ui/ResetSheet.svelte';
@@ -49,120 +45,51 @@
 		URL.revokeObjectURL(url);
 	}
 
+	/**
+	 * The spreadsheet, laid out as `Výdaje 2026.xlsx` was — a sheet per month,
+	 * a column pair per bucket, SUMA at the end — with the rest of the app in
+	 * tables after it (Q81). Every account, each in its own months: the file
+	 * is the whole ledger, not the account the keypad happens to be on.
+	 */
 	async function downloadWorkbook() {
 		const database = db();
-		const [rows, cats, goalRows, holdingRows, valuationRows] = await Promise.all([
-			data.accountId
-				? database.txns.where('accountId').equals(data.accountId).toArray()
-				: database.txns.toArray(),
+		const [
+			accounts,
+			txns,
+			categories,
+			schedules,
+			goals,
+			monthTargets,
+			holdings,
+			valuations,
+			plans
+		] = await Promise.all([
+			database.accounts.toArray(),
+			database.txns.toArray(),
 			database.categories.toArray(),
+			database.schedules.toArray(),
 			database.goals.toArray(),
+			database.monthTargets.toArray(),
 			database.holdings.toArray(),
-			database.valuations.toArray()
+			database.valuations.toArray(),
+			database.plans.toArray()
 		]);
 
-		const live = rows.filter((t) => !t.isDeleted);
-		const nameOf = (id: string | null) =>
-			id === null ? 'bez kategorie' : (cats.find((c) => c.id === id)?.name ?? 'bez kategorie');
+		const workbook = buildWorkbook({
+			accounts,
+			txns,
+			categories,
+			schedules,
+			goals,
+			monthTargets,
+			holdings,
+			valuations,
+			plans,
+			activeAccountId: data.accountId,
+			today: today()
+		});
 
-		const ledger: Sheet = {
-			name: 'Záznamy',
-			header: [
-				'Datum',
-				'Kategorie',
-				'Popis',
-				'Částka',
-				'Typ',
-				'Jednorázový',
-				'Dluží mi',
-				'Kdo',
-				'Vyrovnáno'
-			],
-			rows: [...live]
-				.sort((a, b) => a.date.localeCompare(b.date))
-				.map((t) => {
-					const shares = sharesOf(t);
-					const owedTotal = shares.reduce((total, s) => total + s.amount, 0);
-					const settled = shares.filter((s) => s.settledByTxnId !== null).length;
-					return [
-						{ date: t.date },
-						nameOf(t.categoryId),
-						t.payee,
-						{ money: t.amount },
-						cats.find((c) => c.id === t.categoryId)?.spendType ?? '',
-						t.isOneOff ? 'ano' : '',
-						owedTotal > 0 ? { money: owedTotal as Minor } : null,
-						shares.map((s) => s.who.trim() || 'někdo').join(', '),
-						shares.length === 0
-							? ''
-							: settled === shares.length
-								? 'ano'
-								: settled > 0
-									? 'zčásti'
-									: ''
-					];
-				})
-		};
-
-		const months = monthsCovered(live);
-		const summary: Sheet = {
-			name: 'Měsíce',
-			header: ['Měsíc', 'Příjem', 'Výdaje', 'Čistý', 'Běžný chod', 'Jednorázové'],
-			rows: monthlyRows({ months, txns: live, categories: cats, today: today() }).map((m) => [
-				m.month,
-				{ money: m.income },
-				{ money: m.outflow },
-				{ money: m.net },
-				{ money: m.recurringOutflow },
-				{ money: m.oneOffOutflow }
-			])
-		};
-
-		const perCategory: Sheet = {
-			name: 'Kategorie po měsících',
-			header: ['Měsíc', 'Kategorie', 'Typ', 'Částka', 'Počet'],
-			rows: months.flatMap((m) =>
-				summariseMonth({ month: m, txns: live, categories: cats, today: today() })
-					.buckets.filter((b) => b.total !== 0)
-					.map((b) => [
-						m,
-						b.category?.name ?? 'bez kategorie',
-						b.category?.spendType ?? '',
-						{ money: b.total },
-						b.count
-					])
-			)
-		};
-
-		const goalsSheet: Sheet = {
-			name: 'Cíle',
-			header: ['Cíl', 'Proč', 'Cílová částka', 'Termín', 'Počítá se od', 'Kategorie'],
-			rows: goalRows
-				.filter((g) => !g.isDeleted)
-				.map((g) => [
-					g.name,
-					g.why,
-					{ money: g.targetAmount },
-					{ date: g.targetDate },
-					{ date: g.startDate },
-					nameOf(g.categoryId)
-				])
-		};
-
-		const wealthSheet: Sheet = {
-			name: 'Jmění',
-			header: ['Investice', 'Druh', 'Datum hodnoty', 'Hodnota'],
-			rows: holdingRows
-				.filter((h) => !h.isDeleted && !h.isArchived)
-				.flatMap((h) =>
-					valuationRows
-						.filter((v) => !v.isDeleted && v.holdingId === h.id)
-						.sort((a, b) => a.date.localeCompare(b.date))
-						.map((v) => [h.name, KIND_LABEL[h.kind], { date: v.date }, { money: v.value }])
-				)
-		};
-
-		const bytes = buildXlsx([ledger, summary, perCategory, goalsSheet, wealthSheet]);
+		const bytes = buildXlsx(workbook.sheets, { activeSheet: workbook.activeSheet });
 		const blob = new Blob([bytes as BlobPart], {
 			type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 		});
@@ -172,7 +99,7 @@
 		link.download = `prosper-${today()}.xlsx`;
 		link.click();
 		URL.revokeObjectURL(url);
-		toast.show(`Vyexportováno ${counted(live.length, RECORDS)}`);
+		toast.show(`Vyexportováno ${counted(workbook.rowCount, RECORDS)}`);
 	}
 
 	async function runImport(event: Event) {

@@ -13,7 +13,7 @@
  * Pure (§11.6).
  */
 
-import { ZERO, abs, minor, sum, type Minor } from './money';
+import { ZERO, abs, minor, mulRatio, parseAmount, sum, type Minor } from './money';
 import type { Txn, TxnShare } from './types';
 
 /**
@@ -130,4 +130,38 @@ export function netOf(txn: Txn): Minor {
 	const net = txn.amount + sum(shares.map((s) => abs(s.amount)));
 	// Shares larger than the expense would flip the sign; clamp rather than lie.
 	return minor(txn.amount < 0 ? Math.min(net, 0) : Math.max(net, 0));
+}
+
+// ── a share by percent ──────────────────────────────────────────────────────
+
+/**
+ * The shares the owed sheet offers in one tap — asked for 2026-09-29. Half
+ * the dinner is the common case; a quarter and a tenth are the two slices
+ * that come up next. Anything else is typed.
+ */
+export const SHARE_PRESETS = [10, 25, 50] as const;
+
+/**
+ * A typed percentage as hundredths of a percent: "50" → 5 000, "33,3" →
+ * 3 330, "12,5 %" → 1 250. Integers, so the share is computed without a
+ * float anywhere near the money.
+ *
+ * The shape of a percentage is the shape of an amount — digits, one comma,
+ * at most two decimals — so `parseAmount` reads it, and the minor units it
+ * returns are the hundredths. Null for anything that is not a slice of a
+ * whole: empty, not a number, zero or less, over a hundred.
+ */
+export function parsePercent(input: string): number | null {
+	const parsed = parseAmount(input.replace('%', ''));
+	if (!parsed.ok || parsed.value <= 0 || parsed.value > 10_000) return null;
+	return parsed.value;
+}
+
+/**
+ * `hundredths` of a percent of `total`, rounded half away from zero to the
+ * haléř — 50 % of 99,99 Kč is 50,00 Kč. A positive magnitude, whatever the
+ * sign of the total: a share is always what comes back.
+ */
+export function shareByPercent(total: Minor, hundredths: number): Minor {
+	return mulRatio(abs(total), hundredths, 10_000);
 }

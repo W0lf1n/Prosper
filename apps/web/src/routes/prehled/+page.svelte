@@ -254,13 +254,19 @@
 	}
 
 	// ── platby ──────────────────────────────────────────────────────────────
+	/* Which account's payments are listed (Q80). It opens on the active one;
+	   there is no "vše", because the year of a koruna rent and a euro gym is
+	   not one number. A row an older build wrote without an account posts to
+	   the active account, so that is where it is listed. */
+	let payChoice = $state<string | null>(null);
+	const payAccountId = $derived(payChoice ?? data.accountId);
 	const liveSchedules = $derived(
 		(($schedules ?? []) as Schedule[]).filter(
-			(s) => !s.isDeleted && !s.isArchived && (!s.accountId || s.accountId === data.accountId)
+			(s) => !s.isDeleted && !s.isArchived && (s.accountId || data.accountId) === payAccountId
 		)
 	);
-	const activeAccount = $derived(accountRows.find((a) => a.id === data.accountId) ?? null);
-	const payCurrency = $derived(activeAccount?.currency ?? 'CZK');
+	const payAccount = $derived(accountRows.find((a) => a.id === payAccountId) ?? null);
+	const payCurrency = $derived(payAccount?.currency ?? 'CZK');
 
 	const cost = $derived(recurringCost(liveSchedules));
 	const income = $derived(recurringIncome(liveSchedules));
@@ -294,11 +300,13 @@
 	}
 
 	async function saveSchedule(input: ScheduleInput) {
-		if (!data.accountId) return;
 		const patch = { ...input, amount: input.amount as Minor };
 		if (editing) await updateSchedule(editing.id, patch);
-		else await createSchedule({ ...patch, accountId: data.accountId });
+		else await createSchedule(patch);
 		sheetOpen = false;
+		/* Saved to another account, the list follows it there — otherwise the
+		   payment just written would vanish from under the thumb. */
+		payChoice = input.accountId;
 		toast.show(editing ? 'Uloženo' : sheetIncoming ? 'Pravidelný příjem přidán' : 'Platba přidána');
 	}
 
@@ -729,6 +737,22 @@
 			</section>
 		{/if}
 	{:else}
+		{#if accountRows.length > 1}
+			<nav class="accounts" aria-label="Účet">
+				{#each accountRows as row (row.id)}
+					<button
+						type="button"
+						class="chip"
+						class:chip--on={payAccountId === row.id}
+						aria-pressed={payAccountId === row.id}
+						onclick={() => (payChoice = row.id)}
+					>
+						{row.name}
+					</button>
+				{/each}
+			</nav>
+		{/if}
+
 		<DueCard
 			groups={due}
 			categories={pickable}
@@ -887,9 +911,10 @@
 
 <ScheduleSheet
 	open={sheetOpen}
-	code={payCurrency}
 	schedule={editing}
 	categories={sheetCategories}
+	accounts={accountRows}
+	defaultAccountId={payAccountId}
 	onsave={saveSchedule}
 	onarchive={editing ? removeSchedule : null}
 	onclose={() => (sheetOpen = false)}

@@ -3226,3 +3226,90 @@ iPhone gets two and three ticks too. The first is inside the gesture; the
 later ones come from a timer a few tens of milliseconds behind it, which is
 how `web-haptics` plays its patterns. Not verified on hardware — if Safari
 drops the followers, the iPhone feels one tick and nothing else changes.
+
+---
+
+## The 2026-09-29 pass — a share by percent, a payment on any account, and the export in the workbook's shape
+
+### Q79 — The owed sheet takes a share by percent · answered 2026-09-29
+
+**Asked for.** Under _Částka_ in the _Kolik ti vrátí_ sheet: 10 %, 25 %,
+50 % in one tap, and a small field for any other percentage, filling the
+amount from the whole.
+
+**Answer.** A soft segmented pill (`SHARE_PRESETS` in `domain/receivables.ts`)
+and a pill-shaped field beside it with `%` in it. `parsePercent` reads the
+field the way `parseAmount` reads money — its minor units _are_ hundredths of
+a percent, so "33,3" is 3 330 — and `shareByPercent` is `mulRatio(total,
+hundredths, 10 000)`, rounded half away from zero to the haléř. No float
+touches the amount.
+
+**A percentage follows the keypad.** Picking 50 % and then correcting the
+amount keeps it at half. Typing koruny into _Částka_ by hand drops the
+percentage — the typed figure is the answer from then on. With no amount on
+the keypad the pills are disabled and a line says to type the amount first.
+
+### Q80 — A recurring payment chooses its account · answered 2026-09-29
+
+**Asked for.** _Pravidelné platby_ could only declare a payment on the active
+account.
+
+**Found.** `Schedule.accountId` has existed since v11 and `confirmScheduled`
+posts to it; only the sheet never asked, and Platby listed only the active
+account's schedules — so a payment moved elsewhere would have vanished from
+the list.
+
+**Answer.** `ScheduleSheet` gets _Účet_ (a select, shown only with two or more
+accounts), and the currency of the yearly figure follows it. Platby gets the
+account chips Měsíc already has, opening on the active account, with no
+_vše_ — the year of a koruna rent and a euro gym is not one number. Saving a
+payment to another account moves the list there. A row an older build wrote
+without an account is listed, and preselected, as the active account's —
+which is where it posts.
+
+### Q81 — The export is laid out as `Výdaje 2026.xlsx` was · answered 2026-09-29
+
+**Asked for.** The spreadsheet in the template's shape — `PŘÍJEM | popis |
+DARY | popis | … | OSTATNÍ | popis | CELKEM | VÝDAJE`, bucket totals in the
+second row — with everything else the app knows added in the same style.
+
+**Answer.** `domain/workbook.ts` builds the sheets; `xlsx.ts` still writes
+them, now with fills, fonts, centring, column widths, frozen rows, formulas
+and the tab it opens on. Per account, one sheet per month and a `SUMA`:
+
+- **A month** is the template. Every live bucket is a column pair, income
+  first, in the app's order, used or not — the template's columns were
+  fixed — plus any archived bucket, SMĚNA or unfiled row the account's
+  history reaches, the same on every month so they line up. Row 2 totals
+  each bucket by `SUM` (green for income, pink for a bucket, darker pink over
+  `popis`), `CELKEM` is `income − VÝDAJE` in dark green, `VÝDAJE` is red —
+  the template's colours. After them JEDNORÁZOVÉ, BĚŽNÝ CHOD and VRACÍ SE.
+  Each column lists its rows oldest first; the `popis` starts with the date
+  — the workbook's missing field — and ends with the flags: _směna,
+  pravidelná, jednorázový, blokace, dluží Jana 600,00 Kč_.
+- **SUMA** is one row per month, the buckets across, under a CELKEM row and a
+  PRŮMĚR row, both formulas. After the money: days without an expense and the
+  10/10/10/70 split as percentages of earned income.
+- **Then the other screens as tables:** Záznamy (every row, every account,
+  every flag), Pohledávky (every share, open first), Pravidelné platby, Cíle
+  and Cíle po měsících, Účty with today's balances, Jmění, Plány, Kategorie.
+
+**A row lands where `summariseMonth` puts it**, so a sheet's CELKEM is
+Přehled's net to the haléř: an inflow is income in an income bucket or none,
+an inflow in a spending bucket is a refund written as a negative cost in its
+column, and a spending row filed under an income bucket gets its own
+"(výdaj)" column rather than shrinking PŘÍJEM. A formula carries the app's
+own figure as its cached value; `fullCalcOnLoad` makes Excel recompute, and
+the two agree.
+
+**Every account is exported, never summed.** The export used to cover only
+the active account. Now each account with rows gets its own months and SUMA,
+suffixed with its name when there is more than one; the active one comes
+first and the file opens on its latest month. An empty ledger still gets the
+template for this month.
+
+**Money in the template is General, not `#,##0.00`** — "2380", as the
+workbook wrote it; the tables keep the grouped format. **The palette is
+ARGB literals in `xlsx.ts`**: a spreadsheet cannot read `tokens.css`, the
+same exception as the manifest's `theme_color`. **Two tabs whose names agree
+for 31 characters** are numbered, because Excel refuses the file otherwise.
