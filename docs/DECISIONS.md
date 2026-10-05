@@ -3479,3 +3479,23 @@ own names; **vocabulary** — the dictionary, as before. Only a habit says
 same resolver. Cashew's per-bucket keyword lists ("associated titles") would
 need a schema field and an editor, and are not built; nor does Zápis pick the
 bucket by itself — the finding still offers it in one tap.
+
+### Q87 — The demo on this machine · answered 2026-10-05
+
+**Asked for.** A sandbox for local development, to try new features on; and
+the demo's rows "around the current day" after starting over, not six months
+down the tape.
+
+**Found.** Začít znovu already re-dates the sample: `demoLedger(today())`
+counts every row back from the day it is seeded (verified: the reseed ran
+2026-07-24 → yesterday). What drifts is a demo left alone — the tape draws
+every day up to today, so months later the sample sits under a run of empty
+days. Locally the demo was `VITE_DEMO=1` in front of the command, which
+PowerShell cannot write, and on an origin that already held a ledger it opened
+blank: the sample seeds only into an empty database.
+
+**Answer.** `pnpm dev:demo` — `vite dev --mode demo` on port 5175, and
+`vite.config.ts` treats `--mode demo` as `VITE_DEMO=1` and sets the demo
+manifest suffix. Its own port is its own origin, so its IndexedDB never meets
+the real ledger on 5173, and its Začít znovu (a hard wipe) cannot reach it.
+`.claude/launch.json` lists it as `paska-demo`.

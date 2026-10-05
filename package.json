@@ -4,6 +4,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "pnpm --filter web dev",
+		"dev:demo": "pnpm --filter web dev:demo",
 		"build": "pnpm --filter web build",
 		"preview": "pnpm --filter web preview",
 		"test": "pnpm --filter web test",
