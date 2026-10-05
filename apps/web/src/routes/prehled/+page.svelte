@@ -87,17 +87,41 @@
 	const categoryById = $derived(new Map(allCategories.map((c) => [c.id, c])));
 
 	// ── which account the month is about (Q49) ──────────────────────────────
+	//
+	// One account, "vše" — and since Q83 a currency: when the card and the
+	// cash are both koruny, "CZK celkem" is the whole koruna month on the full
+	// screen, split and trends included, and the screen opens on it the way
+	// Domů reads it. A currency of one account needs no chip of its own; the
+	// account's chip is the same rows.
+	const CURRENCY_VIEW = 'currency:';
+	const groups = $derived(groupByCurrency(accountRows));
 	let viewChoice = $state<string | null>(null);
-	const view = $derived(viewChoice ?? data.accountId ?? 'all');
-	const viewAccount = $derived(
-		view === 'all' ? null : (accountRows.find((a) => a.id === view) ?? null)
+	const view = $derived.by(() => {
+		if (viewChoice) return viewChoice;
+		const active = accountRows.find((a) => a.id === data.accountId);
+		if (!active) return data.accountId ?? 'all';
+		return (groups.get(active.currency)?.length ?? 0) > 1
+			? `${CURRENCY_VIEW}${active.currency}`
+			: active.id;
+	});
+	const viewCurrency = $derived(
+		view.startsWith(CURRENCY_VIEW) ? view.slice(CURRENCY_VIEW.length) : null
 	);
-	const currency = $derived(viewAccount?.currency ?? 'CZK');
-	const viewRows = $derived(view === 'all' ? [] : rows.filter((t) => t.accountId === view));
+	const viewAccount = $derived(
+		view === 'all' || viewCurrency ? null : (accountRows.find((a) => a.id === view) ?? null)
+	);
+	const currency = $derived(viewCurrency ?? viewAccount?.currency ?? 'CZK');
+	const viewRows = $derived(
+		view === 'all'
+			? []
+			: viewCurrency
+				? inCurrency(rows, ($accounts ?? []) as Account[], viewCurrency)
+				: rows.filter((t) => t.accountId === view)
+	);
 
 	const currencyGroups = $derived.by(() => {
 		if (view !== 'all') return [];
-		return [...groupByCurrency(accountRows).keys()].map((code) => ({
+		return [...groups.keys()].map((code) => ({
 			code,
 			summary: summariseMonth({
 				month,
@@ -391,29 +415,47 @@
 
 	{#if tab === 'mesic'}
 		{#if accountRows.length > 1}
-			<!-- Which account the month is about (Q49). "Vše" lays the currencies
-			     side by side; it never adds them up. -->
+			<!-- Which account the month is about (Q49), or which currency, when it
+			     holds more than one (Q83). "Vše" lays the currencies side by side;
+			     it never adds them up, and with one currency it has nothing to lay
+			     out that "celkem" does not already show. -->
 			<nav class="accounts" aria-label="Účet">
-				{#each accountRows as row (row.id)}
+				{#each [...groups] as [code, members] (code)}
+					{#if members.length > 1}
+						{@const key = `${CURRENCY_VIEW}${code}`}
+						<button
+							type="button"
+							class="chip"
+							class:chip--on={view === key}
+							aria-pressed={view === key}
+							onclick={() => (viewChoice = key)}
+						>
+							{code} celkem
+						</button>
+					{/if}
+					{#each members as row (row.id)}
+						<button
+							type="button"
+							class="chip"
+							class:chip--on={view === row.id}
+							aria-pressed={view === row.id}
+							onclick={() => (viewChoice = row.id)}
+						>
+							{row.name}
+						</button>
+					{/each}
+				{/each}
+				{#if groups.size > 1}
 					<button
 						type="button"
 						class="chip"
-						class:chip--on={view === row.id}
-						aria-pressed={view === row.id}
-						onclick={() => (viewChoice = row.id)}
+						class:chip--on={view === 'all'}
+						aria-pressed={view === 'all'}
+						onclick={() => (viewChoice = 'all')}
 					>
-						{row.name}
+						vše
 					</button>
-				{/each}
-				<button
-					type="button"
-					class="chip"
-					class:chip--on={view === 'all'}
-					aria-pressed={view === 'all'}
-					onclick={() => (viewChoice = 'all')}
-				>
-					vše
-				</button>
+				{/if}
 			</nav>
 		{/if}
 
@@ -684,20 +726,27 @@
 							<div class="bucket__body">
 								<div class="bucket__head">
 									<span class="bucket__name">{bucket.category?.name ?? 'bez kategorie'}</span>
-									<span class="bucket__total">
-										{formatMoney(bucket.total, { sign: 'never', code: currency })}
+									<!-- A bucket that came out ahead — more came back than went
+									     out (Q82) — is money in, signed and in mint, with no bar. -->
+									<span class="bucket__total" class:bucket__total--in={bucket.total > 0}>
+										{formatMoney(bucket.total, {
+											sign: bucket.total > 0 ? 'always' : 'never',
+											code: currency
+										})}
 									</span>
 								</div>
 								<div class="meter meter--thin">
 									<span
 										class="meter__fill bucket__fill"
-										style="width: {barWidth(bucket.total)}%; background: {bucket.category
+										style="width: {bucket.total > 0
+											? 0
+											: barWidth(bucket.total)}%; background: {bucket.category
 											? colorVar(style.color)
 											: 'var(--flag)'}"
 									></span>
 								</div>
 								<div class="bucket__foot">
-									<span>{bucket.share} %</span>
+									<span>{bucket.total > 0 ? 'víc zpět' : `${bucket.share} %`}</span>
 									<span class="bucket__note" data-up={trend?.direction === 'up'}>
 										{#if trend && trend.direction !== 'flat' && trend.changePercent !== null}
 											{trend.direction === 'up' ? '↑' : '↓'}
@@ -1271,6 +1320,10 @@
 
 	.bucket__total {
 		flex: none;
+	}
+
+	.bucket__total--in {
+		color: var(--in);
 	}
 
 	.bucket__foot {

@@ -14,12 +14,13 @@
 	 * A difference is offered as a row to write, never as a balance to overwrite.
 	 * Overwriting would close the gap and destroy the evidence in one move.
 	 */
-	import { formatMoney, parseAmount, type Minor } from '$lib/domain/money';
+	import { formatMoney, parseSigned, type Minor } from '$lib/domain/money';
 	import { today } from '$lib/domain/datetime';
 	import { describeDelta, isClean, reconcileDelta } from '$lib/domain/reconcile';
 	import type { Category } from '$lib/domain/types';
 	import Money from './Money.svelte';
 	import Sheet from './Sheet.svelte';
+	import SignedAmount from './SignedAmount.svelte';
 
 	interface Props {
 		/** Currency of the account being reconciled (Q49). */
@@ -43,6 +44,8 @@
 	let { open, computed, accountName, categories, code = 'CZK', onsave, onclose }: Props = $props();
 
 	let statementText = $state('');
+	/** The statement is below zero — a pill, because the keypad has no minus (Q85). */
+	let statementNegative = $state(false);
 	let date = $state(today());
 	let categoryId = $state('');
 	let error = $state('');
@@ -51,13 +54,27 @@
 	$effect(() => {
 		if (open) return;
 		statementText = '';
+		statementNegative = false;
 		date = today();
 		categoryId = '';
 		error = '';
 		busy = false;
 	});
 
-	const parsed = $derived(parseAmount(statementText));
+	/* An account already in the red is most likely read off a statement in
+	   the red, so the pill opens where the ledger stands. Once per opening. */
+	let seeded = false;
+	$effect(() => {
+		if (!open) {
+			seeded = false;
+			return;
+		}
+		if (seeded) return;
+		seeded = true;
+		statementNegative = computed < 0;
+	});
+
+	const parsed = $derived(parseSigned(statementText, statementNegative));
 	const statement = $derived(parsed.ok ? parsed.value : null);
 
 	const delta = $derived(statement === null ? null : reconcileDelta({ computed, statement }));
@@ -124,16 +141,11 @@
 			<Money value={computed} size="xl" bold colour={false} {code} />
 		</div>
 
-		<label class="field">
-			<span class="field__label">Zůstatek z výpisu</span>
-			<input
-				class="field__input field__input--mono"
-				bind:value={statementText}
-				inputmode="decimal"
-				placeholder="0"
-				autocomplete="off"
-			/>
-		</label>
+		<SignedAmount
+			label="Zůstatek z výpisu"
+			bind:text={statementText}
+			bind:negative={statementNegative}
+		/>
 
 		<label class="field">
 			<span class="field__label">K datu</span>

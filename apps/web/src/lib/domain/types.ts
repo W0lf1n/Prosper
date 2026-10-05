@@ -41,12 +41,14 @@ export interface Synced {
 /**
  * Money held elsewhere in an account's currency — Q50.
  *
- * There is one account per currency, so the koruny on a Revolut card have no
- * account of their own: they are part of the CZK account. A pocket is the
- * stated amount that arrived from somewhere else and joins the opening
- * balance, with a name so Settings can say where it sits. It is *opening*
- * money, not a live balance — every flow after it is a row like any other,
- * so a pocket is never restated the way a holding's value is.
+ * Written while there was one account per currency, so the koruny on a
+ * Revolut card had no account of their own: they were part of the CZK
+ * account. A pocket is the stated amount that arrived from somewhere else
+ * and joins the opening balance, with a name so Settings can say where it
+ * sits. It is *opening* money, not a live balance — every flow after it is a
+ * row like any other, so a pocket is never restated the way a holding's
+ * value is. Since Q83 a currency may hold a second account, and Settings
+ * turns a pocket into one (`pocketToAccount`).
  *
  * Positive magnitude, in the account's currency. `id` only has to be unique
  * within its account.
@@ -61,6 +63,11 @@ export interface Account extends Synced {
 	id: string;
 	name: string;
 	kind: AccountKind;
+	/**
+	 * Signed. Zero is an account opened empty, and below zero is one opened
+	 * in debt — the overdraft, the credit card, the loan (Q85). Every balance
+	 * is this plus rows, so nothing downstream assumes it is positive.
+	 */
 	openingBalance: Minor;
 	openingDate: IsoDate;
 	/**
@@ -122,9 +129,11 @@ export interface Category extends Synced {
  * that carried it — each share settles on its own, because Friend1 paying up
  * says nothing about Friend2.
  *
- * `amount` is a positive magnitude; the shares together never exceed the
- * expense. `id` only has to be unique within its row — it exists so a screen
- * can settle *this* share and not its neighbour.
+ * `amount` is a positive magnitude — what is coming back, or once settled,
+ * what came. Since Q82 the shares may add up to more than the expense: a
+ * thank-you on top is money that came back. `id` only has to be unique
+ * within its row — it exists so a screen can settle *this* share and not its
+ * neighbour.
  */
 export interface TxnShare {
 	id: string;

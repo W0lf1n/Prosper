@@ -3,6 +3,7 @@ import {
 	CURRENCIES,
 	ZERO,
 	abs,
+	currencyName,
 	currencySymbol,
 	add,
 	cmp,
@@ -14,6 +15,7 @@ import {
 	mulRatio,
 	neg,
 	parseAmount,
+	parseSigned,
 	percentOf,
 	roundToUnit,
 	split,
@@ -242,12 +244,72 @@ describe('other currencies (Q49)', () => {
 	});
 
 	it('offers only two-decimal currencies, so Minor keeps meaning hundredths', () => {
+		// The forint is two digits in ISO 4217 — the fillér is still the minor
+		// unit on paper — though the locale displays it whole. It is offered,
+		// and prints ",00".
+		const displayedWhole = new Set(['HUF']);
 		for (const code of CURRENCIES) {
+			if (displayedWhole.has(code)) continue;
 			expect(
 				new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: code }).resolvedOptions()
 					.maximumFractionDigits
 			).toBe(2);
 		}
+		expect(CURRENCIES).not.toContain('JPY');
+	});
+});
+
+describe('the wider list of currencies (Q84)', () => {
+	it('offers the neighbours, the dollars and the rest, home first', () => {
+		expect(CURRENCIES[0]).toBe('CZK');
+		expect(CURRENCIES.slice(0, 4)).toEqual(['CZK', 'EUR', 'USD', 'GBP']);
+		for (const code of ['PLN', 'CHF', 'HUF', 'SEK', 'NOK', 'DKK', 'CAD', 'AUD']) {
+			expect(CURRENCIES).toContain(code);
+		}
+		expect(new Set(CURRENCIES).size).toBe(CURRENCIES.length);
+	});
+
+	it('prints the sign people read where the locale would print a bare code', () => {
+		expect(currencySymbol('PLN')).toBe('zł');
+		expect(currencySymbol('HUF')).toBe('Ft');
+		expect(formatMoney(m(1234_50), { code: 'PLN' })).toBe(`1${NBSP}234,50${NBSP}zł`);
+		// The narrow "$" belongs to seven offered currencies, so the dollar keeps its prefix.
+		expect(currencySymbol('USD')).toBe('US$');
+		expect(currencySymbol('SEK')).toBe('SEK');
+	});
+
+	it('never prints the same symbol for two offered currencies', () => {
+		const symbols = CURRENCIES.map((code) => currencySymbol(code));
+		expect(new Set(symbols).size).toBe(symbols.length);
+	});
+
+	it('names each currency in Czech, out of Intl', () => {
+		expect(currencyName('PLN')).toBe('polský zlotý');
+		expect(currencyName('CZK')).toBe('česká koruna');
+		for (const code of CURRENCIES) expect(currencyName(code)).not.toBe('');
+	});
+});
+
+describe('parseSigned() — a balance on a keypad with no minus (Q85)', () => {
+	it('takes the side of zero from the pill', () => {
+		expect(parseSigned('1 000', false)).toEqual({ ok: true, value: 1000_00 });
+		expect(parseSigned('1 000', true)).toEqual({ ok: true, value: -1000_00 });
+	});
+
+	it('honours a minus typed by hand, whatever the pill says', () => {
+		expect(parseSigned('-250,50', false)).toEqual({ ok: true, value: -250_50 });
+		expect(parseSigned('-250,50', true)).toEqual({ ok: true, value: -250_50 });
+	});
+
+	it('keeps zero zero — never a negative zero', () => {
+		const zero = parseSigned('0', true);
+		expect(zero).toEqual({ ok: true, value: 0 });
+		expect(zero.ok && Object.is(zero.value, -0)).toBe(false);
+	});
+
+	it('refuses what is not an amount, as parseAmount does', () => {
+		expect(parseSigned('abc', true)).toEqual({ ok: false, error: 'not-a-number' });
+		expect(parseSigned('', false)).toEqual({ ok: false, error: 'empty' });
 	});
 });
 

@@ -10,7 +10,7 @@
 import {
 	EXCHANGE_CATEGORY_ID,
 	EXCHANGE_CATEGORY_NAME,
-	availableCurrencies,
+	guessAccountKind,
 	homeCurrency,
 	inCurrency,
 	pocketsOf,
@@ -416,11 +416,16 @@ export async function restoreTxn(id: string): Promise<void> {
  *
  * Writing the row back through `sharesOf` is deliberate — it is what upgrades
  * a legacy single-share row to the array shape the first time it is settled.
+ *
+ * `amount` is what actually arrived, when it is not what was owed (Q82): the
+ * friend who owed 10 Kč and sent 11 as a thank-you. The inflow carries it,
+ * and the share is rewritten to it — once settled, a share records what came
+ * back, so the row's net and the bucket's refund say the same thing.
  */
 export async function settleReceivable(
 	txnId: string,
 	shareId: string,
-	date?: string
+	options: { amount?: Minor; date?: string } = {}
 ): Promise<Txn | undefined> {
 	const database = db();
 	const original = await database.txns.get(txnId);
@@ -430,10 +435,12 @@ export async function settleReceivable(
 	const share = shares.find((s) => s.id === shareId);
 	if (!share || !isOpenShare(share)) return undefined;
 
+	const received =
+		options.amount !== undefined && options.amount > 0 ? options.amount : share.amount;
 	const repayment = await createTxn({
 		accountId: original.accountId,
-		amount: share.amount,
-		date: date ?? today(),
+		amount: received,
+		date: options.date ?? today(),
 		categoryId: original.categoryId,
 		payee: share.who.trim() ? `vrácení — ${share.who.trim()}` : 'vrácení',
 		note: `k výdaji „${original.payee || 'bez popisu'}“`
@@ -441,7 +448,9 @@ export async function settleReceivable(
 
 	const next: Txn = {
 		...original,
-		shares: shares.map((s) => (s.id === shareId ? { ...s, settledByTxnId: repayment.id } : s)),
+		shares: shares.map((s) =>
+			s.id === shareId ? { ...s, amount: received, settledByTxnId: repayment.id } : s
+		),
 		...(await stamp())
 	};
 	await database.txns.put(next);
@@ -449,8 +458,14 @@ export async function settleReceivable(
 	return repayment;
 }
 
-/** Undo of the above: removes the inflow and reopens that one share. */
-export async function unsettleReceivable(txnId: string, shareId: string): Promise<void> {
+/** Undo of the above: removes the inflow and reopens that one share — at
+    `owed`, when it was settled with a different figure than it was written
+    with, so the undo puts back what was there. */
+export async function unsettleReceivable(
+	txnId: string,
+	shareId: string,
+	owed?: Minor
+): Promise<void> {
 	const database = db();
 	const original = await database.txns.get(txnId);
 	if (!original) return;
@@ -462,7 +477,11 @@ export async function unsettleReceivable(txnId: string, shareId: string): Promis
 	await deleteTxn(share.settledByTxnId);
 	const next: Txn = {
 		...original,
-		shares: shares.map((s) => (s.id === shareId ? { ...s, settledByTxnId: null } : s)),
+		shares: shares.map((s) =>
+			s.id === shareId
+				? { ...s, amount: owed !== undefined && owed > 0 ? owed : s.amount, settledByTxnId: null }
+				: s
+		),
 		...(await stamp())
 	};
 	await database.txns.put(next);
@@ -487,10 +506,11 @@ export async function updateAccount(
 /**
  * Money from elsewhere joins the account — Q50.
  *
- * The koruny on a Revolut card do not get an account of their own; they are
- * part of the CZK account and this is how they get in. A pocket is opening
- * money with a name on it, and it is written the way the opening balance is:
- * a field on the account row, stamped and queued as one change.
+ * Written while the koruny on a Revolut card could not have an account of
+ * their own. Since Q83 they can, and `pocketToAccount` turns a pocket into
+ * one. A pocket is opening money with a name on it, and it is written the
+ * way the opening balance is: a field on the account row, stamped and queued
+ * as one change.
  */
 export async function addPocket(
 	accountId: string,
@@ -529,48 +549,87 @@ export async function removePocket(accountId: string, pocketId: string): Promise
 	await enqueue('account', next.id, next);
 }
 
-/**
- * Thrown by `createAccount` for a currency a live account already holds —
- * one account per currency (Q50). The form never offers such a currency; the
- * guard exists because a rule that lives only in a form is not a rule.
- */
-export class CurrencyTakenError extends Error {
-	constructor(public readonly currency: string) {
-		super(`An account in ${currency} already exists`);
-		this.name = 'CurrencyTakenError';
-	}
-}
+type NewAccount = Pick<Account, 'name' | 'kind'> &
+	Partial<Pick<Account, 'currency' | 'openingBalance' | 'openingDate'>>;
 
-export async function createAccount(
-	input: Pick<Account, 'name' | 'kind'> &
-		Partial<Pick<Account, 'currency' | 'openingBalance' | 'openingDate'>>
-): Promise<Account> {
-	const database = db();
-	const currency = input.currency ?? 'CZK';
-	if (!availableCurrencies(await database.accounts.toArray()).includes(currency)) {
-		throw new CurrencyTakenError(currency);
-	}
-
+async function accountRow(input: NewAccount): Promise<Account> {
 	const { updatedAt, deviceId } = await stamp();
-	const account: Account = {
+	return {
 		id: uuidv7(),
 		name: input.name.trim(),
 		kind: input.kind,
+		// Signed: an account may open empty, or in debt (Q85).
 		openingBalance: input.openingBalance ?? ZERO,
 		openingDate: input.openingDate ?? today(),
 		pockets: [],
 		// Chosen once, at the counter. There is deliberately no way to change it
 		// later — an account with rows in it cannot switch currency without
 		// silently redenominating its whole history (Q49).
-		currency,
+		currency: input.currency ?? 'CZK',
 		isArchived: false,
-		sortOrder: await database.accounts.count(),
+		sortOrder: await db().accounts.count(),
 		updatedAt,
 		deviceId,
 		isDeleted: false
 	};
-	await database.accounts.put(account);
+}
+
+/**
+ * Open an account. Any currency, including one another account already
+ * holds — the card and the cash in the wallet are both koruny (Q83, which
+ * lifted Q50's one account per currency).
+ */
+export async function createAccount(input: NewAccount): Promise<Account> {
+	const account = await accountRow(input);
+	await db().accounts.put(account);
 	await enqueue('account', account.id, account);
+	return account;
+}
+
+/**
+ * A pocket becomes an account of its own — Q83.
+ *
+ * The koruny that Q50 folded into the CZK account as "peníze jinde" can have
+ * their own balance and their own rows now. The new account opens with the
+ * pocket's amount on the day its parent opened, and the pocket leaves the
+ * parent, in one transaction: the currency's total is the same before and
+ * after, and so is every line Settings prints under it — the pocket's line
+ * becomes the account's, and the parent's own line never included it.
+ *
+ * The kind is guessed from the name — "Hotovost" is cash — and Settings lets
+ * it be changed.
+ */
+export async function pocketToAccount(
+	accountId: string,
+	pocketId: string
+): Promise<Account | undefined> {
+	const database = db();
+	const parent = await database.accounts.get(accountId);
+	if (!parent || parent.isDeleted) return undefined;
+	const pocket = pocketsOf(parent).find((p) => p.id === pocketId);
+	if (!pocket) return undefined;
+
+	// Resolved before the transaction — `enqueue` reads `meta` on its first
+	// call and `meta` is not one of the tables below (the importBackup trap).
+	await refreshSyncEnabled();
+	const account = await accountRow({
+		name: pocket.name,
+		kind: guessAccountKind(pocket.name),
+		currency: parent.currency,
+		openingBalance: pocket.amount,
+		openingDate: parent.openingDate
+	});
+	const rest: Account = {
+		...parent,
+		pockets: pocketsOf(parent).filter((p) => p.id !== pocketId),
+		...(await stamp())
+	};
+
+	await database.transaction('rw', [database.accounts, database.outbox], async () => {
+		await database.accounts.bulkPut([rest, account]);
+		await enqueue('account', rest.id, rest);
+		await enqueue('account', account.id, account);
+	});
 	return account;
 }
 
@@ -585,8 +644,9 @@ export interface NewTransfer {
 	    pair of amounts *is* the exchange rate; nothing else records one (Q49). */
 	amountIn: Minor;
 	/** The bucket the outgoing leg is spent from — DOVOLENÁ, LIFESTYLE, the
-	    mortgage's. The incoming leg lands in SMĚNA on its own. */
-	categoryId: string;
+	    mortgage's. The incoming leg lands in SMĚNA on its own. Required
+	    across currencies; null inside one makes the transfer a move (Q83). */
+	categoryId: string | null;
 	date?: string;
 	note?: string | null;
 }
@@ -635,31 +695,35 @@ export async function ensureExchangeCategory(): Promise<Category> {
  * `transferPairId`, never one row.
  *
  * Both legs commit together or not at all: one leg alone would be a phantom
- * expense on one account and a phantom windfall on the other. Since
- * 2026-09-02 the legs *count* the way they read — with one account per
- * currency every transfer is an exchange, and the koruna month should show
- * the holiday it paid for: the outgoing leg is an expense from the chosen
- * bucket, the incoming leg is income in SMĚNA. The balances see both, as
- * they always did.
+ * expense on one account and a phantom windfall on the other. What the legs
+ * mean is decided by the bucket (`domain/accounts.ts`):
+ *
+ *   - **with one** — an exchange, and every transfer across currencies is
+ *     one: the outgoing leg is an expense from the chosen bucket, the
+ *     incoming leg is income in SMĚNA (2026-09-02);
+ *   - **without** — a move, possible only inside a currency: cash out of the
+ *     ATM. Neither leg carries a bucket and no measurement sees them (Q83).
+ *
+ * The balances see both legs either way, as they always did.
  */
 export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 	const database = db();
 	if (input.fromAccountId === input.toAccountId) {
 		throw new Error('Převod potřebuje dva různé účty.');
 	}
-	if (!input.categoryId) {
-		throw new Error('Převod potřebuje kategorii, ze které odchází.');
-	}
 	const [from, to] = await Promise.all([
 		database.accounts.get(input.fromAccountId),
 		database.accounts.get(input.toAccountId)
 	]);
 	if (!from || !to) throw new Error('Účet převodu neexistuje.');
+	if (from.currency !== to.currency && !input.categoryId) {
+		throw new Error('Směna potřebuje kategorii výdaje.');
+	}
 
 	// Resolved before the transaction — `enqueue` reads `meta` on its first
 	// call and `meta` is not one of the tables below (the importBackup trap).
 	await refreshSyncEnabled();
-	const exchange = await ensureExchangeCategory();
+	const exchange = input.categoryId ? await ensureExchangeCategory() : null;
 
 	const { updatedAt, deviceId } = await stamp();
 	const date = input.date ?? today();
@@ -685,7 +749,7 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 		id: uuidv7(),
 		accountId: from.id,
 		amount: neg(abs(input.amountOut)),
-		categoryId: input.categoryId,
+		categoryId: input.categoryId || null,
 		payee: `Převod → ${to.name}`,
 		transferPairId: '' // filled below, once the other id exists
 	};
@@ -694,7 +758,7 @@ export async function createTransfer(input: NewTransfer): Promise<Transfer> {
 		id: uuidv7(),
 		accountId: to.id,
 		amount: abs(input.amountIn),
-		categoryId: exchange.id,
+		categoryId: exchange?.id ?? null,
 		payee: `Převod ← ${from.name}`,
 		transferPairId: outLeg.id
 	};

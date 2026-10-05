@@ -37,7 +37,13 @@
 		toMinor,
 		type AmountInput
 	} from '$lib/domain/amount-input';
-	import { homeCurrency, liveAccounts, openingTotal } from '$lib/domain/accounts';
+	import {
+		ACCOUNT_KIND_LABEL,
+		homeCurrency,
+		inCurrency,
+		liveAccounts,
+		openingTotal
+	} from '$lib/domain/accounts';
 	import { checkDraft, type Finding } from '$lib/domain/checks';
 	import { addDays, formatDayHeading, today } from '$lib/domain/datetime';
 	import { balanceOf, categoryRanking, suggestPayees } from '$lib/domain/ledger';
@@ -50,7 +56,7 @@
 	import Icon from '$lib/ui/Icon.svelte';
 	import Keypad from '$lib/ui/Keypad.svelte';
 	import Sheet from '$lib/ui/Sheet.svelte';
-	import { accountColor, colorVar } from '$lib/ui/palette';
+	import { accountColor, accountGlyph, colorVar } from '$lib/ui/palette';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
 
@@ -215,10 +221,14 @@
 		liveCategories.filter((c) => (direction === 'in' ? c.isIncome : !c.isIncome))
 	);
 
-	/** Most-used first: what is one tap away is decided by habit. */
+	/** Most-used first: what is one tap away is decided by habit — the
+	    person's, over every account in the currency, so a cash account opened
+	    today offers the buckets the card has been teaching for months (Q83). */
 	const rankedCategories = $derived.by(() => {
 		const byId = new Map(directionCategories.map((c) => [c.id, c]));
-		return categoryRanking(accountTxns, [...byId.keys()])
+		return categoryRanking(inCurrency(liveRows, ($allAccounts ?? []) as Account[], currency), [
+			...byId.keys()
+		])
 			.map((id) => byId.get(id)!)
 			.filter(Boolean);
 	});
@@ -434,6 +444,7 @@
 
 		<div class="rail" bind:this={rail} onscroll={onRailScroll}>
 			{#each accountRows as account, i (account.id)}
+				{@const glyph = accountGlyph(account, accountRows)}
 				<button
 					type="button"
 					class="acct glass"
@@ -445,11 +456,21 @@
 						class="circle circle--md"
 						style="--c: {colorVar(accountColor(account.currency, home))}"
 					>
-						{currencySymbol(account.currency)}
+						{#if 'icon' in glyph}
+							<Icon name={glyph.icon} size={18} stroke={2} />
+						{:else}
+							{glyph.symbol}
+						{/if}
 					</span>
 					<span class="acct__body">
 						<span class="acct__name">{account.name}</span>
-						<span class="acct__code">{account.currency}</span>
+						<!-- Two accounts in one currency are told apart by kind (Q83):
+						     "hotovost · CZK" under the wallet, not "CZK" twice. -->
+						<span class="acct__code">
+							{'icon' in glyph
+								? `${ACCOUNT_KIND_LABEL[account.kind]} · ${account.currency}`
+								: account.currency}
+						</span>
 					</span>
 					<span class="acct__balance">
 						{formatMoney(balanceFor(account), { code: account.currency })}
@@ -687,8 +708,13 @@
 			<input class="field__input" bind:value={owedBy} placeholder="kdo ti to vrátí" />
 		</label>
 
-		{#if owedAmount !== null && owedAmount > toMinor(amount)}
-			<p class="error-text">Vrátit se má víc, než kolik jsi utratil.</p>
+		<!-- More back than went out is allowed (Q82) — a thank-you on top. Said,
+		     not refused, so a slipped digit is still visible. -->
+		{#if hasAmount && owedAmount !== null && owedAmount > toMinor(amount)}
+			<p class="field__hint">
+				Vrátí o {formatMoney((owedAmount - toMinor(amount)) as Minor, { code: currency })} víc, než jsi
+				utratil — třeba jako díky. Zapíše se celé, až to přijde.
+			</p>
 		{/if}
 
 		<div class="actions actions--fill">

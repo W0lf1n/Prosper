@@ -1,16 +1,20 @@
 <script lang="ts">
 	/**
-	 * Moving money between two accounts — Q49, and since 2026-09-02 an exchange.
+	 * Moving money between two accounts — Q49; an exchange since 2026-09-02, and
+	 * a move again since Q83.
 	 *
 	 * Two rows, never one (§6.1): what leaves one account and what lands on the
 	 * other. Inside one currency that is a single amount asked once; across
 	 * currencies both sides are asked, because the pair *is* the exchange rate
 	 * — 2 470 Kč out, 100 € in — and no rate is ever fetched or stored.
 	 *
-	 * With one account per currency (Q50) every transfer crosses a currency, so
-	 * the two legs count the way they read: what leaves is an expense from a
-	 * bucket chosen here, what arrives is income in SMĚNA. The koruna month
-	 * shows the holiday it paid for; the euro month shows what arrived.
+	 * The bucket decides what the legs mean (`domain/accounts.ts`). Across
+	 * currencies it is required: what leaves is an expense from the bucket
+	 * chosen here, what arrives is income in SMĚNA, so the koruna month shows
+	 * the holiday it paid for. Inside one currency it is optional and opens
+	 * empty: cash out of the ATM is a move, and a move is in no month at all.
+	 * Chosen anyway — koruny to the savings account, filed under SPOŘENÍ — it
+	 * counts the way an exchange does.
 	 *
 	 * A form, not the keypad: a transfer is a rare, deliberate act and has no
 	 * claim on the five-second path. That is why it lives on /vypis and in
@@ -29,8 +33,8 @@
 		toAccountId: string;
 		amountOut: Minor;
 		amountIn: Minor;
-		/** The bucket the outgoing leg is spent from. */
-		categoryId: string;
+		/** The bucket the outgoing leg is spent from; null for a move. */
+		categoryId: string | null;
 		date: string;
 	}
 
@@ -66,6 +70,10 @@
 	let fromId = $state('');
 	let toId = $state('');
 	let categoryId = $state('');
+	/** Picked by hand — from then on the bucket stays what was picked, whichever
+	    accounts are chosen. Until then it follows them: the last exchange's
+	    bucket across currencies, nothing inside one. */
+	let categoryTouched = $state(false);
 	let outText = $state('');
 	let inText = $state('');
 	let date = $state(today());
@@ -81,8 +89,14 @@
 		if (seeded) return;
 		seeded = true;
 		fromId = defaultFromId ?? live[0]?.id ?? '';
-		toId = live.find((a) => a.id !== fromId)?.id ?? '';
-		categoryId = lastExchangeCategoryId(exchanges) ?? buckets[0]?.id ?? '';
+		/* The other account in the same currency first — cash out of the card's
+		   account is the transfer made most often — and any other after it. */
+		const source = live.find((a) => a.id === fromId);
+		toId =
+			live.find((a) => a.id !== fromId && a.currency === source?.currency)?.id ??
+			live.find((a) => a.id !== fromId)?.id ??
+			'';
+		categoryTouched = false;
 		outText = '';
 		inText = '';
 		date = today();
@@ -93,6 +107,11 @@
 	const to = $derived(live.find((a) => a.id === toId) ?? null);
 	/** One amount inside a currency; both sides across two. */
 	const crossCurrency = $derived(from !== null && to !== null && from.currency !== to.currency);
+
+	$effect(() => {
+		if (!open || categoryTouched) return;
+		categoryId = crossCurrency ? (lastExchangeCategoryId(exchanges) ?? buckets[0]?.id ?? '') : '';
+	});
 
 	function parsed(text: string): Minor | null {
 		const result = parseAmount(text);
@@ -134,7 +153,7 @@
 			toAccountId: to.id,
 			amountOut: amountOut!,
 			amountIn: amountIn!,
-			categoryId,
+			categoryId: categoryId || null,
 			date
 		});
 	}
@@ -162,16 +181,26 @@
 			</label>
 		</div>
 
-		<!-- The koruny leave as an expense, and an expense has a bucket — the
-		     holiday's, the mortgage's. It is asked the way every expense is
-		     asked, by its bucket, not "from" one: nothing leaves a category. A
-		     select rather than the keypad's chip rail: the rail opens a sheet
+		<!-- Across currencies the koruny leave as an expense, and an expense has
+		     a bucket — the holiday's, the mortgage's. It is asked the way every
+		     expense is asked, by its bucket, not "from" one: nothing leaves a
+		     category. Inside a currency it may stay empty, and empty is a move.
+		     A select rather than the keypad's chip rail: the rail opens a sheet
 		     of its own for search, and a sheet inside a sheet is one modal too
 		     many. -->
 		<label class="field">
-			<span class="field__label">Kategorie výdaje</span>
-			<select class="field__input" bind:value={categoryId}>
-				{#if !categoryId}
+			<span class="field__label">
+				Kategorie výdaje
+				{#if !crossCurrency}<span class="unit">nepovinné</span>{/if}
+			</span>
+			<select
+				class="field__input"
+				bind:value={categoryId}
+				onchange={() => (categoryTouched = true)}
+			>
+				{#if !crossCurrency}
+					<option value="">žádná — jen přesun</option>
+				{:else if !categoryId}
 					<option value="">za co to je…</option>
 				{/if}
 				{#each buckets as bucket (bucket.id)}
@@ -179,7 +208,12 @@
 				{/each}
 			</select>
 			<span class="field__hint">
-				Odchozí částka je výdaj jako každý jiný — dovolená, lifestyle, hypotéka.
+				{#if crossCurrency}
+					Odchozí částka je výdaj jako každý jiný — dovolená, lifestyle, hypotéka.
+				{:else}
+					Výběr z bankomatu ani přesun mezi kartami nic neutrácí — kategorii nech prázdnou. Vyber
+					ji, jen když převod za něco platí, třeba spoření.
+				{/if}
 			</span>
 		</label>
 
@@ -229,8 +263,12 @@
 		{/if}
 
 		<p class="field__hint">
-			Co odejde, se zapíše jako výdaj ve zvolené kategorii; co dorazí, jako příjem ve SMĚNA. Každý
-			účet to vidí ve své měně a dohromady se nesčítají.
+			{#if categoryId}
+				Co odejde, se zapíše jako výdaj ve zvolené kategorii; co dorazí, jako příjem ve SMĚNA.
+				{#if crossCurrency}Každý účet to vidí ve své měně a dohromady se nesčítají.{/if}
+			{:else}
+				Peníze se jen přesunou: pohnou se zůstatky obou účtů a do přehledu měsíce se nepočítá nic.
+			{/if}
 		</p>
 
 		{#if error}

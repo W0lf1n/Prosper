@@ -10,6 +10,11 @@
  * Since Q47 an expense can carry more than one share — Netflix paid whole,
  * two friends each returning their slice — and every share settles on its own.
  *
+ * Since Q82 what comes back may be more than what went out: the friend who
+ * owes 10 Kč and sends 11 as a thank-you. Nothing caps a share at its
+ * expense, and a share can be settled with a different figure than the one
+ * it was written with — the figure that arrived is the one that is kept.
+ *
  * Pure (§11.6).
  */
 
@@ -123,13 +128,16 @@ export function owedByPerson(txns: readonly Txn[]): { who: string; amount: Minor
  * What this expense really cost you once every share comes back.
  *
  * Reporting only — never the balance. The balance shows what left the account.
+ *
+ * Positive when more comes back than went out (Q82): a 10 Kč coffee repaid
+ * with 11 Kč as a thank-you cost nothing and left a koruna over, and that is
+ * what the figure says. It used to clamp at zero on the argument that such
+ * shares were nonsense; a thank-you is not nonsense.
  */
 export function netOf(txn: Txn): Minor {
 	const shares = sharesOf(txn);
 	if (shares.length === 0) return txn.amount;
-	const net = txn.amount + sum(shares.map((s) => abs(s.amount)));
-	// Shares larger than the expense would flip the sign; clamp rather than lie.
-	return minor(txn.amount < 0 ? Math.min(net, 0) : Math.max(net, 0));
+	return minor(txn.amount + sum(shares.map((s) => abs(s.amount))));
 }
 
 // ── a share by percent ──────────────────────────────────────────────────────

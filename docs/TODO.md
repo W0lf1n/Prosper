@@ -82,7 +82,11 @@ exchange started counting the way it reads**: the koruna leg of a transfer
 is an expense from a bucket chosen in the sheet, the euro leg is income in a
 `SMĚNA` bucket created on first use, reversing the part of Q49 that kept
 transfer legs out of every measurement (`DECISIONS.md`, "An exchange counts
-the way it reads").
+the way it reads"). **The one-account rule was lifted on 2026-10-05** (Q83):
+a currency may hold the card and the cash, a month is read per currency, and
+a transfer without a bucket is a move that no measurement sees — alongside a
+share larger than its expense (Q82), twenty-six currencies (Q84) and a
+balance below zero (Q85).
 
 **The third edition of the design landed on 2026-09-05** (`DECISIONS.md`, the
 third-edition pass): the consumer-banking handoff in `docs/redesign/` applied as

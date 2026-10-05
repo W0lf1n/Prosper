@@ -175,8 +175,8 @@ export interface CurrencyBalances {
 	    plus its rows. Exists per currency and nowhere above it, because there
 	    is no figure across currencies (Q49). */
 	total: Minor;
-	/** The account's own line, then each of its pockets — and the same again
-	    for a currency that, from before Q50, still holds a second account. */
+	/** Each account's own line, then each of its pockets — the card, then the
+	    cash in the wallet, when a currency holds both (Q83). */
 	lines: BalanceLine[];
 }
 
@@ -184,9 +184,9 @@ export interface CurrencyBalances {
  * Every live account's balance, grouped by currency, broken into the parts
  * the balance is made of, with each group's total.
  *
- * The one shape that answers "what is on the accounts". The CZK account with
- * 15 000 Kč at the bank and a Revolut pocket of 5 000 Kč is one koruna figure
- * of 20 000 Kč, and the screen may print both parts under it — which is the
+ * The one shape that answers "what is on the accounts". The CZK card with
+ * 15 000 Kč and the cash in the wallet at 5 000 Kč are one koruna figure of
+ * 20 000 Kč, and the screen may print both parts under it — which is the
  * whole reason the parts are returned rather than only the sum: a total that
  * does not show what it is made of is a number you have to trust rather than
  * read. `groupByCurrency` decides membership and order, so every screen that

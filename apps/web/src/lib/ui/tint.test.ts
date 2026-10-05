@@ -9,6 +9,8 @@ describe('currencyTint()', () => {
 	it('names any other offered currency', () => {
 		expect(currencyTint('EUR', 'CZK')).toBe('EUR');
 		expect(currencyTint('GBP', 'CZK')).toBe('GBP');
+		// The wider list (Q84): named, and the lilac ground in tokens.css takes it.
+		expect(currencyTint('PLN', 'CZK')).toBe('PLN');
 	});
 
 	it('follows the home currency rather than assuming koruny', () => {

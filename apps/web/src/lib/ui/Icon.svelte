@@ -50,6 +50,10 @@
 		/** A transfer between accounts, and a legacy leg with no bucket. */
 		repeat:
 			'<path d="M4.4 11.4V9.8a3.4 3.4 0 0 1 3.4-3.4h11.8"/><path d="m16.4 3.6 3.2 2.8-3.2 2.8"/><path d="M19.6 12.6v1.6a3.4 3.4 0 0 1-3.4 3.4H4.4"/><path d="m7.6 20.8-3.2-2.8 3.2-2.8"/>',
+		/** An account's kind, in its circle once two share a currency (Q83). Lucide. */
+		'credit-card': '<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
+		landmark:
+			'<path d="M3 22h18"/><path d="M6 18v-7"/><path d="M10 18v-7"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="m12 2 8 5H4z"/>',
 
 		/* ── categories (Lucide 0.460, ISC) ──────────────────────────── */
 		'shopping-cart':

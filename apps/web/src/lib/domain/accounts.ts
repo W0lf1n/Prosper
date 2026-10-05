@@ -14,6 +14,12 @@
  * currencies does not exist in this app, because it would need an exchange
  * rate and no exchange rate is ever fetched or stored.
  *
+ * **A month is measured in a currency, money sits on an account** (Q83).
+ * Since 2026-10-05 a currency may hold several accounts — the card and the
+ * cash in the wallet — so the screens that answer "how did the month go"
+ * read every account in the currency, and the screens that answer "what is
+ * on it" read one account.
+ *
  * **The home currency is the first account's.** Goals are measured in it
  * (their targets were typed in it), and only rows from home-currency accounts
  * count toward them. In practice it is CZK: the seed account is CZK and the
@@ -22,8 +28,9 @@
  * Pure (§11.6). No Dexie, no fetch, no DOM.
  */
 
-import { CURRENCIES, HOME_CURRENCY, add, sum, type Minor } from './money';
+import { HOME_CURRENCY, add, sum, type Minor } from './money';
 import type { Account, AccountKind, AccountPocket, Txn } from './types';
+import { normalize } from './vocabulary';
 
 export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = {
 	checking: 'běžný účet',
@@ -76,26 +83,34 @@ export function groupByCurrency(accounts: readonly Account[]): Map<string, Accou
 	return groups;
 }
 
-// ── one account per currency (Q50) ──────────────────────────────────────────
+/**
+ * Does another live account hold this one's currency? Then the currency no
+ * longer tells them apart — "Kč" and "Kč" — and a screen has to say which
+ * by something else: the kind, the name.
+ */
+export function sharesCurrency(account: Account, accounts: readonly Account[]): boolean {
+	return liveAccounts(accounts).some((a) => a.id !== account.id && a.currency === account.currency);
+}
 
 /**
- * The currencies a new account may still be opened in: every offered code
- * that no live account already holds. An archived account frees its
- * currency — changing banks is exactly the case that needs it.
- *
- * The rule itself: **one account per currency.** "Which CZK account" was a
- * question with no useful answer — the expense is the expense wherever the
- * card was — so the app stops asking it. Koruny that sit somewhere else
- * join the CZK account as a pocket (`pocketsOf`) instead of becoming a
- * second account nobody wants to choose between.
+ * The kind a name most likely means — "Hotovost" and "peněženka" are cash,
+ * anything else is an account at a bank. A default for a form, never a rule:
+ * the select beside it says what the account is.
  */
-export function availableCurrencies(
-	accounts: readonly Account[],
-	offered: readonly string[] = CURRENCIES
-): string[] {
-	const taken = new Set(liveAccounts(accounts).map((a) => a.currency));
-	return offered.filter((code) => !taken.has(code));
+export function guessAccountKind(name: string): AccountKind {
+	const folded = normalize(name);
+	return /hotovost|penezenk|cash|kapsa/.test(folded) ? 'cash' : 'checking';
 }
+
+// ── pockets (Q50) ───────────────────────────────────────────────────────────
+
+//
+// Q50 made it one account per currency, and koruny that sat somewhere else
+// joined the CZK account as a pocket: a named amount that opened it. Q83
+// lifted the rule on 2026-10-05 — a second koruna account is an account
+// again — so a pocket is now the lighter of two ways to say "some of it is
+// elsewhere": no rows of its own, no balance that moves. The pockets that
+// exist keep counting; Settings offers to turn one into an account.
 
 /** The pockets on an account — empty for a row an older build wrote. */
 export function pocketsOf(account: Account): AccountPocket[] {
@@ -123,15 +138,23 @@ export function validatePocket(draft: { name: string; amount: number }): PocketP
 // ── transfers ───────────────────────────────────────────────────────────────
 
 //
-// With one account per currency (Q50) every transfer crosses a currency, so a
-// transfer *is* an exchange: koruny leave the CZK account and euros land on
-// the EUR one. Since 2026-09-02 the two legs count the way they read — the
-// outgoing leg is an expense from a bucket the person chose, the incoming
-// leg is income in SMĚNA — because the koruna month should show the holiday
-// it paid for, and the euro month should show what arrived. Q49's rule that
-// a transfer is neither was written for same-currency moves, which no longer
-// exist. The two legs stay one fact: linked, deleted together, restored
-// together, and the pair of amounts is still the only rate the app knows.
+// A transfer is two rows, one per account, linked by `transferPairId` (§6.1)
+// and deleted and restored together. What the legs *mean* depends on whether
+// the money changed currency, and the bucket on them says which:
+//
+// **A move** — no bucket on either leg. Cash out of the ATM, the card topped
+// up from the account: the money is still yours and still koruny, so neither
+// leg is spent or earned and no measurement sees it (Q83). Only the two
+// balances move. This is Q49's original rule, back for the case it was
+// written for now that two accounts may share a currency again.
+//
+// **An exchange** — a bucket on both. Since 2026-09-02 the outgoing leg is an
+// expense from a bucket the person chose and the incoming leg is income in
+// SMĚNA, because the koruna month should show the holiday it paid for and
+// the euro month should show what arrived. Every transfer across currencies
+// is one. A transfer inside a currency may be one too, when it pays for
+// something: koruny moved to the savings account, filed under SPOŘENÍ, are
+// the month's saving.
 
 /**
  * The income bucket every incoming leg lands in — one constant id, so two
@@ -149,7 +172,7 @@ export interface TransferDraft {
 	amountOut: number;
 	/** What lands on `to`, positive, in `to`'s currency. */
 	amountIn: number;
-	/** The bucket the outgoing leg is spent from. */
+	/** The bucket the outgoing leg is spent from — null for a move. */
 	categoryId: string | null;
 }
 
@@ -159,18 +182,20 @@ export type TransferProblem = 'same-account' | 'amount-out' | 'amount-in' | 'cat
  * What is still wrong with a transfer before it may be written.
  *
  * The two amounts are independent on purpose: between currencies the pair *is*
- * the exchange rate — 2 470 Kč out, 100 € in, rate implied and never stored —
- * and inside one currency the bank can still take a fee. The UI prefills them
- * equal in the same-currency case; equality is a default, not a rule.
+ * the exchange rate — 2 470 Kč out, 100 € in — and no rate is ever stored.
+ * Inside one currency the sheet asks once and the two are equal.
+ *
+ * A bucket is required across currencies, for the reason every row's bucket
+ * is: koruny that became euros were spent on something, and an
+ * uncategorised expense is a hole in next month's report. Inside a currency
+ * it is optional — leaving it out is what makes the transfer a move.
  */
 export function validateTransfer(draft: TransferDraft): TransferProblem[] {
 	const problems: TransferProblem[] = [];
 	if (draft.from.id === draft.to.id) problems.push('same-account');
 	if (!(draft.amountOut > 0)) problems.push('amount-out');
 	if (!(draft.amountIn > 0)) problems.push('amount-in');
-	/* Required for the reason every row's bucket is: an uncategorised expense
-	   is a hole in next month's report. */
-	if (!draft.categoryId) problems.push('category');
+	if (draft.from.currency !== draft.to.currency && !draft.categoryId) problems.push('category');
 	return problems;
 }
 
@@ -189,10 +214,23 @@ export function lastExchangeCategoryId(txns: readonly Txn[]): string | null {
 }
 
 /**
- * A transfer leg — one half of an exchange. Since 2026-09-02 it counts in
- * the month like any other row; what still asks this is what a leg is *not*:
- * a payee worth suggesting, or a subscription worth watching for.
+ * A transfer leg — one half of a move or an exchange. What still asks this
+ * is what a leg is *not*: a payee worth suggesting, or a subscription worth
+ * watching for.
  */
 export function isTransfer(txn: Txn): boolean {
 	return txn.transferPairId !== null;
+}
+
+/**
+ * A transfer leg with no bucket: money that only moved between your own
+ * accounts (Q83). Neither spent nor earned, so every measurement — the
+ * month, the split, the trends, the days without an expense, the
+ * uncategorised queue — leaves it out, and only the balances see it.
+ *
+ * Legs written between Q49 and 2026-09-02 carry no bucket either. They were
+ * moves when they were written, and they read as moves again.
+ */
+export function isMove(txn: Txn): boolean {
+	return txn.transferPairId !== null && txn.categoryId === null;
 }

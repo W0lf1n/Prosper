@@ -260,6 +260,32 @@ describe('accounts', () => {
 		expect(names).toContain('SUMA · revolut');
 	});
 
+	it('leaves a move out of every column, and names it in Záznamy (Q83)', () => {
+		// Cash out of the ATM: no bucket on either leg, so no column, and the
+		// month's CELKEM stays the Přehled net it was without it.
+		const accounts = [account('kb'), account('cash', { kind: 'cash', sortOrder: 1 })];
+		const out = txn('2026-08-07', -200_000, null, {
+			payee: 'Převod → cash',
+			transferPairId: 'leg-in'
+		});
+		const arrived = txn('2026-08-07', 200_000, null, {
+			id: 'leg-in',
+			accountId: 'cash',
+			payee: 'Převod ← kb',
+			transferPairId: out.id
+		});
+		const { sheets } = buildWorkbook(input([...LEDGER, out, arrived], { accounts }));
+		const august = sheetNamed(sheets, 'Srpen 2026 · kb');
+		const plain = sheetNamed(buildWorkbook(input(LEDGER)).sheets, 'Srpen 2026');
+
+		expect(august.header.map(text)).toEqual(plain.header.map(text));
+		expect(august.rows[0]!.map(money)).toEqual(plain.rows[0]!.map(money));
+		const ledger = sheetNamed(sheets, 'Záznamy');
+		const row = ledger.rows.find((r) => text(r[3]) === 'Převod → cash')!;
+		expect(text(row[2])).toBe('převod');
+		expect(text(row[12])).toBe('převod');
+	});
+
 	it('puts the account the app is on first', () => {
 		const accounts = [account('kb'), account('revolut', { currency: 'EUR', sortOrder: 1 })];
 		const txns = [...LEDGER, txn('2026-09-12', -2_000, 'cat-JÍDLO', { accountId: 'revolut' })];

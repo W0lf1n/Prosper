@@ -14,7 +14,7 @@
 		updateTxn,
 		type Transfer
 	} from '$lib/db/repo';
-	import { liveAccounts, openingTotal } from '$lib/domain/accounts';
+	import { isMove, liveAccounts, openingTotal } from '$lib/domain/accounts';
 	import { DAYS, capitalize, counted } from '$lib/domain/czech';
 	import { formatDayHeading, formatMonthHeading, today } from '$lib/domain/datetime';
 	import { ZERO, formatMoney, neg, parseAmount, type Minor } from '$lib/domain/money';
@@ -221,16 +221,32 @@
 		editError = '';
 	}
 
-	async function receive(shareId: string) {
-		if (!editing) return;
+	/**
+	 * What "Přijato" will record for a share: the figure in its field, when
+	 * that is an amount — the friend who owed 10 Kč and sent 11 (Q82) — and
+	 * the stored share otherwise.
+	 */
+	function receivedAmount(row: EditShare): Minor | null {
+		const stored = row.id !== null ? storedShares.get(row.id) : undefined;
+		if (!stored) return null;
+		const typed = parseAmount(row.amount);
+		return typed.ok && typed.value > 0 ? typed.value : stored.amount;
+	}
+
+	async function receive(row: EditShare) {
+		if (!editing || row.id === null) return;
 		const txnId = editing.id;
+		const shareId = row.id;
+		/* Captured before the write: the undo puts back what was owed. */
+		const owed = storedShares.get(shareId)?.amount;
+		const amount = receivedAmount(row) ?? undefined;
 		editing = null;
-		const repayment = await settleReceivable(txnId, shareId);
+		const repayment = await settleReceivable(txnId, shareId, { amount });
 		if (!repayment) return;
 		toast.money(repayment.amount, {
 			message: repayment.payee,
 			code: currency,
-			undo: () => unsettleReceivable(txnId, shareId)
+			undo: () => unsettleReceivable(txnId, shareId, owed)
 		});
 	}
 
@@ -251,16 +267,14 @@
 		const magnitude = Math.abs(parsed.value) as Minor;
 		const amount = editing.amount < 0 ? neg(magnitude) : magnitude;
 
+		/* No ceiling at the expense (Q82): a thank-you on top is money that
+		   comes back, and the form has no business refusing it. */
 		const shares: TxnShare[] = [];
 		if (amount < 0) {
-			let total = 0;
 			for (const row of editShares) {
 				if (row.settledByTxnId !== null && row.id !== null) {
 					const saved = storedShares.get(row.id);
-					if (saved) {
-						shares.push(saved);
-						total += saved.amount;
-					}
+					if (saved) shares.push(saved);
 					continue;
 				}
 				if (!row.amount.trim()) continue;
@@ -269,17 +283,12 @@
 					editError = 'Dlužná částka není částka.';
 					return;
 				}
-				total += share.value;
 				shares.push({
 					id: row.id ?? uuidv7(),
 					who: row.who,
 					amount: share.value,
 					settledByTxnId: null
 				});
-			}
-			if (total > magnitude) {
-				editError = 'Vrátit ti nemůže víc, než kolik to stálo.';
-				return;
 			}
 		}
 
@@ -484,30 +493,39 @@
 			<input class="field__input" type="date" bind:value={editDate} />
 		</label>
 
-		<div class="field">
-			<span class="field__label">Kategorie</span>
-			<button type="button" class="field__input bucket" onclick={() => (pickingCategory = true)}>
-				{#if editCategoryRow}
-					{@const style = categoryStyle(editCategoryRow)}
-					<span class="circle circle--xs" style="--c: {colorVar(style.color)}">
-						<Icon name={style.icon} size={14} stroke={2} />
-					</span>
-					<span class="bucket__name">{editCategoryRow.name}</span>
-				{:else}
-					<span class="circle circle--xs" style="--c: var(--flag)">
-						<Icon name="tag" size={14} stroke={2} />
-					</span>
-					<span class="bucket__name bucket__name--none">bez kategorie</span>
-				{/if}
-				<span class="card__go"><Icon name="chevron-right" size={16} /></span>
-			</button>
-		</div>
-
-		{#if editing?.transferPairId !== null}
+		{#if editing && isMove(editing)}
+			<!-- A move has no bucket, and that is what makes it a move (Q83):
+			     offering one here would turn cash out of the ATM into spending. -->
 			<p class="field__hint">
-				Tohle je jedna strana převodu mezi účty. Co odešlo, je výdaj z vybrané kategorie; co
-				dorazilo, je příjem ve SMĚNA. Smazáním zmizí obě strany.
+				Tohle je jedna strana převodu mezi tvými účty. Peníze se jen přesunuly, takže to není výdaj
+				ani příjem a do přehledu měsíce se nepočítá. Smazáním zmizí obě strany.
 			</p>
+		{:else}
+			<div class="field">
+				<span class="field__label">Kategorie</span>
+				<button type="button" class="field__input bucket" onclick={() => (pickingCategory = true)}>
+					{#if editCategoryRow}
+						{@const style = categoryStyle(editCategoryRow)}
+						<span class="circle circle--xs" style="--c: {colorVar(style.color)}">
+							<Icon name={style.icon} size={14} stroke={2} />
+						</span>
+						<span class="bucket__name">{editCategoryRow.name}</span>
+					{:else}
+						<span class="circle circle--xs" style="--c: var(--flag)">
+							<Icon name="tag" size={14} stroke={2} />
+						</span>
+						<span class="bucket__name bucket__name--none">bez kategorie</span>
+					{/if}
+					<span class="card__go"><Icon name="chevron-right" size={16} /></span>
+				</button>
+			</div>
+
+			{#if editing?.transferPairId !== null}
+				<p class="field__hint">
+					Tohle je jedna strana převodu mezi účty. Co odešlo, je výdaj z vybrané kategorie; co
+					dorazilo, je příjem ve SMĚNA. Smazáním zmizí obě strany.
+				</p>
+			{/if}
 		{/if}
 
 		<label class="field">
@@ -569,13 +587,17 @@
 						</div>
 
 						{#if row.id !== null && storedShares.get(row.id) && isOpenShare(storedShares.get(row.id)!)}
-							<button
-								type="button"
-								class="btn btn--block owed__ok"
-								onclick={() => receive(row.id!)}
-							>
-								Přijato — {formatMoney(storedShares.get(row.id)!.amount)}
+							{@const owed = storedShares.get(row.id)!.amount}
+							{@const received = receivedAmount(row) ?? owed}
+							<button type="button" class="btn btn--block owed__ok" onclick={() => receive(row)}>
+								Přijato — {formatMoney(received, { code: currency })}
 							</button>
+							{#if received > owed}
+								<p class="field__hint">
+									O {formatMoney((received - owed) as Minor, { code: currency })} víc, než dlužil — díky
+									navíc se zapíše taky.
+								</p>
+							{/if}
 						{/if}
 					{/if}
 				{/each}
@@ -597,7 +619,8 @@
 				{#if editShares.some((row) => row.settledByTxnId === null && row.amount.trim())}
 					<p class="field__hint">
 						Zaplatil jsi celou částku, takže celá jde ze zůstatku. Tohle si jen pamatuje, kolik se
-						má vrátit — až dorazí, odškrtneš to a zapíše se příjem, za každého zvlášť.
+						má vrátit — až dorazí, odškrtneš to a zapíše se příjem, za každého zvlášť. Poslal víc,
+						třeba jako díky? Přepiš částku a ťukni na Přijato.
 					</p>
 				{:else}
 					<p class="field__hint">

@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-09-29 · schema v15 · 572 web tests · 56 API tests
+**Last revised:** 2026-10-05 · schema v15 · 599 web tests · 56 API tests
 
 ---
 
@@ -117,7 +117,7 @@ client imports a sibling workspace package. The runbook is `docs/DEPLOYMENT.md`.
 | `czech.ts`        | Czech plurals — "3 záznamy", not "3 záznamů" — and `capitalize` |
 | `ids.ts`          | UUIDv7, hand-rolled, no dependency                              |
 | `types.ts`        | The data model. Mirrors the server, when there is one           |
-| `accounts.ts`     | One account per currency, pockets, home currency, never-sum-across, transfers |
+| `accounts.ts`     | Several accounts per currency, moves and exchanges, pockets, home currency, never-sum-across |
 | `vocabulary.ts`   | A hand-written dictionary of Petr's own words. Not ML, ever     |
 | `checks.ts`       | The four laws, enforced. Every rule cites its workbook figure   |
 | `ledger.ts`       | Tape building, every day of it, bucket rankings, recent payees  |

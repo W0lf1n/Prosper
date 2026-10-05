@@ -25,6 +25,7 @@
  * Pure (§13.6). No Dexie, no fetch, no DOM.
  */
 
+import { isMove } from './accounts';
 import { addDays, daysBetween, endOfMonth, monthKey, type IsoDate } from './datetime';
 import type { Txn } from './types';
 
@@ -50,11 +51,13 @@ export interface Coverage {
 
 /** Every date that carries an outflow. Income does not make a day expensive.
     An exchange's outgoing leg does, since 2026-09-02: koruny left for the
-    holiday wallet, and that is the day they were spent. */
+    holiday wallet, and that is the day they were spent. A move does not
+    (Q83) — cash out of the ATM is the day money changed pockets, and the
+    day it is spent is the day the stall is paid. */
 function spendingDays(txns: readonly Txn[]): Set<IsoDate> {
 	const days = new Set<IsoDate>();
 	for (const txn of txns) {
-		if (txn.isDeleted) continue;
+		if (txn.isDeleted || isMove(txn)) continue;
 		if (txn.amount < 0) days.add(txn.date);
 	}
 	return days;

@@ -1802,7 +1802,7 @@ tills; it was wrong about which device the thumb lives on.
 Three asks out of the first days with two accounts, each challenged before
 it was built. Schema **v12**.
 
-### Q50 — One account per currency · answered 2026-09-02
+### Q50 — One account per currency · answered 2026-09-02 · _lifted 2026-10-05, see Q83_
 
 Asked for, in order: koruny on KB and koruny on Revolut read as one sum, and
 "which account" never asked on the keypad; then a merge — a second account
@@ -3313,3 +3313,134 @@ workbook wrote it; the tables keep the grouped format. **The palette is
 ARGB literals in `xlsx.ts`**: a spreadsheet cannot read `tokens.css`, the
 same exception as the manifest's `theme_color`. **Two tabs whose names agree
 for 31 characters** are numbered, because Excel refuses the file otherwise.
+
+---
+
+## The 2026-10-05 pass — a thank-you, the cash beside the card, more currencies, a balance below zero
+
+Four asks in one message. No schema change — everything rides fields that
+already existed — and the backup format stays at **7**.
+
+### Q82 — What comes back may be more than what went out · answered 2026-10-05
+
+**Asked for.** "I paid 10 Kč for someone and they return 11 Kč as a thank-you."
+Every form refused it: the keypad's owed sheet (_Vrátit se má víc, než kolik
+jsi utratil_), the tape's edit sheet, and `netOf`, which clamped at zero on
+the argument that such shares were nonsense.
+
+**Answer.** No ceiling on a share. Both sheets take a share larger than the
+expense; the owed sheet says by how much in a hint instead of an error, so a
+slipped digit is still visible. **Přijato records what arrived.** On the
+tape's edit sheet the button follows the figure in the share's field — owed
+11, typed 12, _Přijato — 12,00 Kč_ — and `settleReceivable(…, { amount })`
+writes the inflow at that figure and rewrites the share to it: once settled,
+a share is what came back, so `netOf`, the bucket's refund and the export's
+VRACÍ SE say one thing. The undo puts the owed figure back. Přehled's
+one-tap _Přijato_ still settles at the share.
+
+**The inflow stays in the expense's bucket**, as every repayment always has
+(Q25), so a thank-you on a 10 Kč coffee leaves the bucket a koruna _ahead_.
+`summariseMonth` gives such a bucket no share and measures the others against
+what the costing buckets cost — against an outflow it shrank they would add
+past a hundred — and Přehled prints it as money in: "+2,00 Kč", mint, no bar,
+_víc zpět_. The case existed before (a refund larger than a month's spending
+in its bucket); it is likelier now. With no bucket ahead the two
+denominators are the same number, so every other month reads as it did.
+
+**Not changed.** A recurring payment's declared shares keep their ceiling — a
+standing promise to pay back more than the payment is not a thank-you — and
+`sharesForPosting` still clamps to the posted row. The percentage presets
+still stop at 100 %.
+
+### Q83 — The cash beside the card, in one currency · answered 2026-10-05 · lifts Q50
+
+**Asked for.** Better handling of accounts in the same currency: "an account
+like cash and card, in the same currency."
+
+**Why Q50 gave way.** Q50 refused a second koruna account because "which
+account" had no useful answer and koruny held elsewhere could be a pocket. A
+pocket has no rows and no balance that moves; the cash in a wallet has both,
+and they are the reason to track it at all.
+
+**The rule now: money sits on an account; a month is measured in a currency.**
+
+- `createAccount` takes any currency. `CurrencyTakenError` and
+  `availableCurrencies` are gone, _Přidat účet_ is always offered and its
+  select lists every currency.
+- **Domů's month is the active account's currency, every account in it** — the
+  figure, the due payments, the holds, the goal. The keypad left on the cash
+  must not halve the month. **Přehled** gets a _CZK celkem_ chip for any
+  currency held by two or more accounts, ahead of their own chips, and opens
+  on it; _vše_ appears only when there are two currencies to lay side by side.
+  Zápis ranks buckets over the currency's rows, so a cash account opened today
+  offers what the card has been teaching for months.
+- **A transfer with no bucket is a move** (`isMove`): cash out of the ATM.
+  Neither leg is spent or earned. `measuredRows` (so the month, the split,
+  trends and the uncategorised queue), the days without an expense and the
+  export's columns all leave it out — Q49's original rule, back for the case
+  it was written for; only the balances move. Inside a currency the bucket is
+  optional and the transfer sheet opens without one, with the other account
+  in that currency preselected. Chosen anyway — koruny to savings under
+  SPOŘENÍ — the transfer counts the way an exchange does: the outgoing leg in
+  the bucket, the incoming one in SMĚNA, arrived but not earned. Across
+  currencies a bucket is still required. The tape's edit sheet offers no
+  bucket on a move; filing one would turn the withdrawal into spending.
+- **Legs written between Q49 and 2026-09-02 carry no bucket either**, so they
+  read as moves again — which they were when written. The uncategorised nag
+  the 2026-09-02 entry put on them goes with it.
+- **Telling two koruna accounts apart.** Once a currency is shared, the circle
+  shows the account's kind instead of its symbol (`accountGlyph` in
+  `palette.ts`: a card, a banknote, a piggy bank, a bank); the colour stays the
+  currency's, and an account alone in its currency keeps the symbol. The rail
+  reads "hotovost · CZK". The edit form gained _Druh_, and a new account's
+  kind follows its name until it is picked by hand (`guessAccountKind`:
+  "Hotovost" is cash).
+- **Pockets stay**, and the ones that exist keep counting. Each now has _Na
+  účet_: `pocketToAccount` opens an account with the pocket's amount on its
+  parent's opening day and takes the pocket off the parent in one
+  transaction — the currency's total, and every line printed under it, are
+  the same before and after.
+
+**Not built:** a merge of two accounts (Q50's reasons for refusing it still
+hold); a transfer on the keypad (still declined).
+
+### Q84 — The wider list of currencies · answered 2026-10-05
+
+**Asked for.** "More widely used currencies — złoty, dollars, euro and so on."
+
+**Answer.** `CURRENCIES` goes from four to twenty-six, every one with two
+minor-unit digits in ISO 4217: the neighbours (PLN, CHF, HUF), the Nordics
+(SEK, NOK, DKK), RON, TRY, UAH, the dollars (CAD, AUD, NZD, HKD, SGD, MXN),
+CNY, THB, AED, ILS, INR, BRL and ZAR. Zero-decimal currencies (JPY, KRW, ISK)
+stay out — they would redefine `Minor` — and the lev is out because Bulgaria
+joined the euro on 2026-01-01. The forint is two digits in ISO though the
+locale shows it whole; it prints ",00".
+
+**Symbols.** The Czech locale prints a bare code for most of the new ones.
+Where a currency has a sign people read and it is unique among those offered,
+the narrow symbol is used — zł, Ft, ₺, ₴, ฿, ₪, ₹ (`NARROW_SYMBOL` in
+`money.ts`). "$" and "kr" belong to several, so the dollar stays "US$" and the
+krona "SEK"; a test holds that no two offered currencies print alike. The
+select names each in Czech through `Intl.DisplayNames` (`currencyName`).
+
+**Colour.** The dollars are blue, the kronor yellow, the złoty red, the franc
+orange, the forint green (`accountColor`); the rest are stone. On the ground,
+every foreign currency without a tint of its own shares one lilac
+(`:root[data-currency]` in `tokens.css`, ahead of the four named ones).
+
+### Q85 — A balance at zero or below · answered 2026-10-05
+
+**Asked for.** "An account can be at 0 or below — someone in debt sets the
+account to -1 000 Kč."
+
+**Found.** Nothing refused a negative opening balance — `parseAmount` reads
+"-1000" — but the decimal keypad a phone shows for `inputmode="decimal"` has
+no minus key on most Android keyboards and on no iPhone, so it could not be
+typed. _Srovnat s bankou_ had the same hole.
+
+**Answer.** A sign pill beside the field, in the words a balance is spoken
+in — _V plusu_ / _V mínusu_ (`SignedAmount.svelte`) — on the opening balance,
+new account and edit, and on the statement balance. The field holds the
+magnitude and `parseSigned` in `money.ts` puts the two together; a minus typed
+by hand still counts, and zero is never a negative zero. The reconciliation
+opens on minus when the ledger already stands below it.

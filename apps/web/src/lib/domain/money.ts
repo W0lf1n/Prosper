@@ -163,6 +163,22 @@ export function parseAmount(input: string): ParseResult {
 	return { ok: true, value: minor(sign === '-' ? -value : value) };
 }
 
+/**
+ * Parse a balance typed as a magnitude beside a sign pill — Q85.
+ *
+ * The decimal keypad most phones show has no minus key, so a balance below
+ * zero is typed as its magnitude and the pill says which side of zero it is
+ * on. A minus typed into the field by hand says the same thing and wins over
+ * a pill left on plus; zero is zero whichever pill is lit.
+ */
+export function parseSigned(input: string, negative: boolean): ParseResult {
+	const parsed = parseAmount(input);
+	if (!parsed.ok) return parsed;
+	const magnitude = Math.abs(parsed.value);
+	const below = magnitude !== 0 && (negative || parsed.value < 0);
+	return { ok: true, value: minor(below ? -magnitude : magnitude) };
+}
+
 // ── formatting ──────────────────────────────────────────────────────────────
 
 const LOCALE = 'cs-CZ';
@@ -171,14 +187,58 @@ const LOCALE = 'cs-CZ';
 export const HOME_CURRENCY = 'CZK';
 
 /**
- * The currencies an account may be opened in.
+ * The currencies an account may be opened in — the four of Q49, widened on
+ * 2026-10-05 (Q84) to the ones a Czech wallet actually meets: the
+ * neighbours, the Nordics, the holiday destinations, the dollars.
  *
- * A short list on purpose, and every entry has **two minor-unit digits**, so a
- * `Minor` means the same thing whatever the account: hundredths. A currency
- * with zero decimals (JPY) would quietly redefine the unit, and stays out
- * until it is actually needed.
+ * Every entry has **two minor-unit digits** in ISO 4217, so a `Minor` means
+ * the same thing whatever the account: hundredths. A currency with zero
+ * decimals (JPY, KRW, ISK) would quietly redefine the unit, and stays out
+ * until it is actually needed. The forint is two digits in ISO even though
+ * nobody has seen a fillér since 1999, so it is in, and prints ",00".
+ * Bulgaria joined the euro on 2026-01-01, so the lev is not offered.
+ *
+ * Home and the first three keep their places; the order is the order of the
+ * select.
  */
-export const CURRENCIES = ['CZK', 'EUR', 'USD', 'GBP'] as const;
+export const CURRENCIES = [
+	'CZK',
+	'EUR',
+	'USD',
+	'GBP',
+	'PLN',
+	'CHF',
+	'HUF',
+	'SEK',
+	'NOK',
+	'DKK',
+	'RON',
+	'TRY',
+	'UAH',
+	'CAD',
+	'AUD',
+	'NZD',
+	'CNY',
+	'HKD',
+	'SGD',
+	'THB',
+	'AED',
+	'ILS',
+	'INR',
+	'MXN',
+	'BRL',
+	'ZAR'
+] as const;
+
+/**
+ * Where the Czech locale prints a bare ISO code — "PLN", "HUF" — but the
+ * currency has a sign people read, the narrow symbol is used instead: "zł",
+ * "Ft", "₴". Only where it is unambiguous among the offered currencies: "$"
+ * belongs to seven of them and "kr" to three, so those keep "US$" and "SEK".
+ * The glyph itself still comes out of Intl (§11.9); this only picks which of
+ * its two forms.
+ */
+const NARROW_SYMBOL = new Set(['PLN', 'HUF', 'TRY', 'UAH', 'THB', 'ILS', 'INR']);
 
 const groupFormat = new Intl.NumberFormat(LOCALE, {
 	useGrouping: true,
@@ -203,10 +263,7 @@ function glyphsFor(code: string): Glyphs {
 	const cached = glyphCache.get(code);
 	if (cached) return cached;
 
-	const parts = new Intl.NumberFormat(LOCALE, {
-		style: 'currency',
-		currency: code
-	}).formatToParts(-1);
+	const parts = currencyParts(code, NARROW_SYMBOL.has(code) ? 'narrowSymbol' : 'symbol');
 
 	let decimal = ',';
 	let minus = '-';
@@ -227,6 +284,38 @@ function glyphsFor(code: string): Glyphs {
 	const glyphs = { decimal, minus, currency, beforeCurrency };
 	glyphCache.set(code, glyphs);
 	return glyphs;
+}
+
+/** `formatToParts(-1)` for a code, falling back to the plain symbol on an
+    engine that does not know `narrowSymbol`. */
+function currencyParts(code: string, display: 'symbol' | 'narrowSymbol'): Intl.NumberFormatPart[] {
+	try {
+		return new Intl.NumberFormat(LOCALE, {
+			style: 'currency',
+			currency: code,
+			currencyDisplay: display
+		}).formatToParts(-1);
+	} catch {
+		return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: code }).formatToParts(-1);
+	}
+}
+
+let currencyNames: Intl.DisplayNames | null | undefined;
+
+/**
+ * The currency's Czech name — "polský zlotý", "švýcarský frank" — for the
+ * select an account is opened from. Out of Intl, like every other word the
+ * locale already knows; the bare code where the engine cannot say.
+ */
+export function currencyName(code: string): string {
+	if (currencyNames === undefined) {
+		try {
+			currencyNames = new Intl.DisplayNames(LOCALE, { type: 'currency' });
+		} catch {
+			currencyNames = null;
+		}
+	}
+	return currencyNames?.of(code) ?? code;
 }
 
 export interface FormatOptions {

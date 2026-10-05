@@ -14,7 +14,9 @@
  * holding's is its kind. Both are derivations, so both live here.
  */
 
-import type { Category, Holding } from '$lib/domain/types';
+import { sharesCurrency } from '$lib/domain/accounts';
+import { currencySymbol } from '$lib/domain/money';
+import type { Account, AccountKind, Category, Holding } from '$lib/domain/types';
 import { defaultCategoryStyle } from '$lib/db/seed';
 import { isIconName, type IconName } from './Icon.svelte';
 
@@ -98,19 +100,60 @@ export function categoryStyle(
 	return { icon: icon as IconName, color: color as CategoryColor };
 }
 
+/**
+ * The hue each offered currency takes abroad. The dollars are blue and the
+ * Nordic kronor yellow, so a family reads as one; anything unlisted is
+ * stone. Ten keys for twenty-six currencies means hues repeat — two that
+ * share one rarely sit on the same screen, and the symbol beside it differs.
+ */
+const ABROAD: Readonly<Record<string, CategoryColor>> = {
+	EUR: 'teal',
+	USD: 'blue',
+	CAD: 'blue',
+	AUD: 'blue',
+	NZD: 'blue',
+	HKD: 'blue',
+	SGD: 'blue',
+	MXN: 'blue',
+	GBP: 'pink',
+	PLN: 'red',
+	TRY: 'red',
+	CHF: 'orange',
+	HUF: 'green',
+	SEK: 'yellow',
+	NOK: 'yellow',
+	DKK: 'yellow',
+	RON: 'brown',
+	UAH: 'brown'
+};
+
 /** An account's colour: the accent at home, a hue of its own abroad. */
 export function accountColor(currency: string, home: string): CategoryColor {
 	if (currency === home) return 'cobalt';
-	switch (currency) {
-		case 'EUR':
-			return 'teal';
-		case 'USD':
-			return 'blue';
-		case 'GBP':
-			return 'pink';
-		default:
-			return 'stone';
-	}
+	return ABROAD[currency] ?? 'stone';
+}
+
+const KIND_ICON: Record<AccountKind, IconName> = {
+	checking: 'credit-card',
+	credit: 'credit-card',
+	cash: 'banknote',
+	savings: 'piggy-bank',
+	loan: 'landmark'
+};
+
+/**
+ * What goes inside an account's circle: its currency's symbol while that
+ * tells it from the others — "Kč", "€" — and the icon of its kind once
+ * another account holds the same currency (Q83), because the card and the
+ * cash in the wallet are both "Kč" and a circle that says so twice says
+ * nothing. The colour stays the currency's either way.
+ */
+export type AccountGlyph = { icon: IconName } | { symbol: string };
+
+export function accountGlyph(account: Account, accounts: readonly Account[]): AccountGlyph {
+	return sharesCurrency(account, accounts)
+		? { icon: KIND_ICON[account.kind] ?? 'wallet' }
+		: { symbol: currencySymbol(account.currency) };
 }
 
 /** A holding's colour is its kind. */

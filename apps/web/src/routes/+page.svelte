@@ -16,7 +16,7 @@
 	import { db } from '$lib/db/schema';
 	import { confirmScheduled, deleteTxn, skipScheduled, updateTxn } from '$lib/db/repo';
 	import { IS_DEMO } from '$lib/demo';
-	import { homeCurrency, liveAccounts } from '$lib/domain/accounts';
+	import { homeCurrency, inCurrency, liveAccounts } from '$lib/domain/accounts';
 	import { summariseMonth } from '$lib/domain/checks';
 	import { capitalize } from '$lib/domain/czech';
 	import { formatDayHeading, formatMonthHeading, monthKey, today } from '$lib/domain/datetime';
@@ -66,7 +66,13 @@
 	/* Table-wide and filtered here, so the account switch on /zapis is
 	   followed by construction (`CLAUDE.md`, the liveQuery trap). */
 	const liveRows = $derived((($allTxns ?? []) as Txn[]).filter((t) => !t.isDeleted));
-	const accountTxns = $derived(liveRows.filter((t) => t.accountId === data.accountId));
+	/* The month is the active account's currency, every account in it (Q83):
+	   the card and the cash in the wallet are one koruna month, and the figure
+	   must not halve because the keypad was last left on the cash. */
+	const currencyTxns = $derived(inCurrency(liveRows, ($allAccounts ?? []) as Account[], currency));
+	const currencyAccountIds = $derived(
+		new Set(accountRows.filter((a) => a.currency === currency).map((a) => a.id))
+	);
 
 	const liveCategories = $derived(
 		(($allCategories ?? []) as Category[]).filter((c) => !c.isDeleted && !c.isArchived)
@@ -78,23 +84,25 @@
 	const summary = $derived(
 		summariseMonth({
 			month: monthKey(today()),
-			txns: accountTxns,
+			txns: currencyTxns,
 			categories: liveCategories,
 			today: today()
 		})
 	);
 
-	/** The `confirm` set, on this account (Q49) — `auto` was written at launch. */
+	/** The `confirm` set, on this currency's accounts (Q49, Q83) — `auto` was
+	    written at launch. A schedule from before accounts were plural posts to
+	    the active account, which is in the currency by definition. */
 	const due = $derived(
 		dueGroups({ schedules: ($allSchedules ?? []) as Schedule[], today: today() }).filter(
 			(group) =>
 				group.item.schedule.mode === 'confirm' &&
-				(!group.item.schedule.accountId || group.item.schedule.accountId === data.accountId)
+				(!group.item.schedule.accountId || currencyAccountIds.has(group.item.schedule.accountId))
 		)
 	);
 
-	/** The rows the bank has only blocked so far, on this account (Q75). */
-	const holds = $derived(openHolds(accountTxns));
+	/** The rows the bank has only blocked so far, in this currency (Q75, Q83). */
+	const holds = $derived(openHolds(currencyTxns));
 
 	/** Goals live in the home currency, so the card speaks only there (Q49). */
 	const goal = $derived.by<GoalStatus | null>(() => {
@@ -105,7 +113,8 @@
 			(($allGoals ?? []) as Goal[]).map((g) =>
 				goalStatus({
 					goal: g,
-					txns: accountTxns,
+					/* Home-currency rows of every account (Q49) — the card's and the cash's. */
+					txns: currencyTxns,
 					categories: liveCategories,
 					target: written.find((t) => t.goalId === g.id && t.month === month) ?? null,
 					month,

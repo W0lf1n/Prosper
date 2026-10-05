@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
 	EXCHANGE_CATEGORY_ID,
-	availableCurrencies,
 	groupByCurrency,
+	guessAccountKind,
 	homeCurrency,
 	inCurrency,
+	isMove,
 	isTransfer,
 	lastExchangeCategoryId,
 	liveAccounts,
 	openingTotal,
 	pocketsOf,
+	sharesCurrency,
 	validatePocket,
 	validateTransfer
 } from './accounts';
@@ -212,23 +214,72 @@ describe('lastExchangeCategoryId() — the sheet opens on the last bucket used',
 	});
 });
 
-describe('availableCurrencies() — one account per currency (Q50)', () => {
-	it('offers only the currencies no live account holds', () => {
-		const accounts = [account('kb', { currency: 'CZK' }), account('rev', { currency: 'EUR' })];
-		expect(availableCurrencies(accounts)).toEqual(['USD', 'GBP']);
+describe('several accounts in one currency (Q83)', () => {
+	const card = account('card', { sortOrder: 0 });
+	const cash = account('cash', { kind: 'cash', sortOrder: 1 });
+	const revolut = account('revolut', { currency: 'EUR', sortOrder: 2 });
+
+	it('knows when an account shares its currency with another live one', () => {
+		expect(sharesCurrency(card, [card, cash, revolut])).toBe(true);
+		expect(sharesCurrency(revolut, [card, cash, revolut])).toBe(false);
+		// An archived sibling no longer stands beside it.
+		expect(sharesCurrency(card, [card, { ...cash, isArchived: true }])).toBe(false);
 	});
 
-	it('frees a currency when its account is archived or deleted', () => {
-		const accounts = [
-			account('kb', { currency: 'CZK' }),
-			account('old', { currency: 'EUR', isArchived: true }),
-			account('gone', { currency: 'USD', isDeleted: true })
-		];
-		expect(availableCurrencies(accounts)).toEqual(['EUR', 'USD', 'GBP']);
+	it('sums the card and the cash as one koruna figure', () => {
+		const rows = [txn('a', 'card'), txn('b', 'cash'), txn('c', 'revolut')];
+		expect(inCurrency(rows, [card, cash, revolut], 'CZK').map((t) => t.id)).toEqual(['a', 'b']);
 	});
 
-	it('offers everything to an empty ledger', () => {
-		expect(availableCurrencies([])).toEqual(['CZK', 'EUR', 'USD', 'GBP']);
+	it('guesses cash from the name, and a bank account otherwise', () => {
+		expect(guessAccountKind('Hotovost')).toBe('cash');
+		expect(guessAccountKind('peněženka')).toBe('cash');
+		expect(guessAccountKind('Cash EUR')).toBe('cash');
+		expect(guessAccountKind('Revolut')).toBe('checking');
+		expect(guessAccountKind('')).toBe('checking');
+	});
+});
+
+describe('a move — a transfer that only moved money (Q83)', () => {
+	const card = account('card');
+	const cash = account('cash', { kind: 'cash', sortOrder: 1 });
+	const revolut = account('revolut', { currency: 'EUR', sortOrder: 2 });
+
+	it('is a transfer leg with no bucket', () => {
+		expect(isMove(txn('out', 'card', { transferPairId: 'in', categoryId: null }))).toBe(true);
+		expect(isMove(txn('in', 'cash', { transferPairId: 'out', categoryId: null }))).toBe(true);
+	});
+
+	it('is neither an exchange leg nor an ordinary row without a bucket', () => {
+		expect(isMove(txn('out', 'card', { transferPairId: 'in', categoryId: 'cat-sporeni' }))).toBe(
+			false
+		);
+		expect(isMove(txn('bare', 'card', { categoryId: null }))).toBe(false);
+	});
+
+	it('needs no bucket inside a currency, and still one across two', () => {
+		expect(
+			validateTransfer({
+				from: card,
+				to: cash,
+				amountOut: 2000_00,
+				amountIn: 2000_00,
+				categoryId: null
+			})
+		).toEqual([]);
+		// Chosen anyway — koruny to savings, filed as saving — it is allowed.
+		expect(
+			validateTransfer({
+				from: card,
+				to: cash,
+				amountOut: 2000_00,
+				amountIn: 2000_00,
+				categoryId: 'cat-sporeni'
+			})
+		).toEqual([]);
+		expect(
+			validateTransfer({ from: card, to: revolut, amountOut: 100, amountIn: 4, categoryId: null })
+		).toEqual(['category']);
 	});
 });
 

@@ -5,15 +5,20 @@
 	 * Tapping an account that is not the active one makes it the account the
 	 * keypad writes to; the opening figures and the pockets fold behind
 	 * Upravit once the ledger has a row in it.
+	 *
+	 * Since Q83 a currency may hold several accounts — the card and the cash —
+	 * so Přidat účet is always offered, every currency is in its select, and a
+	 * pocket can become an account of its own. An opening balance may be zero
+	 * or below (Q85): the sign is a pill, because the keypad has no minus.
 	 */
 	import { liveQuery } from 'dexie';
 	import { invalidateAll } from '$app/navigation';
 	import { db } from '$lib/db/schema';
 	import {
-		CurrencyTakenError,
 		addPocket,
 		createAccount,
 		createTransfer,
+		pocketToAccount,
 		removePocket,
 		setActiveAccountId,
 		updateAccount,
@@ -21,7 +26,7 @@
 	} from '$lib/db/repo';
 	import {
 		ACCOUNT_KIND_LABEL,
-		availableCurrencies,
+		guessAccountKind,
 		homeCurrency,
 		liveAccounts,
 		pocketsOf,
@@ -29,14 +34,24 @@
 	} from '$lib/domain/accounts';
 	import { formatShortDate, today } from '$lib/domain/datetime';
 	import { balancesByCurrency } from '$lib/domain/ledger';
-	import { ZERO, currencySymbol, formatMoney, parseAmount, sum } from '$lib/domain/money';
+	import {
+		CURRENCIES,
+		abs,
+		currencyName,
+		currencySymbol,
+		formatMoney,
+		parseAmount,
+		parseSigned,
+		sum
+	} from '$lib/domain/money';
 	import type { Account, AccountKind, Category, Txn } from '$lib/domain/types';
 	import AppBar from '$lib/ui/AppBar.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
 	import BottomSheet from '$lib/ui/Sheet.svelte';
+	import SignedAmount from '$lib/ui/SignedAmount.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
 	import TransferSheet, { type TransferInput } from '$lib/ui/TransferSheet.svelte';
-	import { accountColor, colorVar } from '$lib/ui/palette';
+	import { accountColor, accountGlyph, colorVar } from '$lib/ui/palette';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
 
@@ -70,9 +85,12 @@
 
 	// ── the active account ──────────────────────────────────────────────────
 	let accountName = $derived(account?.name ?? '');
+	let accountKind = $derived<AccountKind>(account?.kind ?? 'checking');
+	/* The magnitude in the field, the side of zero on the pill (Q85). */
 	let openingBalance = $derived(
-		account ? formatMoney(account.openingBalance, { currency: false }) : ''
+		account ? formatMoney(abs(account.openingBalance), { currency: false }) : ''
 	);
+	let openingNegative = $derived((account?.openingBalance ?? 0) < 0);
 	let openingDate = $derived(account?.openingDate ?? today());
 	let accountError = $state('');
 
@@ -82,7 +100,7 @@
 
 	async function saveAccount() {
 		if (!data.accountId) return;
-		const parsed = parseAmount(openingBalance);
+		const parsed = parseSigned(openingBalance.trim() || '0', openingNegative);
 		if (!parsed.ok) {
 			accountError = 'Počáteční zůstatek není částka.';
 			return;
@@ -90,6 +108,7 @@
 		accountError = '';
 		await updateAccount(data.accountId, {
 			name: accountName.trim() || 'Účet',
+			kind: accountKind,
 			openingBalance: parsed.value,
 			openingDate
 		});
@@ -132,6 +151,13 @@
 		await removePocket(data.accountId, id);
 	}
 
+	/** A pocket becomes an account of its own (Q83) — the totals do not move. */
+	async function promotePocket(id: string) {
+		if (!data.accountId) return;
+		const created = await pocketToAccount(data.accountId, id);
+		if (created) toast.show(`„${created.name}“ je teď samostatný účet`);
+	}
+
 	async function switchTo(next: Account) {
 		await setActiveAccountId(next.id);
 		await invalidateAll();
@@ -142,17 +168,33 @@
 	let addOpen = $state(false);
 	let newAccountName = $state('');
 	let newAccountKind = $state<AccountKind>('checking');
+	/** Until the kind is picked by hand, it follows the name — "Hotovost" is cash. */
+	let newAccountKindTouched = $state(false);
 	let newAccountCurrency = $state('CZK');
 	let newAccountBalance = $state('');
+	let newAccountNegative = $state(false);
 	let newAccountDate = $state(today());
 	let newAccountError = $state('');
 
 	const ACCOUNT_KINDS = Object.entries(ACCOUNT_KIND_LABEL) as [AccountKind, string][];
-	const freeCurrencies = $derived(availableCurrencies(($allAccounts ?? []) as Account[]));
+
+	/** Every offered currency, named — "PLN — polský zlotý · zł". Home first,
+	    as the list already is; any currency, held or not (Q83, Q84). */
+	const CURRENCY_OPTIONS = CURRENCIES.map((code) => {
+		const symbol = currencySymbol(code);
+		return {
+			code,
+			label: `${code} — ${currencyName(code)}${symbol === code ? '' : ` · ${symbol}`}`
+		};
+	});
 
 	function openAdd() {
-		newAccountCurrency = freeCurrencies[0] ?? 'CZK';
+		newAccountCurrency = home;
 		addOpen = true;
+	}
+
+	function typeNewName() {
+		if (!newAccountKindTouched) newAccountKind = guessAccountKind(newAccountName);
 	}
 
 	async function addAccount() {
@@ -161,34 +203,26 @@
 			newAccountError = 'Pojmenuj účet.';
 			return;
 		}
-		const parsed = newAccountBalance.trim()
-			? parseAmount(newAccountBalance)
-			: ({ ok: true, value: ZERO } as const);
+		const parsed = parseSigned(newAccountBalance.trim() || '0', newAccountNegative);
 		if (!parsed.ok) {
 			newAccountError = 'Počáteční zůstatek není částka.';
 			return;
 		}
 		newAccountError = '';
-		try {
-			await createAccount({
-				name,
-				kind: newAccountKind,
-				currency: newAccountCurrency,
-				openingBalance: parsed.value,
-				openingDate: newAccountDate
-			});
-		} catch (error) {
-			if (error instanceof CurrencyTakenError) {
-				newAccountError = `Účet v ${error.currency} už máš — další peníze v téhle měně přidej k němu jako peníze jinde.`;
-				return;
-			}
-			throw error;
-		}
+		await createAccount({
+			name,
+			kind: newAccountKind,
+			currency: newAccountCurrency,
+			openingBalance: parsed.value,
+			openingDate: newAccountDate
+		});
 		addOpen = false;
 		newAccountName = '';
 		newAccountBalance = '';
-		newAccountCurrency = 'CZK';
+		newAccountNegative = false;
+		newAccountCurrency = home;
 		newAccountKind = 'checking';
+		newAccountKindTouched = false;
 		newAccountDate = today();
 		toast.show(`Účet „${name}“ přidán`);
 	}
@@ -224,6 +258,17 @@
 	<title>Prosper — účty</title>
 </svelte:head>
 
+{#snippet accountCircle(row: Account)}
+	{@const glyph = accountGlyph(row, accountRows)}
+	<span class="circle" style="--c: {colorVar(accountColor(row.currency, home))}">
+		{#if 'icon' in glyph}
+			<Icon name={glyph.icon} size={18} stroke={2} />
+		{:else}
+			{glyph.symbol}
+		{/if}
+	</span>
+{/snippet}
+
 <main class="page">
 	<AppBar title="Účty" back="/nastaveni" />
 
@@ -252,12 +297,7 @@
 						</div>
 					{:else if line.account.id === data.accountId}
 						<div class="row row--short acct">
-							<span
-								class="circle"
-								style="--c: {colorVar(accountColor(line.account.currency, home))}"
-							>
-								{currencySymbol(line.account.currency)}
-							</span>
+							{@render accountCircle(line.account)}
 							<span class="row__body">
 								<span class="row__title">{line.name}</span>
 								<span class="row__sub"
@@ -272,12 +312,7 @@
 							class="row row--short row--press acct"
 							onclick={() => switchTo(line.account)}
 						>
-							<span
-								class="circle"
-								style="--c: {colorVar(accountColor(line.account.currency, home))}"
-							>
-								{currencySymbol(line.account.currency)}
-							</span>
+							{@render accountCircle(line.account)}
 							<span class="row__body">
 								<span class="row__title">{line.name}</span>
 								<span class="row__sub"
@@ -292,9 +327,7 @@
 		{/each}
 
 		<div class="actions actions--fill">
-			{#if freeCurrencies.length > 0}
-				<button type="button" class="btn" onclick={openAdd}>Přidat účet</button>
-			{/if}
+			<button type="button" class="btn" onclick={openAdd}>Přidat účet</button>
 			<button type="button" class="btn" onclick={() => (accountOpen = !accountExpanded)}>
 				{accountExpanded ? 'Skrýt' : 'Upravit'}
 			</button>
@@ -311,9 +344,19 @@
 				</label>
 
 				<label class="field">
-					<span class="field__label">Počáteční zůstatek</span>
-					<input class="field__input" bind:value={openingBalance} inputmode="decimal" />
+					<span class="field__label">Druh</span>
+					<select class="field__input" bind:value={accountKind}>
+						{#each ACCOUNT_KINDS as [kind, label] (kind)}
+							<option value={kind}>{label}</option>
+						{/each}
+					</select>
 				</label>
+
+				<SignedAmount
+					label="Počáteční zůstatek"
+					bind:text={openingBalance}
+					bind:negative={openingNegative}
+				/>
 
 				<label class="field">
 					<span class="field__label">Ke dni</span>
@@ -332,6 +375,13 @@
 									<span class="pocket__amount"
 										>{formatMoney(pocket.amount, { code: activeCurrency })}</span
 									>
+									<button
+										type="button"
+										class="btn btn--sm pocket__promote"
+										onclick={() => promotePocket(pocket.id)}
+									>
+										Na účet
+									</button>
 									<button
 										type="button"
 										class="pocket__drop"
@@ -367,8 +417,10 @@
 					{/if}
 
 					<span class="field__hint">
-						Peníze v téhle měně na jiné kartě nebo v hotovosti. Přičtou se k zůstatku tohohle účtu;
-						výdaje z nich zapisuješ sem jako z každého jiného.
+						Částka v téhle měně, která leží jinde a jen se přičte k zůstatku tohohle účtu. Hotovost
+						nebo druhá karta, ze které zapisuješ zvlášť, patří na vlastní účet{pockets.length > 0
+							? ' — Na účet ji tam převede i se zůstatkem'
+							: ''}.
 					</span>
 				</div>
 
@@ -421,8 +473,9 @@
 
 		<p class="hint">
 			Klávesnice zapisuje na aktivní účet; přepnout jde tady, nebo na obrazovce zápisu posunutím
-			karty účtu. V každé měně je jeden účet — koruny z jiné banky se k tomu korunovému přidají jako
-			peníze jinde. Mezi měnami se nesčítá nic: kurz se nikde nebere.
+			karty účtu. V jedné měně může být účtů víc — karta i hotovost; měsíc se počítá za všechny
+			dohromady a výběr z bankomatu je převod, ne výdaj. Mezi měnami se nesčítá nic: kurz se nikde
+			nebere.
 		</p>
 	</section>
 </main>
@@ -432,13 +485,22 @@
 	<div class="form">
 		<label class="field">
 			<span class="field__label">Název</span>
-			<input class="field__input" bind:value={newAccountName} placeholder="Revolut" />
+			<input
+				class="field__input"
+				bind:value={newAccountName}
+				oninput={typeNewName}
+				placeholder="Hotovost"
+			/>
 		</label>
 
 		<div class="pair">
 			<label class="field">
 				<span class="field__label">Druh</span>
-				<select class="field__input" bind:value={newAccountKind}>
+				<select
+					class="field__input"
+					bind:value={newAccountKind}
+					onchange={() => (newAccountKindTouched = true)}
+				>
 					{#each ACCOUNT_KINDS as [kind, label] (kind)}
 						<option value={kind}>{label}</option>
 					{/each}
@@ -448,32 +510,30 @@
 			<label class="field">
 				<span class="field__label">Měna</span>
 				<select class="field__input" bind:value={newAccountCurrency}>
-					{#each freeCurrencies as code (code)}
-						<option value={code}>{code} — {currencySymbol(code)}</option>
+					{#each CURRENCY_OPTIONS as option (option.code)}
+						<option value={option.code}>{option.label}</option>
 					{/each}
 				</select>
 			</label>
 		</div>
-		<span class="field__hint"
-			>Napořád — účet s historií měnu změnit nemůže. V každé měně je jeden účet.</span
-		>
+		<span class="field__hint">
+			Měna je napořád — účet s historií ji změnit nemůže. Druhý účet v měně, kterou už máš, je v
+			pořádku: karta a hotovost se v přehledu měsíce sečtou.
+		</span>
 
-		<div class="pair">
-			<label class="field">
-				<span class="field__label">Počáteční zůstatek</span>
-				<input
-					class="field__input"
-					bind:value={newAccountBalance}
-					inputmode="decimal"
-					placeholder="0"
-				/>
-			</label>
+		<SignedAmount
+			label="Počáteční zůstatek"
+			bind:text={newAccountBalance}
+			bind:negative={newAccountNegative}
+		/>
+		<span class="field__hint">
+			Nula je v pořádku. V mínusu je účet, na kterém dlužíš — kontokorent, kreditka, půjčka.
+		</span>
 
-			<label class="field">
-				<span class="field__label">Ke dni</span>
-				<input class="field__input" type="date" bind:value={newAccountDate} />
-			</label>
-		</div>
+		<label class="field">
+			<span class="field__label">Ke dni</span>
+			<input class="field__input" type="date" bind:value={newAccountDate} />
+		</label>
 
 		{#if newAccountError}
 			<p class="error-text">{newAccountError}</p>
@@ -580,6 +640,10 @@
 
 	.pocket__amount {
 		font-weight: 600;
+	}
+
+	.pocket__promote {
+		flex: none;
 	}
 
 	.pocket__drop {

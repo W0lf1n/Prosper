@@ -17,7 +17,7 @@ import { abs, percentOf, sum, type Minor } from './money';
 import { RECORDS, counted } from './czech';
 import { daysBetween, monthKey, shiftMonth, type IsoDate } from './datetime';
 import type { Category, Txn } from './types';
-import { EXCHANGE_CATEGORY_ID } from './accounts';
+import { EXCHANGE_CATEGORY_ID, isMove } from './accounts';
 import { isVagueDescription, normalize, numbersIn, suggestBucket } from './vocabulary';
 
 export type Severity = 'warn' | 'info';
@@ -267,25 +267,29 @@ export interface MonthSummary {
 	findings: Finding[];
 }
 
-/**
- * The rows a month is measured over: live and in the month — transfer legs
- * included, since 2026-09-02. With one account per currency (Q50) a transfer
- * is an exchange, and an exchange is the moment koruny become the holiday:
- * the outgoing leg is an expense from the bucket it was spent from, the
- * incoming leg is income in SMĚNA. Q49 kept both legs out on the argument
- * that moving your own money is not spending it, which was true of KB to
- * Revolut CZK and is no longer a move the app can make. The two currencies
- * are still never summed, so the koruna month and the euro month each tell
- * their own half of the same fact.
- */
 /** The tape's order: the day first, then the moment it was written. */
 function newestFirst(a: Txn, b: Txn): number {
 	if (a.date !== b.date) return a.date < b.date ? 1 : -1;
 	return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
 }
 
+/**
+ * The rows a month is measured over: live, in the month, and not a move.
+ *
+ * An exchange's legs are in, since 2026-09-02: the moment koruny become the
+ * holiday, the outgoing leg is an expense from the bucket it was spent from
+ * and the incoming leg is income in SMĚNA. The two currencies are still
+ * never summed, so the koruna month and the euro month each tell their own
+ * half of the same fact.
+ *
+ * A move is out (Q83): cash drawn from the card's account is still koruny
+ * and still yours, and counting its legs would book the withdrawal as
+ * spending and then the market stall it paid for a second time.
+ */
 function measuredRows(context: MonthContext): Txn[] {
-	return context.txns.filter((t) => !t.isDeleted && monthKey(t.date) === context.month);
+	return context.txns.filter(
+		(t) => !t.isDeleted && !isMove(t) && monthKey(t.date) === context.month
+	);
 }
 
 export function summariseMonth(context: MonthContext): MonthSummary {
@@ -323,20 +327,33 @@ export function summariseMonth(context: MonthContext): MonthSummary {
 
 	const recurringOutflow = (outflow - oneOffOutflow) as Minor;
 
-	const buckets: BucketTotal[] = [...byCategory.entries()]
-		.map(([id, group]) => {
-			const total = sum(group.map((t) => t.amount));
-			const oneOffTotal = sum(group.filter((t) => t.isOneOff).map((t) => t.amount));
-			return {
-				category: categories.find((c) => c.id === id) ?? null,
-				total,
-				oneOffTotal,
-				count: group.length,
-				rows: [...group].sort(newestFirst),
-				share: percentOf(total, outflow),
-				recurringShare: percentOf((total - oneOffTotal) as Minor, recurringOutflow)
-			};
-		})
+	const totals = [...byCategory.entries()].map(([id, group]) => ({
+		id,
+		group,
+		total: sum(group.map((t) => t.amount)),
+		oneOffTotal: sum(group.filter((t) => t.isOneOff).map((t) => t.amount))
+	}));
+
+	// A bucket can come out ahead: a refund larger than the month's spending in
+	// it, or a thank-you on top of a share (Q82). It cost nothing, so it has no
+	// share, and the others are measured against what the buckets that did
+	// cost came to — against the outflow it shrank they would add past a
+	// hundred. With no bucket ahead, which is nearly every month, the two
+	// denominators are the same number.
+	const costing = totals.filter((b) => b.total < 0);
+	const spent = sum(costing.map((b) => b.total));
+	const spentRecurring = sum(costing.map((b) => (b.total - b.oneOffTotal) as Minor));
+
+	const buckets: BucketTotal[] = totals
+		.map(({ id, group, total, oneOffTotal }) => ({
+			category: categories.find((c) => c.id === id) ?? null,
+			total,
+			oneOffTotal,
+			count: group.length,
+			rows: [...group].sort(newestFirst),
+			share: total < 0 ? percentOf(total, spent) : 0,
+			recurringShare: total < 0 ? percentOf((total - oneOffTotal) as Minor, spentRecurring) : 0
+		}))
 		.sort((a, b) => a.total - b.total);
 
 	return {

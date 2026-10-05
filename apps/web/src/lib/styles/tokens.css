@@ -224,7 +224,18 @@
  * holds, and the account rail on the record screen says which account it is.
  *
  * The root attribute is set by `lib/ui/tint.ts` from the active account.
+ *
+ * Every offered currency without a hue of its own — the złoty, the franc,
+ * the Nordic kronor (Q84) — shares the lilac below, which the four named ones
+ * override: "not home" is the whole message, and twenty-two more grounds
+ * would only be twenty-two more values to keep apart. Same specificity, so
+ * the order decides; it stays first.
  */
+:root[data-currency] {
+	--ground: #f2f1fa;
+	--ground-2: #f2f1fa;
+}
+
 :root[data-currency='EUR'] {
 	--ground: #ecf5fc;
 	--ground-2: #ecf5fc;

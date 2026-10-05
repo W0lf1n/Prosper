@@ -25,6 +25,7 @@ import {
 	createSchedule,
 	createTransfer,
 	createTxn,
+	addPocket,
 	deletePlan,
 	deleteTxn,
 	ensureSeeded,
@@ -32,6 +33,7 @@ import {
 	getCollapsedMonths,
 	importBackup,
 	pinGoal,
+	pocketToAccount,
 	recordValuation,
 	refreshSyncEnabled,
 	resetLedger,
@@ -464,6 +466,39 @@ describe('shares — one expense, several payers (Q47)', () => {
 		expect((await db.txns.get(repayBea!.id))?.isDeleted).toBe(false);
 	});
 
+	it('settles with what actually came back — more than owed, a thank-you (Q82)', async () => {
+		const coffee = await createTxn({
+			accountId,
+			amount: -10_00 as Minor,
+			payee: 'kafe',
+			shares: [{ who: 'Bea', amount: 11_00 as Minor }]
+		});
+		expect(coffee.shares[0]?.amount).toBe(11_00);
+
+		const lunch = await createTxn({
+			accountId,
+			amount: -200_00 as Minor,
+			payee: 'oběd',
+			shares: [{ who: 'Alex', amount: 100_00 as Minor }]
+		});
+		const share = lunch.shares[0]!;
+
+		const repayment = await settleReceivable(lunch.id, share.id, { amount: 120_00 as Minor });
+		expect(repayment?.amount).toBe(120_00);
+		// Once settled, the share records what came back.
+		expect((await db.txns.get(lunch.id))?.shares[0]).toMatchObject({
+			amount: 120_00,
+			settledByTxnId: repayment!.id
+		});
+
+		// The undo puts back what was owed.
+		await unsettleReceivable(lunch.id, share.id, 100_00 as Minor);
+		expect((await db.txns.get(lunch.id))?.shares[0]).toMatchObject({
+			amount: 100_00,
+			settledByTxnId: null
+		});
+	});
+
 	it('confirmScheduled copies the declared shares onto the posted row, with fresh ids', async () => {
 		const schedule = await createSchedule({
 			accountId,
@@ -640,6 +675,78 @@ describe('transfers — two accounts, one movement (Q49)', () => {
 			{ accountId }
 		);
 		expect(posted.accountId).toBe(revolut.id);
+	});
+});
+
+describe('several accounts in one currency (Q83)', () => {
+	async function wallet() {
+		return createAccount({ name: 'Hotovost', kind: 'cash', currency: 'CZK' });
+	}
+
+	it('opens a second koruna account beside the first', async () => {
+		const cash = await wallet();
+		const live = (await db.accounts.toArray()).filter((a) => !a.isDeleted);
+		expect(live.map((a) => a.currency)).toEqual(['CZK', 'CZK']);
+		expect(cash.kind).toBe('cash');
+	});
+
+	it('opens an account in debt, or empty (Q85)', async () => {
+		const loan = await createAccount({
+			name: 'Půjčka',
+			kind: 'loan',
+			openingBalance: -1000_00 as Minor
+		});
+		expect(loan.openingBalance).toBe(-1000_00);
+		expect((await createAccount({ name: 'Nic', kind: 'cash' })).openingBalance).toBe(0);
+	});
+
+	it('writes cash out of the ATM as a move: two legs, no bucket, no SMĚNA', async () => {
+		const cash = await wallet();
+		const transfer = await createTransfer({
+			fromAccountId: accountId,
+			toAccountId: cash.id,
+			amountOut: 2000_00 as Minor,
+			amountIn: 2000_00 as Minor,
+			categoryId: null
+		});
+
+		expect(transfer.out.categoryId).toBeNull();
+		expect(transfer.in.categoryId).toBeNull();
+		expect(transfer.out.transferPairId).toBe(transfer.in.id);
+		expect(await db.categories.get(EXCHANGE_CATEGORY_ID)).toBeUndefined();
+	});
+
+	it('still refuses an exchange without a bucket', async () => {
+		const revolut = await createAccount({ name: 'Revolut', kind: 'checking', currency: 'EUR' });
+		await expect(
+			createTransfer({
+				fromAccountId: accountId,
+				toAccountId: revolut.id,
+				amountOut: 100_00 as Minor,
+				amountIn: 4_00 as Minor,
+				categoryId: null
+			})
+		).rejects.toThrow(/kategorii/);
+	});
+
+	it('turns a pocket into an account, and the koruna total does not move', async () => {
+		await updateAccount(accountId, { openingBalance: 20_000_00 as Minor });
+		const pocket = await addPocket(accountId, { name: 'Hotovost', amount: 5_000_00 as Minor });
+
+		const created = await pocketToAccount(accountId, pocket!.id);
+
+		expect(created).toMatchObject({
+			name: 'Hotovost',
+			kind: 'cash',
+			currency: 'CZK',
+			openingBalance: 5_000_00
+		});
+		const parent = await db.accounts.get(accountId);
+		expect(parent?.pockets).toEqual([]);
+		expect(parent?.openingBalance).toBe(20_000_00);
+		expect(created?.openingDate).toBe(parent?.openingDate);
+		// Twice is a no-op: the pocket is gone.
+		expect(await pocketToAccount(accountId, pocket!.id)).toBeUndefined();
 	});
 });
 

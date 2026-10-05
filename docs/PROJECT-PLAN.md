@@ -182,7 +182,7 @@ Full reasoning, including every rejected alternative, is in `DECISIONS.md`.
 | Ids            | Client-generated **UUIDv7**, hand-rolled, no dependency                          |
 | Hosting        | Static output (`adapter-static`), served by its own nginx container from the API's origin — `deploy/`, runbook in `DEPLOYMENT.md` |
 | UI language    | **Czech.** Code, identifiers, comments and docs stay English                     |
-| Currency       | One account per currency since Q50 (CZK, EUR, USD, GBP); never summed across, no rates; koruny held elsewhere join the CZK account as pockets |
+| Currency       | Twenty-six two-decimal currencies (Q84); any number of accounts in each since Q83 — a month is measured per currency; never summed across, no rates |
 | Phone          | Android primary; iOS kept working as a degraded case                             |
 | History import | **None.** Clean start — the 2026 workbook has no dates to import                 |
 | Repository     | `github.com/W0lf1n/Prosper`, public, **MIT**                                     |
@@ -271,10 +271,10 @@ interface Account extends Synced {
 	id: string;
 	name: string;
 	kind: AccountKind;
-	openingBalance: Minor;
+	openingBalance: Minor; // signed: zero, or below it for an account opened in debt — Q85
 	openingDate: string;
-	currency: string; // per account since Q49 — immutable once the account has rows; one account per currency since Q50
-	pockets: AccountPocket[]; // money from elsewhere in this currency, opening the account — Q50, v12
+	currency: string; // per account since Q49 — immutable once the account has rows; shared by several accounts since Q83
+	pockets: AccountPocket[]; // money from elsewhere in this currency, opening the account — Q50, v12; `pocketToAccount` since Q83
 	isArchived: boolean;
 	sortOrder: number;
 }
@@ -434,17 +434,22 @@ interface MetaEntry {
   one; `categoryId` stays nullable only so pre-existing and future imported rows
   can be represented and then fixed. See §6.2.
 - **Transfers are two rows**, mutually referencing `transferPairId`. Never
-  one row. With one account per currency every transfer is an exchange, and
-  since 2026-09-02 the legs count the way they read: the outgoing leg is an
-  expense from a bucket chosen in the sheet, the incoming leg is income in
-  `SMĚNA` — one income bucket under a constant id, created on first use.
-  The two amounts are the only rate the app knows; deleting either leg
-  removes both (`DECISIONS.md`, "An exchange counts the way it reads").
+  one row; deleting either leg removes both. The bucket says what they mean.
+  **With one** it is an exchange, and the legs count the way they read
+  (2026-09-02): the outgoing leg is an expense from the chosen bucket, the
+  incoming leg is income in `SMĚNA` — one income bucket under a constant id,
+  created on first use, arrived but not earned. Every transfer across
+  currencies is one, and the two amounts are the only rate the app knows.
+  **Without one** it is a _move_ (Q83), possible only inside a currency —
+  cash out of the ATM — and no measurement sees either leg; only the balances
+  move.
 - **Every transaction belongs to an account.** No orphans.
 - **An outstanding share is not money.** A share never touches the balance or
   any total until it is settled and its `settledByTxnId` points at the inflow
   that carried it — and each share settles alone (Q47): one friend paying up
-  says nothing about the other.
+  says nothing about the other. A share may be larger than its expense (Q82):
+  a thank-you on top is money that comes back, and once settled the share is
+  the figure that arrived.
 - **An inflow filed under a spending bucket is a refund**, and nets against that
   bucket rather than counting as income.
 - **Goal progress is read off the ledger, never stored** — with one stated
@@ -594,8 +599,10 @@ already on Domů, so the slot went to Nastavení (Q61).
 ```
 
 The month's standing is the first thing visible, every launch — the answer to
-"how am I doing" before anything is tapped. The figure is the active account's
-month (Q49); the two pills under it are what came in and what went out.
+"how am I doing" before anything is tapped. The figure is the month of the
+active account's currency, every account in it (Q49, Q83): the card and the
+cash in the wallet are one koruna month, and so are the due payments and the
+holds under it. The two pills under it are what came in and what went out.
 
 Everything that used to be a glyph in a header slab is a card here: what the
 standing orders are waiting on — a deck of slides, one per due payment, swiped
@@ -634,9 +641,12 @@ The direction is a segmented pill in the header; Příjem preselects the one
 income bucket when there is exactly one. The account is the rail under it: one
 card per account with its colour, its code and its balance, snapping one at a
 time, and the selected card is the account the row is written to and the
-currency the amount is in. Sticky, like the date — the same meta write Settings
-makes, so every other screen follows (Q50). The currency beside the amount is
-text, not a control: the rail is the switch (Q56).
+currency the amount is in. Two accounts in one currency — the card and the
+cash — show their kind in the circle and under the name instead of the symbol
+twice (Q83). Sticky, like the date — the same meta write Settings makes, so
+every other screen follows (Q50). The currency beside the amount is text, not
+a control: the rail is the switch (Q56). The buckets are ranked over every
+account in the currency, so a new cash account offers the card's habits.
 
 Below the amount: the bucket rail (every category, most-used first, a coloured
 circle on each), the date pill and the payee field, the three rare properties on
@@ -697,7 +707,11 @@ a card payment that has not cleared.
 One title row — _Přehled_ and the month switcher — and a full-width segmented
 pill under it. The month view keeps its own account chips (Q49): per-account is
 a month in that account's currency with everything the screen knows how to say;
-_vše_ lays the currencies side by side and never adds them up.
+a currency held by two or more accounts gets a _CZK celkem_ chip ahead of them,
+the same full month over all of them, and the screen opens on it (Q83); _vše_
+lays the currencies side by side and never adds them up, and is shown only
+when there are two. A bucket that came out ahead — more came back than went
+out (Q82) — prints as money in, without a share or a bar.
 
 **Měsíc** is the workbook's `SUMA` sheet, rebuilt, in this order: the net with
 _Přišlo_ and _Odešlo_ as two tiles and the one-off figure separated from the
@@ -795,9 +809,13 @@ each opening its own page with a back chevron to the hub: `/nastaveni/ucty`,
 `/kategorie`, `/vzhled`, `/sync`, `/data`. The hub is the last slot of the bar
 (Q61); `lib/ui/settings.ts` builds the summaries. **Účty**: every live
 account with what is on it right now, by currency, the pockets that joined it
-(Q50) indented under it; _Přidat účet_ for a currency not yet held, _Upravit_
-for the opening figures and the pockets, _Převod_ once there are two; tapping an
-account that is not the active one makes it the account the keypad writes to.
+(Q50) indented under it; _Přidat účet_ in any of the twenty-six currencies,
+named in Czech (Q84), _Upravit_ for the name, the kind, the opening figures
+and the pockets — each pocket with _Na účet_, which makes it an account of its
+own — and _Převod_ once there are two; tapping an account that is not the
+active one makes it the account the keypad writes to. An opening balance may
+be zero or below: the sign is a _V plusu_ / _V mínusu_ pill beside the field,
+because the phone's decimal keypad has no minus (Q85).
 **Kategorie**: one row per bucket with its circle, its type and a chevron —
 tapping opens the editor (`ui/CategorySheet.svelte`): name, type, ten colours,
 thirty-two icons, and archiving; colour and icon apply live, everywhere the
@@ -807,11 +825,15 @@ bucket appears. _Nová kategorie_ opens the same sheet empty. **Vzhled**: systé
 znovu** — the app's only destructive action, behind a typed phrase and a backup
 ticked by default (`resetLedger` in `repo.ts`, `domain/reset.ts` for the phrase).
 
-**One account per currency** (Q50). Koruny on another card are a *pocket* on the
-CZK account — a name and an amount that opened it. The switch between accounts
-lives on the record screen's rail as well as here, and the ground of every
-screen takes the colour of a foreign currency so the account being written to
-is known before a digit is typed.
+**Money sits on an account; a month is measured in a currency** (Q83, lifting
+Q50's one account per currency). The card and the cash in the wallet are two
+koruna accounts, each with its own balance and rows, and one koruna month.
+Cash out of the ATM is a transfer with no bucket — a _move_ — which only the
+balances see. Koruny elsewhere that need no rows of their own can still be a
+_pocket_ on an account. The switch between accounts lives on the record
+screen's rail as well as here, and the ground of every screen takes the
+colour of a foreign currency so the account being written to is known before a
+digit is typed.
 
 ## 9. Design
 

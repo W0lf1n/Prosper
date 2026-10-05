@@ -170,8 +170,18 @@ describe('netOf()', () => {
 		expect(netOf(txn(-99900))).toBe(-99900);
 	});
 
-	it('clamps rather than flipping the sign on nonsense shares', () => {
-		expect(netOf(txn(-100000, { shares: [share(500000)] }))).toBe(0);
+	it('goes above zero when more comes back than went out — a thank-you (Q82)', () => {
+		// 10 Kč of coffee, 11 Kč back: it cost nothing and left a koruna over.
+		expect(netOf(txn(-10_00, { shares: [share(11_00, 'Bea')] }))).toBe(1_00);
+	});
+});
+
+describe('a share larger than its expense (Q82)', () => {
+	it('is owed, listed and totalled like any other', () => {
+		const coffee = txn(-10_00, { shares: [share(11_00, 'Bea')] });
+		expect(isOpenReceivable(coffee)).toBe(true);
+		expect(totalOwed([coffee])).toBe(11_00);
+		expect(openReceivables([coffee])[0]).toMatchObject({ who: 'Bea', amount: 11_00, spent: 10_00 });
 	});
 });
 

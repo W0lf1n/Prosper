@@ -67,6 +67,23 @@ describe('monthCoverage', () => {
 		expect(result.quiet).toBe(2);
 	});
 
+	it('cash out of the ATM is not a spending day — a move has no bucket (Q83)', () => {
+		const result = monthCoverage({
+			month: '2026-08',
+			txns: [txn('2026-08-01', { transferPairId: 'pair', categoryId: null })],
+			today: '2026-08-02'
+		});
+
+		expect(result.spending).toBe(0);
+		expect(result.quiet).toBe(2);
+		expect(
+			quietStreak({
+				txns: [txn('2026-08-01', { transferPairId: 'p', categoryId: null })],
+				today: '2026-08-03'
+			}).days
+		).toBe(2);
+	});
+
 	it('counts a day nobody recorded as a day without an expense', () => {
 		// The whole reversal: no mark, no tap, no hole. Nothing was spent.
 		const result = monthCoverage({

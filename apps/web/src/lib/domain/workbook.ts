@@ -20,13 +20,20 @@
  * Every figure is the app's own. A row lands in a column by the rule
  * `summariseMonth` uses — income is an inflow to an income bucket or to none,
  * a refund nets against its bucket — so a sheet's CELKEM is the month's net
- * on Přehled to the haléř. Accounts are never summed together: each gets its
- * own months and its own SUMA, because koruny and euros are not one column.
+ * on Přehled to the haléř — and a move between two of your own accounts is in
+ * no column at all, as it is in no total there (Q83). Accounts are never
+ * summed together: each gets its own months and its own SUMA.
  *
  * Pure (§13.6). No Dexie, no fetch, no DOM.
  */
 
-import { ACCOUNT_KIND_LABEL, EXCHANGE_CATEGORY_ID, isTransfer, openingTotal } from './accounts';
+import {
+	ACCOUNT_KIND_LABEL,
+	EXCHANGE_CATEGORY_ID,
+	isMove,
+	isTransfer,
+	openingTotal
+} from './accounts';
 import { summariseMonth, type MonthSummary } from './checks';
 import { monthCoverage } from './coverage';
 import { capitalize } from './czech';
@@ -116,9 +123,10 @@ const keyOf = (categoryId: string | null, side: Side) => `${side}:${categoryId ?
  * The side `summariseMonth` puts a row on. An inflow is income when its
  * bucket is an income bucket or it has none; an inflow to a spending bucket
  * is a refund and nets against that bucket; every outflow is spending. A row
- * of zero is on neither, as it is there.
+ * of zero is on neither, as it is there, and neither is a move (Q83).
  */
 function sideOf(txn: Txn, byId: ReadonlyMap<string, Category>): Side | null {
+	if (isMove(txn)) return null;
 	if (txn.amount < 0) return 'out';
 	if (txn.amount === 0) return null;
 	const isIncome = txn.categoryId === null || (byId.get(txn.categoryId)?.isIncome ?? false);
@@ -188,13 +196,16 @@ const SOURCE_LABEL: Record<TxnSource, string> = {
 	adjustment: 'vyrovnání zůstatku'
 };
 
+/** A leg with a bucket is an exchange; one without is a move (Q83). */
+const transferLabel = (txn: Txn) => (isMove(txn) ? 'převod' : 'směna');
+
 /**
  * "12. 9. Lidl · jednorázový · dluží Bea 250,00 Kč" — the payee, with the
  * date the workbook never had in front of it and the app's flags behind it.
  */
 function popisOf(txn: Txn, code: string): string {
 	const tags: string[] = [];
-	if (isTransfer(txn)) tags.push('směna');
+	if (isTransfer(txn)) tags.push(transferLabel(txn));
 	if (txn.source === 'recurring') tags.push('pravidelná');
 	if (txn.isOneOff) tags.push('jednorázový');
 	if (txn.isProvisional) tags.push('blokace');
@@ -473,7 +484,7 @@ function ledgerSheet(input: WorkbookInput, accountById: ReadonlyMap<string, Acco
 			return [
 				{ date: t.date },
 				accountById.get(t.accountId)?.name ?? '',
-				category?.name ?? 'bez kategorie',
+				category?.name ?? (isMove(t) ? 'převod' : 'bez kategorie'),
 				t.payee,
 				{ money: t.amount },
 				accountById.get(t.accountId)?.currency ?? '',
@@ -489,7 +500,7 @@ function ledgerSheet(input: WorkbookInput, accountById: ReadonlyMap<string, Acco
 						: settled > 0
 							? 'zčásti'
 							: 'ne',
-				isTransfer(t) ? 'směna' : SOURCE_LABEL[t.source],
+				isTransfer(t) ? transferLabel(t) : SOURCE_LABEL[t.source],
 				schedule?.payee ?? '',
 				t.note ?? ''
 			];

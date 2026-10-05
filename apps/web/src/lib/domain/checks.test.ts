@@ -260,8 +260,9 @@ describe('an exchange counts the way it reads (2026-09-02, reversing part of Q49
 		expect(summary.earned).toBe(50_000_00);
 	});
 
-	it('a leg written before buckets existed is nagged like any other bare row', () => {
-		// Legs from before 2026-09-02 carry no bucket; the tape lets them be filed.
+	it('a leg written before buckets existed reads as the move it was written as (Q83)', () => {
+		// Legs from between Q49 and 2026-09-02 carry no bucket — the shape of a
+		// move — and were moves when they were written.
 		const legacy = txn('2026-08-10', -2470_00, { transferPairId: 'leg-in' });
 
 		const summary = summariseMonth({
@@ -271,8 +272,103 @@ describe('an exchange counts the way it reads (2026-09-02, reversing part of Q49
 			today: '2026-08-30'
 		});
 
-		expect(summary.outflow).toBe(-2470_00);
-		expect(summary.findings.find((f) => f.rule === 'uncategorised')).toBeDefined();
+		expect(summary.outflow).toBe(0);
+		expect(summary.findings.find((f) => f.rule === 'uncategorised')).toBeUndefined();
+	});
+});
+
+describe('a move counts nowhere — cash out of the ATM (Q83)', () => {
+	const exchange = category('SMĚNA', { id: EXCHANGE_CATEGORY_ID, isIncome: true });
+	const saving = category('SPOŘENÍ', { spendType: 'save' });
+	const withBoth = [...CATEGORIES, exchange, saving];
+
+	// The card's account and the wallet, both koruny, read as one month.
+	const withdrawal = txn('2026-08-10', -2000_00, {
+		accountId: 'card',
+		transferPairId: 'leg-in',
+		payee: 'Převod → Hotovost'
+	});
+	const intoWallet = txn('2026-08-10', 2000_00, {
+		accountId: 'cash',
+		transferPairId: 'leg-out',
+		payee: 'Převod ← Karta'
+	});
+	const market = txn('2026-08-11', -350_00, { accountId: 'cash', categoryId: 'cat-jídlo' });
+	const salary = txn('2026-08-01', 40_000_00, { accountId: 'card', categoryId: 'cat-příjem' });
+
+	it('the withdrawal is neither spent nor earned; what the cash bought is spent once', () => {
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [salary, withdrawal, intoWallet, market],
+			categories: withBoth,
+			today: '2026-08-30'
+		});
+
+		expect(summary.income).toBe(40_000_00);
+		expect(summary.earned).toBe(40_000_00);
+		expect(summary.outflow).toBe(-350_00);
+		expect(summary.buckets.map((b) => b.category?.name)).toEqual(['JÍDLO']);
+		expect(summary.findings.find((f) => f.rule === 'uncategorised')).toBeUndefined();
+	});
+
+	it('the wallet alone reads as what it spent, not as income from the card', () => {
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [intoWallet, market],
+			categories: withBoth,
+			today: '2026-08-30'
+		});
+
+		expect(summary.income).toBe(0);
+		expect(summary.outflow).toBe(-350_00);
+	});
+
+	it('a transfer inside a currency filed under a bucket counts — koruny to savings', () => {
+		const toSavings = txn('2026-08-02', -5000_00, {
+			accountId: 'card',
+			transferPairId: 'leg-in',
+			categoryId: saving.id
+		});
+		const arrived = txn('2026-08-02', 5000_00, {
+			accountId: 'savings',
+			transferPairId: 'leg-out',
+			categoryId: exchange.id
+		});
+
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [salary, toSavings, arrived],
+			categories: withBoth,
+			today: '2026-08-30'
+		});
+
+		expect(summary.buckets.map((b) => [b.category?.name, b.total])).toEqual([
+			['SPOŘENÍ', -5000_00]
+		]);
+		// Arrived in SMĚNA: not earnings, so the split still measures against salary.
+		expect(summary.earned).toBe(40_000_00);
+	});
+});
+
+describe('a bucket that came out ahead (Q82)', () => {
+	it('has no share, and the others still add up to a hundred', () => {
+		// 10 Kč of coffee, 12 back as a thank-you; 350 Kč at the market.
+		const coffee = txn('2026-08-03', -10_00, { categoryId: 'cat-jídlo' });
+		const back = txn('2026-08-04', 12_00, { categoryId: 'cat-jídlo' });
+		const market = txn('2026-08-05', -350_00, { categoryId: 'cat-bydlení' });
+
+		const summary = summariseMonth({
+			month: '2026-08',
+			txns: [coffee, back, market],
+			categories: CATEGORIES,
+			today: '2026-08-30'
+		});
+
+		expect(summary.outflow).toBe(-348_00);
+		expect(summary.buckets.map((b) => [b.category?.name, b.total, b.share])).toEqual([
+			['BYDLENÍ', -350_00, 100],
+			['JÍDLO', 2_00, 0]
+		]);
 	});
 });
 
