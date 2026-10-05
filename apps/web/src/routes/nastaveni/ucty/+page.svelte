@@ -296,13 +296,22 @@
 							>
 						</div>
 					{:else if line.account.id === data.accountId}
-						<div class="row row--short acct">
+						<!-- The account the keypad writes to sits in a signal wash with
+						     a filled badge, once there is another to tell it from (Q88). -->
+						<div class="row row--short acct" class:acct--active={accountRows.length > 1}>
 							{@render accountCircle(line.account)}
 							<span class="row__body">
 								<span class="row__title">{line.name}</span>
-								<span class="row__sub"
-									>{ACCOUNT_KIND_LABEL[line.account.kind]} · zapisuje se sem</span
-								>
+								{#if accountRows.length > 1}
+									<span class="row__sub acct__sub"
+										>{ACCOUNT_KIND_LABEL[line.account.kind]}
+										<span class="badge badge--tiny acct__badge">aktivní</span></span
+									>
+								{:else}
+									<span class="row__sub"
+										>{ACCOUNT_KIND_LABEL[line.account.kind]} · zapisuje se sem</span
+									>
+								{/if}
 							</span>
 							<span class="row__amount">{formatMoney(line.amount, { code: group.code })}</span>
 						</div>
@@ -577,6 +586,27 @@
 
 	.acct + .acct {
 		border-top: none;
+	}
+
+	/* Inset, not bled: the wash keeps a margin from the card's edge so it
+	   reads as a selection rather than a pressed row. */
+	.acct--active {
+		width: auto;
+		margin: var(--space-1) calc(var(--space-2) * -1);
+		padding-inline: var(--space-2);
+		border-radius: var(--radius-sm);
+		background: var(--signal-wash);
+	}
+
+	.acct__sub {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.acct__badge {
+		background: var(--signal);
+		color: var(--signal-ink);
 	}
 
 	.acct--pocket .acct__name {

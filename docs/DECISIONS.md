@@ -3499,3 +3499,16 @@ blank: the sample seeds only into an empty database.
 manifest suffix. Its own port is its own origin, so its IndexedDB never meets
 the real ledger on 5173, and its Začít znovu (a hard wipe) cannot reach it.
 `.claude/launch.json` lists it as `paska-demo`.
+
+
+### Q88 — The active account, told apart at a glance · answered 2026-10-05
+
+**Asked for.** "Visually separate which account is primary."
+
+**Answer.** On Účty, once there are two accounts or more, the one the keypad
+writes to sits in an inset `--signal-wash` band and carries a filled
+`--signal` badge, _aktivní_ — the word the help text under the list already
+uses. "Zapisuje se sem" did not fit as a badge at phone width. With a single
+account nothing is highlighted: there is nothing to tell it from, and the
+line keeps saying _zapisuje se sem_. The other rows keep _ťukni a zapisuj
+sem_.
