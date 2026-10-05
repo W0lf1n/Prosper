@@ -2,13 +2,12 @@
 	/**
 	 * A balance, which may be below zero — Q85.
 	 *
-	 * The decimal keypad most phones show for `inputmode="decimal"` has digits
-	 * and a comma and no minus key, so "-1 000" could not be typed and an
-	 * account in debt could not be opened or reconciled. The sign is a pill
-	 * beside the field instead, in the words a bank balance is spoken in: _v
-	 * plusu_, _v mínusu_. The field holds the magnitude; `parseSigned()` in
-	 * `domain/money.ts` puts the two back together, and a minus typed by hand
-	 * still counts.
+	 * A minus typed before the number counts: it is lifted out of the text and
+	 * becomes the sign, so the field always holds the magnitude. The decimal
+	 * keypad most phones show for `inputmode="decimal"` has no minus key, so
+	 * the sign is also a round key inside the field, on the left, where the
+	 * minus would be written: tap it and + becomes − and back.
+	 * `parseSigned()` in `domain/money.ts` puts the two together again.
 	 */
 	interface Props {
 		/** The magnitude as typed. */
@@ -20,56 +19,76 @@
 	}
 
 	let { text = $bindable(), negative = $bindable(), label, placeholder = '0' }: Props = $props();
+
+	/** "-1 000" is −, 1 000; "+50" is +, 50. A sign anywhere but the front is
+	    left for the parser to refuse. */
+	function liftSign(event: Event & { currentTarget: HTMLInputElement }) {
+		const typed = event.currentTarget.value;
+		const sign = /^\s*([-−+])/.exec(typed);
+		if (!sign) return;
+		negative = sign[1] !== '+';
+		text = typed.slice(sign[0].length);
+	}
 </script>
 
 <div class="field">
 	<span class="field__label">{label}</span>
 	<div class="signed">
+		<button
+			type="button"
+			class="signed__sign"
+			aria-pressed={negative}
+			aria-label={negative ? 'V mínusu — přepnout do plusu' : 'V plusu — přepnout do mínusu'}
+			onclick={() => (negative = !negative)}
+		>
+			{negative ? '−' : '+'}
+		</button>
 		<input
-			class="field__input field__input--mono"
+			class="field__input field__input--mono signed__input"
 			bind:value={text}
+			oninput={liftSign}
 			inputmode="decimal"
 			{placeholder}
 			autocomplete="off"
 			aria-label={label}
 		/>
-		<div class="seg seg--soft signed__sign" role="group" aria-label="Kladný, nebo záporný">
-			<button
-				type="button"
-				class="seg__item"
-				aria-pressed={!negative}
-				onclick={() => (negative = false)}
-			>
-				V plusu
-			</button>
-			<button
-				type="button"
-				class="seg__item"
-				aria-pressed={negative}
-				onclick={() => (negative = true)}
-			>
-				V mínusu
-			</button>
-		</div>
 	</div>
 </div>
 
 <style>
 	.signed {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) 11.5rem;
-		gap: var(--space-2);
-		align-items: center;
+		position: relative;
 	}
 
+	.signed__input {
+		padding-left: calc(var(--space-2) + 2.25rem + var(--space-2));
+	}
+
+	/* A pill on the soft field, raised a step by luminance. */
 	.signed__sign {
-		align-self: stretch;
-		align-items: stretch;
+		position: absolute;
+		top: 50%;
+		left: var(--space-2);
+		display: grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: var(--radius-full);
+		background: var(--surface);
+		color: var(--ink);
+		font-size: 1.25rem;
+		font-weight: 500;
+		line-height: 1;
+		transform: translateY(-50%);
+		transition: background-color var(--dur-fast) var(--ease-out);
 	}
 
-	@media (max-width: 360px) {
-		.signed {
-			grid-template-columns: 1fr;
-		}
+	.signed__sign:active {
+		background: var(--surface-2);
+	}
+
+	.signed__sign[aria-pressed='true'] {
+		background: var(--ink);
+		color: var(--surface);
 	}
 </style>
