@@ -151,7 +151,7 @@ export function suggestBucket(description: string): string | null {
 }
 
 /** Whole-word-ish containment: "obed" matches "obed s kolegy" but not "obedvat". */
-function wordIn(haystack: string, needle: string): boolean {
+export function wordIn(haystack: string, needle: string): boolean {
 	let from = 0;
 	for (;;) {
 		const at = haystack.indexOf(needle, from);

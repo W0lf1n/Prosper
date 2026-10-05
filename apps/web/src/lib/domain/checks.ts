@@ -18,7 +18,8 @@ import { RECORDS, counted } from './czech';
 import { daysBetween, monthKey, shiftMonth, type IsoDate } from './datetime';
 import type { Category, Txn } from './types';
 import { EXCHANGE_CATEGORY_ID, isMove } from './accounts';
-import { isVagueDescription, normalize, numbersIn, suggestBucket } from './vocabulary';
+import { isVagueDescription, normalize, numbersIn, suggestBucket, wordIn } from './vocabulary';
+import { categoryForPayee } from './ledger';
 
 export type Severity = 'warn' | 'info';
 
@@ -75,6 +76,11 @@ export interface CheckContext {
 	categories: Category[];
 	/** Recent transactions, newest first. Used for duplicate detection. */
 	recent: Txn[];
+	/**
+	 * Every row the person has written that may teach where a payee belongs.
+	 * Falls back to `recent` when absent.
+	 */
+	history?: readonly Txn[];
 }
 
 function categoryOf(context: CheckContext, id: string | null): Category | undefined {
@@ -85,6 +91,38 @@ function findBucket(context: CheckContext, normalizedName: string): Category | u
 	return context.categories.find(
 		(c) => !c.isArchived && !c.isDeleted && normalize(c.name) === normalizedName
 	);
+}
+
+/**
+ * Where a description points, in the person's own categories, strongest
+ * reason first:
+ *
+ *   1. **habit** — this payee, by its whole name, has been filed here before;
+ *   2. **name** — the description says one of the categories' own names
+ *      ("servis auto" and a bucket called Auto);
+ *   3. **vocabulary** — the hand-written dictionary of `vocabulary.ts`, which
+ *      only knows the seeded names and finds nothing once they are renamed.
+ */
+function whereItBelongs(
+	description: string,
+	context: CheckContext
+): { target: Category; reason: 'habit' | 'name' | 'vocabulary' } | null {
+	const live = context.categories.filter((c) => !c.isArchived && !c.isDeleted);
+
+	const habitId = categoryForPayee(context.history ?? context.recent, description);
+	const habit = habitId ? live.find((c) => c.id === habitId) : undefined;
+	if (habit) return { target: habit, reason: 'habit' };
+
+	const text = normalize(description);
+	const named = live
+		.filter((c) => normalize(c.name).length >= 3)
+		.sort((a, b) => b.name.length - a.name.length)
+		.find((c) => wordIn(text, normalize(c.name)));
+	if (named) return { target: named, reason: 'name' };
+
+	const suggestion = suggestBucket(description);
+	const target = suggestion ? findBucket(context, suggestion) : undefined;
+	return target ? { target, reason: 'vocabulary' } : null;
 }
 
 // ── entry time ──────────────────────────────────────────────────────────────
@@ -103,21 +141,24 @@ export function checkDraft(draft: Draft, context: CheckContext): Finding[] {
 	// PROJEKTY over eight months as under JÍDLO itself. The category with the
 	// most room to improve was the one being under-reported threefold.
 	if (description && draft.direction === 'out') {
-		const suggestion = suggestBucket(description);
-		if (suggestion) {
-			const target = findBucket(context, suggestion);
-			if (target && target.id !== draft.categoryId) {
-				findings.push({
-					id: `misfiled:${suggestion}`,
-					rule: 'misfiled',
-					severity: 'warn',
-					title: chosen ? `Spíš ${target.name}?` : `Vypadá to na ${target.name}`,
-					detail: chosen
+		const found = whereItBelongs(description, context);
+		const target = found?.target;
+		if (found && target && !target.isIncome && target.id !== draft.categoryId) {
+			const habit = found.reason === 'habit';
+			findings.push({
+				id: `misfiled:${target.id}`,
+				rule: 'misfiled',
+				severity: 'warn',
+				title: chosen ? `Spíš ${target.name}?` : `Vypadá to na ${target.name}`,
+				detail: chosen
+					? habit
 						? `„${description}“ jsi jindy dával do ${target.name}, teď to míří do ${chosen.name}.`
+						: `Podle popisu „${description}“ to patří spíš do ${target.name} než do ${chosen.name}.`
+					: habit
+						? `„${description}“ jsi jindy dával do ${target.name}.`
 						: `Podle popisu „${description}“.`,
-					fix: { kind: 'set-category', categoryId: target.id, label: `Dát do ${target.name}` }
-				});
-			}
+				fix: { kind: 'set-category', categoryId: target.id, label: `Dát do ${target.name}` }
+			});
 		}
 	}
 
@@ -166,8 +207,7 @@ export function checkDraft(draft: Draft, context: CheckContext): Finding[] {
 	// "Bea - bydlení plyn 1 250" sat in PŘÍJEM while the full 2 500 sat in
 	// BYDLENÍ. Both sides inflated: income looked bigger, spending looked bigger.
 	if (draft.direction === 'in' && description) {
-		const suggestion = suggestBucket(description);
-		const target = suggestion ? findBucket(context, suggestion) : undefined;
+		const target = whereItBelongs(description, context)?.target;
 		if (target && !target.isIncome) {
 			findings.push({
 				id: 'refund-as-income',

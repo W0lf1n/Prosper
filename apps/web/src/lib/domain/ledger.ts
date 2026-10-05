@@ -295,6 +295,39 @@ function wordStartsWith(text: string, prefix: string): boolean {
 }
 
 /**
+ * Where this payee has gone before: the category the person's own rows file
+ * it under most often, ties going to the most recent — or null when the name
+ * is new. The match is the whole name, folded ("lidl" is "Lidl"), so the
+ * answer is a habit and never a guess. Transfers and rows without a bucket
+ * teach nothing.
+ */
+export function categoryForPayee(txns: readonly Txn[], payee: string): string | null {
+	const needle = normalize(payee);
+	if (!needle) return null;
+
+	const uses = new Map<string, number>();
+	const lastUsed = new Map<string, string>();
+	for (const txn of txns) {
+		if (txn.isDeleted || !txn.categoryId || txn.transferPairId !== null) continue;
+		if (normalize(txn.payee) !== needle) continue;
+		uses.set(txn.categoryId, (uses.get(txn.categoryId) ?? 0) + 1);
+		const seen = lastUsed.get(txn.categoryId);
+		if (!seen || txn.createdAt > seen) lastUsed.set(txn.categoryId, txn.createdAt);
+	}
+
+	let best: string | null = null;
+	for (const [id, count] of uses) {
+		if (best === null) {
+			best = id;
+			continue;
+		}
+		const lead = count - uses.get(best)!;
+		if (lead > 0 || (lead === 0 && lastUsed.get(id)! > lastUsed.get(best)!)) best = id;
+	}
+	return best;
+}
+
+/**
  * Category ids ranked by how often they get used, most-used first, ties broken
  * by whichever was used most recently, then by configured order.
  *

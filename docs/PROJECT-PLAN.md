@@ -523,7 +523,7 @@ expense is worse than the mistake it prevents.
 
 | Rule               | Catches                                                      | From the workbook                            |
 | ------------------ | ------------------------------------------------------------ | -------------------------------------------- |
-| `misfiled`         | Description matches a different bucket; offers it in one tap | nearly twice as much food outside JÍDLO      |
+| `misfiled`         | Description matches a different bucket — the payee's own history first, then a bucket's own name, then the vocabulary (Q86); offers it in one tap | nearly twice as much food outside JÍDLO      |
 | `unclear-number`   | Description carries a number that is not the amount          | "Netflix - 379" recorded as 74 Kč            |
 | `vague`            | A large amount with a description that explains nothing      | "opak. obj", five figures in one month       |
 | `one-off`          | A large expense not yet marked extraordinary                 | a five-figure front door with the groceries  |
@@ -814,8 +814,9 @@ named in Czech (Q84), _Upravit_ for the name, the kind, the opening figures
 and the pockets — each pocket with _Na účet_, which makes it an account of its
 own — and _Převod_ once there are two; tapping an account that is not the
 active one makes it the account the keypad writes to. An opening balance may
-be zero or below: the sign is a _V plusu_ / _V mínusu_ pill beside the field,
-because the phone's decimal keypad has no minus (Q85).
+be zero or below: a minus typed before the number counts, and a round +/−
+key inside the field on the left flips the sign, because the phone's decimal
+keypad has no minus (Q85, Q86).
 **Kategorie**: one row per bucket with its circle, its type and a chevron —
 tapping opens the editor (`ui/CategorySheet.svelte`): name, type, ten colours,
 thirty-two icons, and archiving; colour and icon apply live, everywhere the

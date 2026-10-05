@@ -101,6 +101,34 @@ describe('misfiled category', () => {
 		const found = checkDraft(draft({ payee: 'obědvat u babičky' }), context());
 		expect(rules(found)).not.toContain('misfiled');
 	});
+
+	it('learns from his own rows before the dictionary — the payee is a habit', () => {
+		const history = [
+			txn('2026-08-01', -9900, { payee: 'Netflix', categoryId: 'cat-ostatní' }),
+			txn('2026-07-01', -9900, { payee: 'netflix', categoryId: 'cat-ostatní' })
+		];
+		const found = checkDraft(draft({ payee: 'NETFLIX' }), { ...context(), history });
+		const misfiled = found.find((f) => f.rule === 'misfiled');
+		expect(misfiled?.title).toBe('Vypadá to na OSTATNÍ');
+		expect(misfiled?.detail).toBe('„NETFLIX“ jsi jindy dával do OSTATNÍ.');
+	});
+
+	it('knows a bucket he made himself by its name', () => {
+		const ctx = { ...context(), categories: [...CATEGORIES, category('Auto')] };
+		const found = checkDraft(draft({ payee: 'servis auto' }), ctx);
+		expect(found.find((f) => f.rule === 'misfiled')?.fix).toEqual({
+			kind: 'set-category',
+			categoryId: 'cat-auto',
+			label: 'Dát do Auto'
+		});
+	});
+
+	it('does not claim a habit the dictionary guessed', () => {
+		const found = checkDraft(draft({ payee: 'oběd', categoryId: 'cat-bydlení' }), context());
+		expect(found.find((f) => f.rule === 'misfiled')?.detail).toBe(
+			'Podle popisu „oběd“ to patří spíš do JÍDLO než do BYDLENÍ.'
+		);
+	});
 });
 
 describe('unclear records', () => {

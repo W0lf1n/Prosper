@@ -4,6 +4,7 @@ import {
 	balanceOf,
 	balancesByCurrency,
 	buildTape,
+	categoryForPayee,
 	categoryOrder,
 	categoryRanking,
 	openHolds,
@@ -293,6 +294,31 @@ describe('categoryRanking()', () => {
 	it('ignores deleted rows', () => {
 		const rows = [txn('2026-08-01', -1000, { categoryId: 'c-fuel', isDeleted: true })];
 		expect(categoryRanking(rows, ['c-food', 'c-fuel'])).toEqual(['c-food', 'c-fuel']);
+	});
+});
+
+describe('categoryForPayee()', () => {
+	it('answers with where the payee usually goes, by its whole folded name', () => {
+		const rows = [
+			txn('2026-08-01', -24900, { payee: 'Albert', categoryId: 'potraviny' }),
+			txn('2026-08-02', -3000, { payee: 'albert', categoryId: 'potraviny' }),
+			txn('2026-08-03', -5000, { payee: 'ALBERT', categoryId: 'drogerie' }),
+			txn('2026-08-04', -5000, { payee: 'Albert Heijn', categoryId: 'dovolena' })
+		];
+		expect(categoryForPayee(rows, ' albert ')).toBe('potraviny');
+		expect(categoryForPayee(rows, 'Lidl')).toBeNull();
+		expect(categoryForPayee(rows, '')).toBeNull();
+	});
+
+	it('breaks a tie with the newest row, and learns nothing from transfers or tombstones', () => {
+		const rows = [
+			txn('2026-08-01', -100, { payee: 'Bea', categoryId: 'dary' }),
+			txn('2026-08-02', -100, { payee: 'Bea', categoryId: 'bydleni' }),
+			txn('2026-08-03', -100, { payee: 'Bea', categoryId: 'jidlo', isDeleted: true }),
+			txn('2026-08-04', -100, { payee: 'Bea', categoryId: 'jidlo', transferPairId: 'p' }),
+			txn('2026-08-05', -100, { payee: 'Bea', categoryId: 'jidlo', transferPairId: 'p' })
+		];
+		expect(categoryForPayee(rows, 'bea')).toBe('bydleni');
 	});
 });
 

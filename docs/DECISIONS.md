@@ -3444,3 +3444,38 @@ new account and edit, and on the statement balance. The field holds the
 magnitude and `parseSigned` in `money.ts` puts the two together; a minus typed
 by hand still counts, and zero is never a negative zero. The reconciliation
 opens on minus when the ledger already stands below it.
+
+### Q86 — A select that could not be read, a blue wash on the payee, a minus that can be typed, and buckets learnt from his own rows · answered 2026-10-05
+
+**Asked for.** (1) The currency select on _Nový účet_ opened as white text on
+white. (2) The payee field on Zápis "sometimes gets a half invisible
+background". (3) Accept "-" before the number, or put a +/− key inside the
+field on the left. (4) "Based on what does the app decide the category? It
+should be based on MY categories" — pointing at Cashew.
+
+**Found.** (1) The open list of a native select is painted by the browser
+from the select's own colours; the dark field is `--surface-3`, 8 % white,
+which an option list cannot paint, so it fell back to white under white ink.
+(2) The `<datalist>` of payees: hovering a suggestion, and picking one, puts
+the input in the browser's autofill state, which washes it with a translucent
+blue under `!important`. (3) A typed minus already parsed, but the decimal
+keypad has none. (4) `misfiled` asked only `vocabulary.ts` — a fixed
+dictionary keyed by the seeded bucket names — so a renamed or new bucket was
+never suggested, and its copy "jsi jindy dával do" claimed a habit nobody had
+looked up.
+
+**Answer.** (1) `select.field__input option` takes the opaque `--surface`
+and `--ink` (`app.css`). (2) `input:autofill` pins the ink and delays the
+background change past anyone's patience — the background itself cannot be
+outranked. (3) `SignedAmount.svelte` lifts a leading `-` / `−` / `+` out of
+the text into the sign, and the _V plusu_ / _V mínusu_ pill is replaced by a
+round key inside the field, on the left, that flips + and −; it fills with
+the ink when the balance is below zero. (4) `checks.ts` → `whereItBelongs()`
+asks, in order: **habit** — `ledger.ts` → `categoryForPayee()`, the bucket
+this payee's whole folded name was filed under most often across every row
+(ties to the newest); **name** — the description contains one of his buckets'
+own names; **vocabulary** — the dictionary, as before. Only a habit says
+"jsi jindy dával"; the others say "podle popisu". `refund-as-income` uses the
+same resolver. Cashew's per-bucket keyword lists ("associated titles") would
+need a schema field and an editor, and are not built; nor does Zápis pick the
+bucket by itself — the finding still offers it in one tap.

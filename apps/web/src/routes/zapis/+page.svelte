@@ -247,7 +247,7 @@
 	const findings = $derived(
 		checkDraft(
 			{ amount: toMinor(amount), direction, categoryId, payee, date, isOneOff },
-			{ categories: liveCategories, recent }
+			{ categories: liveCategories, recent, history: liveRows }
 		)
 	);
 
