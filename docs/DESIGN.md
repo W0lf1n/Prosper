@@ -85,6 +85,12 @@ category palette — ten hues, theme-independent, because a bucket's colour is a
 name and a name does not change with the lights. The four split classes borrow
 four of them. The denominator of every meter and ring is the soft surface.
 
+**Charts follow the same rules** (`CHARTS.md` §0). A line is the ink; the
+line it is compared with is the quieter ink, solid — dashed reads as a
+forecast. A day that cost more is a day in more ink, the four `--heat-*`
+steps, and a day that cost nothing is the mint wash. Blue is not a data
+colour here either.
+
 | Role                 | Light (default)                          | Dark                                          |
 | -------------------- | ---------------------------------------- | --------------------------------------------- |
 | Ground → card → soft | `#f4f4f4` → `#ffffff` → `#f0f0f2`        | `#121416` → `#1f2226` → white at 8 %          |
@@ -93,6 +99,7 @@ four of them. The denominator of every meter and ring is the soft surface.
 | Pill                 | `#191c1f` on `#ffffff`                   | `#ffffff` on `#000000`                        |
 | Signal               | `#494fdf`                                | `#494fdf`                                     |
 | In · flag · danger   | `#00a87e` · `#ec7e00` · `#e23b4a`        | `#19c48f` · `#ec7e00` · `#e23b4a`             |
+| Heat 1 → 4           | ink at 9 · 22 · 45 · 78 %                | white at 10 · 24 · 48 · 82 %                  |
 
 Three greps have to come back empty: **a literal hex outside `tokens.css`**,
 **`font-weight: 700`** — the ladder is 400 / 500 / 600 — and

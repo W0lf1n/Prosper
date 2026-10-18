@@ -282,6 +282,11 @@ a {
 .card--list {
 	gap: 0;
 	padding: var(--space-1) var(--space-4);
+	/* A pressed row bleeds to the card's edge (`.row--press`), so at the
+	   top and the bottom its tint would square off the card's corner.
+	   `clip`, not `hidden`: clipping makes no scroll container, so the
+	   card keeps its automatic minimum size (the flex trap in CLAUDE.md). */
+	overflow: clip;
 }
 
 /** The card label: sentence case, small, quiet. Never uppercase. */

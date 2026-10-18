@@ -123,6 +123,9 @@
 		width: calc(100% - 28px);
 		padding: var(--space-1) var(--space-3) var(--space-3);
 		border-radius: var(--radius-md);
+		/* The pressed row inside reaches the slide's edge; its tint keeps the
+		   slide's corners (see `.card--list`). */
+		overflow: clip;
 		background: var(--ground-2);
 		scroll-snap-align: start;
 	}

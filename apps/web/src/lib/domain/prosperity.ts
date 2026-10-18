@@ -24,7 +24,7 @@
  * Pure (§11.6). No Dexie, no fetch, no DOM.
  */
 
-import { ZERO, minor, mulRatio, percentOf, roundToUnit, sum, type Minor } from './money';
+import { ZERO, abs, minor, mulRatio, percentOf, roundToUnit, sub, sum, type Minor } from './money';
 import type { BucketTotal } from './checks';
 import type { SpendType } from './types';
 
@@ -183,4 +183,72 @@ export function verdict(split: ProsperitySplit): string {
 	if (!split.weakest) return 'Všechny tři podíly sedí. Zbytek je na život.';
 	const { label, percent, target } = split.weakest;
 	return `${label}: ${percent} % místo ${target} %. Tohle je ta jedna věc.`;
+}
+
+// ── the split as four meters ───────────────────────────────────────────────
+
+/**
+ * Where one class stands against the book, in money rather than in points.
+ *
+ * - `met` — giving, saving or debt reached its share of the income.
+ * - `short` — it has not yet; `gap` is what is missing.
+ * - `within` — living cost less than its 70 %; `gap` is the room left.
+ * - `over` — living cost more; `gap` is by how much.
+ */
+export type BarState = 'met' | 'short' | 'within' | 'over';
+
+export interface SplitBar {
+	cls: ProsperityClass;
+	label: string;
+	note: string;
+	/** Positive magnitude that went into the class. */
+	amount: Minor;
+	/** The book's share of this month's income, in whole units. */
+	mark: Minor;
+	percent: number;
+	target: number;
+	state: BarState;
+	/** Positive magnitude between `amount` and `mark`. */
+	gap: Minor;
+	/** How full the meter is, 0–100 — `amount` against `mark`. */
+	fill: number;
+}
+
+/**
+ * The split as four meters, each against its own mark (2026-10-18).
+ *
+ * The ring on Přehled answers "what shape was the month" and nobody could
+ * read it: four colours, a percentage in the hole and a column of signed
+ * deltas is three encodings for one question. A meter answers "how far am I
+ * from the book" — the question the law asks — in the one shape every screen
+ * in the app already uses for "how far along", with the koruny it would take.
+ */
+export function splitBars(split: ProsperitySplit): SplitBar[] {
+	return split.slices.map((slice) => {
+		const mark = shareAmount(split.income, slice.target);
+		const reached = slice.amount >= mark;
+		const state: BarState =
+			slice.cls === 'live'
+				? reached && slice.amount > mark
+					? 'over'
+					: 'within'
+				: reached
+					? 'met'
+					: 'short';
+		const gap = abs(sub(slice.amount, mark));
+		const fill =
+			mark > 0 ? Math.min(100, percentOf(slice.amount, mark)) : slice.amount > 0 ? 100 : 0;
+		return {
+			cls: slice.cls,
+			label: slice.label,
+			note: CLASS_NOTE[slice.cls],
+			amount: slice.amount,
+			mark,
+			percent: slice.percent,
+			target: slice.target,
+			state,
+			gap,
+			fill
+		};
+	});
 }

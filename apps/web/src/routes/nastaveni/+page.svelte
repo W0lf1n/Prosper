@@ -1,14 +1,17 @@
 <script lang="ts">
 	/**
-	 * Nastavení — the hub, and the last tab (Q61). Five rows, each a room of
-	 * its own with a back chevron here: Účty, Kategorie, Vzhled, Synchronizace,
-	 * Data. Every row carries a live one-line summary of what is in the room,
+	 * Nastavení — the hub, and the last tab (Q61). Seven rows, each a room of
+	 * its own with a back chevron here: Účty, Kategorie, Domů, Upozornění,
+	 * Vzhled, Synchronizace, Data. Every row carries a live one-line summary of what is in the room,
 	 * so the hub reads as a status page before it is a menu. A tab screen, so
 	 * the title sits in the flow and there is no back — the tabs are peers.
 	 */
 	import { liveQuery } from 'dexie';
 	import { resolve } from '$app/paths';
+	import { getHomeLayout, getNoticePrefs } from '$lib/db/repo';
 	import { db } from '$lib/db/schema';
+	import { DEFAULT_HOME } from '$lib/domain/dashboard';
+	import { DEFAULT_NOTICE_PREFS } from '$lib/domain/notifications';
 	import { IS_DEMO } from '$lib/demo';
 	import { balancesByCurrency } from '$lib/domain/ledger';
 	import type { Account, Category, Txn } from '$lib/domain/types';
@@ -41,6 +44,10 @@
 
 	const sync = syncStatus();
 
+	/* `meta` is a Dexie table like any other, so the summary follows a save. */
+	const notices = liveQuery(() => getNoticePrefs());
+	const homeLayout = liveQuery(() => getHomeLayout());
+
 	const rows = $derived(
 		settingsRows({
 			account,
@@ -48,6 +55,8 @@
 			categoryCount: (($allCategories ?? []) as Category[]).filter(
 				(c) => !c.isDeleted && !c.isArchived
 			).length,
+			homeCards: $homeLayout?.widgets.length ?? DEFAULT_HOME.length,
+			notices: $notices ?? DEFAULT_NOTICE_PREFS,
 			theme: readTheme(),
 			syncState: sync.state,
 			txnCount: ($allTxns ?? []).length

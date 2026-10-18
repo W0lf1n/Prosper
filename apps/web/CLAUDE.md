@@ -20,10 +20,13 @@ has nothing useful to render on a server, and Dexie must not be constructed
 where `indexedDB` does not exist. That is also why `db()` in `lib/db/schema.ts`
 is lazy.
 
-The layout's `load` runs three things on every launch, in this order:
-`ensureSeeded()` → `catchUpSchedules()` → `catchUpGoalTargets()`, then requests
-storage persistence. Anything that must happen "when the app opens" belongs
-there — there is no server and no background worker to do it anywhere else.
+The layout's `load` runs these on every launch, in this order:
+`ensureSeeded()` → `catchUpSchedules()` → `notePaymentsTold()` →
+`catchUpGoalTargets()`, then requests storage persistence. Anything that must
+happen "when the app opens" belongs there. The service worker does wake on
+its own now — a push or a periodic sync, for Upozornění — but it only reads
+IndexedDB and shows a notice; it never writes the ledger, so posting a
+standing order stays the launch's job.
 
 ---
 
@@ -130,17 +133,17 @@ bend.
 
 ## Routes
 
-| Route                                                            | Screen                                                                                                                 |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `/`                                                              | Domů. The launch route: the month's net, the cards                                                                     |
-| `/zapis`                                                         | Zápis. The keypad, full-screen, no bar; `✕` returns where it came from                                                 |
-| `/vypis`                                                         | Výpis — reverse chronological, running balance, a card per day                                                         |
-| `/prehled`                                                       | Přehled — Měsíc \| Platby behind one segmented pill, the month switcher above                                          |
-| `/rozdeleni`                                                     | Rozdělení příjmu — a plan of income and expense lines, what comes back, _pro mě_ against the book; saved by name (Q69) |
-| `/cil`                                                           | The goal — the why, this month's figure, the record of months                                                          |
-| `/jmeni`                                                         | Holdings and the `celkem` total — and the only place one is edited                                                     |
-| `/nastaveni`                                                     | The last tab, a hub: five rows with live summaries (`lib/ui/settings.ts`), each a page                                 |
-| `/nastaveni/ucty` · `/kategorie` · `/vzhled` · `/sync` · `/data` | Accounts · categories with the icon/colour editor · theme · sync · backup, export, Začít znovu                         |
+| Route                                                                                      | Screen                                                                                                                              |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                                                        | Domů. The launch route: the month's net, the decks, then the cards he arranged (Q92)                                                |
+| `/zapis`                                                                                   | Zápis. The keypad, full-screen, no bar; `✕` returns where it came from                                                              |
+| `/vypis`                                                                                   | Výpis — reverse chronological, running balance, a card per day                                                                      |
+| `/prehled`                                                                                 | Přehled — Měsíc \| Platby behind one segmented pill, the month switcher above                                                       |
+| `/rozdeleni`                                                                               | Rozdělení příjmu — a plan of income and expense lines, what comes back, _pro mě_ against the book; saved by name (Q69)              |
+| `/cil`                                                                                     | The goal — the why, this month's figure, the record of months                                                                       |
+| `/jmeni`                                                                                   | Holdings and the `celkem` total — and the only place one is edited                                                                  |
+| `/nastaveni`                                                                               | The last tab, a hub: seven rows with live summaries (`lib/ui/settings.ts`), each a page                                             |
+| `/nastaveni/ucty` · `/kategorie` · `/domu` · `/upozorneni` · `/vzhled` · `/sync` · `/data` | Accounts · categories with the icon/colour editor · Domů's cards (Q95) · notices (Q89) · theme · sync · backup, export, Začít znovu |
 
 The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/cil` and
 `/jmeni` keep Domů lit; `/rozdeleni` keeps Přehled lit; anything under
@@ -152,7 +155,7 @@ The bar is five slots — Domů · Výpis · ⊕ · Přehled · Nastavení. `/ci
 
 ## Testing
 
-Vitest, node environment, `requireAssertions: true`. Twenty-seven files, **599
+Vitest, node environment, `requireAssertions: true`. Thirty files, **663
 tests**. Most are against `lib/domain/` — the pure layer, which is the whole
 point of the layer being pure.
 
@@ -185,7 +188,7 @@ force-close → reopen → reconnect → verify.
 
 ## Data layer
 
-`lib/db/schema.ts` holds the `migrations` array, currently at **v15**. Add a new
+`lib/db/schema.ts` holds the `migrations` array, currently at **v16**. Add a new
 entry; never edit an existing one, even in development — a released version is
 already on the phone. `schema.test.ts` builds a database at the _old_ version
 and opens it with the current code: a migration that has only ever run against
@@ -221,7 +224,9 @@ the result) and named on the console; the rest of the file or page still
 merges, and the pull cursor moves past it.
 
 `meta` holds device preferences, not ledger data: the device id, the active
-account and the folded months. (`profileName` was written by one build on
+account, the folded months, what Upozornění is switched to and what it has
+already said (`noticePrefs`, `noticeLog` — the worker reads both). Domů's
+arrangement is **not** here: it syncs, so it is a `layouts` row (Q95). (`profileName` was written by one build on
 2026-09-05 and read by nothing since — Q55.)
 
 ## The demo build

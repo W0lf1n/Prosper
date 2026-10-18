@@ -88,6 +88,9 @@ function checkShape(value: unknown, shape: Shape): string | null {
 	return null;
 }
 
+const strings: Check = (v) =>
+	Array.isArray(v) && v.every((item) => typeof item === 'string') ? null : 'not a list of strings';
+
 const listOf =
 	(shape: Shape): Check =>
 	(v) => {
@@ -245,6 +248,10 @@ const SHAPES: Record<SyncedEntity, Shape> = {
 		accountId: optional(string),
 		lines: listOf(PLAN_LINE),
 		createdAt: optional(string)
+	},
+	layout: {
+		...SYNCED,
+		widgets: strings
 	},
 	// Keyed by its date, and carries no `id` or `isDeleted` — the one row shape
 	// that is not `Synced`.

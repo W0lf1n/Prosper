@@ -23,6 +23,7 @@ export const SYNCED_ENTITIES = [
   "valuation",
   "schedule",
   "plan",
+  "layout",
 ] as const;
 
 export type SyncedEntity = (typeof SYNCED_ENTITIES)[number];
@@ -114,6 +115,44 @@ export interface HealthResponse {
   ok: boolean;
   version: string;
 }
+
+// ── /api/v1/notify ──────────────────────────────────────────────────────────
+//
+// Web Push for Upozornění (`apps/web/src/lib/domain/notifications.ts`). The
+// server is told *when* to wake a phone and nothing about why: the push
+// carries no payload, and the phone decides what to say from its own ledger.
+// So the server still never reads a row (§10), and there is nothing in the
+// push to encrypt.
+
+/** `GET /api/v1/notify/key` — the VAPID public key, base64url, uncompressed P-256. */
+export interface NotifyKeyResponse {
+  publicKey: string;
+}
+
+/** `POST /api/v1/notify/subscribe` — one subscription per device; a second replaces it. */
+export interface NotifySubscribeRequest {
+  /** The push service URL from `PushSubscription.endpoint`. https only. */
+  endpoint: string;
+  /** `PushSubscription.getKey('p256dh')`, base64url. Kept for a payload one day. */
+  p256dh: string;
+  /** `PushSubscription.getKey('auth')`, base64url. */
+  auth: string;
+  /**
+   * When to wake the phone: UTC instants, ISO 8601 with a `Z`. The phone does
+   * the time-zone arithmetic with its own rules, so the server keeps no zone
+   * and needs no tz database. Past instants are dropped, the rest sorted; at
+   * most `MAX_WAKES`.
+   */
+  wakes: string[];
+}
+
+/** `POST /api/v1/notify/subscribe` and `/unsubscribe` answer with this. */
+export interface NotifyResponse {
+  ok: boolean;
+}
+
+/** How many wakes one subscription may carry: two months of evenings and the dues. */
+export const MAX_WAKES = 128;
 
 // ── shared limits ───────────────────────────────────────────────────────────
 

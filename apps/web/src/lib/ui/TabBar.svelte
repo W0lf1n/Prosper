@@ -7,7 +7,7 @@
 	 * the goal and the wealth are cards on Domů, whose detail screens keep
 	 * Domů lit. The last slot is Nastavení itself (Q61): the Já hub that stood
 	 * in front of it only repeated those two cards, and went. Anything under
-	 * `/nastaveni` keeps the slot lit, which is how its five pages count.
+	 * `/nastaveni` keeps the slot lit, which is how its rooms count.
 	 *
 	 * The disc in the middle is the record screen, which carries no bar of its
 	 * own: the keypad owns the bottom of the phone there.
@@ -126,6 +126,10 @@
 	function isCurrent(tab: (typeof tabs)[number]): boolean {
 		const own = resolve(tab.path).replace(/\/+$/, '') || '/';
 		if (here === own) return true;
+		// A page under a tab's own address is that tab's page — Nastavení's
+		// rooms are `/nastaveni/…`. Domů is `/`, under which is everything, so
+		// it lists its pages in `also` instead.
+		if (own !== '/' && here.startsWith(`${own}/`)) return true;
 		return tab.also.some((p) => {
 			const path = resolve(p as '/').replace(/\/+$/, '') || '/';
 			return here === path || here.startsWith(`${path}/`);

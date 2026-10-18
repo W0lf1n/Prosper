@@ -485,6 +485,21 @@ export interface Plan extends Synced {
 	createdAt: IsoDateTime;
 }
 
+/**
+ * How Domů is arranged — Q92, synced since Q95 (schema v16).
+ *
+ * The cards under the net and the decks, top to bottom, as `WidgetId`s from
+ * `domain/dashboard.ts` — kept as plain strings so a row written by a newer
+ * build with a card this one does not know still loads (the reader drops
+ * what it does not know). One row is all there is meant to be, but two
+ * devices that each arranged Domů before pairing bring one each, and ids are
+ * the client's (rule 3): the newest live row is the arrangement.
+ */
+export interface Layout extends Synced {
+	id: string;
+	widgets: string[];
+}
+
 export type SyncedEntity =
 	| 'txn'
 	| 'account'
@@ -496,7 +511,8 @@ export type SyncedEntity =
 	| 'holding'
 	| 'valuation'
 	| 'schedule'
-	| 'plan';
+	| 'plan'
+	| 'layout';
 
 /** Client-only. Never synced, never sent. Populated from P2 onwards. */
 export interface OutboxEntry {

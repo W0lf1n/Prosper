@@ -20,6 +20,7 @@ import type {
 	DayMark,
 	Goal,
 	Holding,
+	Layout,
 	MetaEntry,
 	MonthTarget,
 	OutboxEntry,
@@ -415,6 +416,16 @@ export const migrations: Migration[] = [
 					if (typeof row.isProvisional !== 'boolean') row.isProvisional = false;
 				});
 		}
+	},
+	{
+		/**
+		 * `layouts` — how Domů is arranged, synced so the phone and the laptop
+		 * show the same cards (Q95, 2026-10-18). A new table and nothing else.
+		 */
+		version: 16,
+		stores: {
+			layouts: 'id, updatedAt'
+		}
 	}
 ];
 
@@ -429,6 +440,7 @@ export class FinanceDb extends Dexie {
 	valuations!: EntityTable<Valuation, 'id'>;
 	schedules!: EntityTable<Schedule, 'id'>;
 	plans!: EntityTable<Plan, 'id'>;
+	layouts!: EntityTable<Layout, 'id'>;
 	dayMarks!: EntityTable<DayMark, 'date'>;
 	outbox!: EntityTable<OutboxEntry, 'seq'>;
 	meta!: EntityTable<MetaEntry, 'key'>;

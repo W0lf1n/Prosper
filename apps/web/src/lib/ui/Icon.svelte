@@ -37,6 +37,11 @@
 		'arrow-down': '<path d="M12 5.2v13.4M6.9 13.5 12 18.6l5.1-5.1"/>',
 		'arrow-up': '<path d="M12 18.8V5.4M6.9 10.5 12 5.4l5.1 5.1"/>',
 		check: '<path d="m5.6 12.4 4.4 4.4 8.4-9.6"/>',
+		/** Upozornění — Lucide's bell, at the chrome's weight. */
+		bell: '<path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/><path d="M3.3 15.3A1 1 0 0 0 4 17h16a1 1 0 0 0 .7-1.7C19.4 14 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.4 6-2.7 7.3"/>',
+		/** Upravit Domů — four tiles of uneven height. */
+		layout:
+			'<rect width="7" height="9" x="3.5" y="3.5" rx="1.5"/><rect width="7" height="5" x="13.5" y="3.5" rx="1.5"/><rect width="7" height="9" x="13.5" y="11.5" rx="1.5"/><rect width="7" height="5" x="3.5" y="15.5" rx="1.5"/>',
 		/** Jmění — a stack, narrowing as it rises. */
 		wealth:
 			'<rect x="3.8" y="15.6" width="16.4" height="4.6" rx="2.3"/><rect x="5.9" y="9.8" width="12.2" height="4.6" rx="2.3"/><rect x="8" y="4" width="8" height="4.6" rx="2.3"/>',

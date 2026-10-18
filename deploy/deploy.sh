@@ -2,7 +2,7 @@
 # The deployment as one command: what `DEPLOYMENT.md` › Updating does by hand,
 # made safe to run unattended.
 #
-#     sudo /opt/prosper/deploy/deploy.sh <commit>
+#     sudo /opt/prosper/deploy/deploy.sh <commit> [both|prod|demo]
 #
 # Runs as root, because compose does. In normal use it is called by
 # `prosper-deploy`, the forced command on the GitHub Actions key, and it is the
@@ -15,10 +15,22 @@
 # on a branch, or one somebody made up, is refused. That is the whole
 # authorisation model: the key can ask for any commit, but only for one that
 # has been pushed to master and has passed CI there.
+#
+# The second argument is where it goes. `both` (the default) is the real app
+# and, on a box with `DEPLOY_DEMO=1`, the demo after it; `prod` leaves the demo
+# where it is; `demo` rebuilds only the demo and leaves the real app — and its
+# database — untouched. Either way the checkout moves to the commit, so the
+# next `both` starts from the same tree.
 set -eu
 
 ROOT=${PROSPER_ROOT:-/opt/prosper}
 WANT=${1:-master}
+TARGET=${2:-both}
+
+case $TARGET in
+	both | prod | demo) ;;
+	*) printf 'deploy: refused: %s is not a target (both, prod or demo)\n' "$TARGET" >&2; exit 64 ;;
+esac
 
 log() { printf '%s deploy: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"; }
 die() { log "$*" >&2; exit 1; }
@@ -45,8 +57,13 @@ else
 	git merge-base --is-ancestor "$SHA" origin/master || die "refused: $SHA is not on origin/master"
 fi
 
+DEMO=$(sed -n 's/^DEPLOY_DEMO=//p' deploy/.env | tail -n1)
+if [ "$TARGET" = demo ] && [ "${DEMO:-}" != 1 ]; then
+	die "refused: this box runs no demo (DEPLOY_DEMO=1 in deploy/.env, DEPLOYMENT.md › The demo)"
+fi
+
 BEFORE=$(git rev-parse HEAD)
-log "deploying $SHA (was $BEFORE)"
+log "deploying $SHA to $TARGET (was $BEFORE)"
 
 # `reset --hard` rather than `pull`: a pull merges, and a merge is a decision
 # this script must never make. Untracked files, meaning `deploy/.env`, survive.
@@ -58,34 +75,35 @@ git reset --quiet --hard "$SHA"
 # arrive. The API is recreated before the client (`depends_on`), which is the
 # order Q69 requires: a new client must never talk to an old server.
 cd deploy
-log "building images"
-docker compose build --pull --quiet
-log "starting containers"
-docker compose up -d --remove-orphans --quiet-pull
+if [ "$TARGET" != demo ]; then
+	log "building images"
+	docker compose build --pull --quiet
+	log "starting containers"
+	docker compose up -d --remove-orphans --quiet-pull
 
-# ── prove it ────────────────────────────────────────────────────────────────
-# The web container proxies /api/ to the API, so one request checks that the
-# static build is served, the proxy matches, and the API is up. Thirty seconds
-# is the API's cold start on a 1 vCPU box, with room.
-HEALTH="http://127.0.0.1:$PORT/api/v1/health"
-i=0
-until BODY=$(curl -fsS --max-time 3 "$HEALTH" 2>/dev/null); do
-	i=$((i + 1))
-	if [ "$i" -ge 30 ]; then
-		docker compose ps
-		docker compose logs --tail=40 api web
-		die "$HEALTH did not answer within 30 s; the logs above say why"
-	fi
-	sleep 1
-done
-log "health: $BODY"
+	# ── prove it ────────────────────────────────────────────────────────────────
+	# The web container proxies /api/ to the API, so one request checks that the
+	# static build is served, the proxy matches, and the API is up. Thirty seconds
+	# is the API's cold start on a 1 vCPU box, with room.
+	HEALTH="http://127.0.0.1:$PORT/api/v1/health"
+	i=0
+	until BODY=$(curl -fsS --max-time 3 "$HEALTH" 2>/dev/null); do
+		i=$((i + 1))
+		if [ "$i" -ge 30 ]; then
+			docker compose ps
+			docker compose logs --tail=40 api web
+			die "$HEALTH did not answer within 30 s; the logs above say why"
+		fi
+		sleep 1
+	done
+	log "health: $BODY"
+fi
 
 # ── the demo, on a box that runs one ────────────────────────────────────────
 # `DEPLOY_DEMO=1` in deploy/.env: the same commit, built with VITE_DEMO=1, as
 # a second compose project with only the web container (Q74). It follows the
-# real deployment so a push to master moves both.
-DEMO=$(sed -n 's/^DEPLOY_DEMO=//p' .env | tail -n1)
-if [ "${DEMO:-}" = 1 ]; then
+# real deployment so a push to master moves both. `prod` skips it.
+if [ "$TARGET" != prod ] && [ "${DEMO:-}" = 1 ]; then
 	DEMO_PORT=$(sed -n 's/^PROSPER_DEMO_PORT=//p' .env | tail -n1)
 	DEMO_PORT=${DEMO_PORT:-8081}
 	log "building the demo"
@@ -106,4 +124,4 @@ fi
 # Layers orphaned by the build just replaced, and nothing that is in use.
 docker image prune -f --filter 'dangling=true' >/dev/null
 
-log "deployed $SHA"
+log "deployed $SHA to $TARGET"

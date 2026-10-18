@@ -34,6 +34,21 @@ public sealed record PullResponse(IReadOnlyList<SyncRow> Changes, long Cursor, b
 
 public sealed record HealthResponse(bool Ok, string Version);
 
+/// <summary><c>GET /api/v1/notify/key</c>.</summary>
+public sealed record NotifyKeyResponse(string PublicKey);
+
+/// <summary>
+/// <c>POST /api/v1/notify/subscribe</c>. Nullable because it arrives as JSON
+/// from outside: a missing field is a refusal with a sentence, not a 500.
+/// </summary>
+public sealed record NotifySubscribeRequest(
+    string? Endpoint,
+    string? P256dh,
+    string? Auth,
+    IReadOnlyList<string>? Wakes);
+
+public sealed record NotifyResponse(bool Ok);
+
 public static class SyncLimits
 {
     public const int MaxPushBatch = 500;
@@ -50,6 +65,6 @@ public static class SyncLimits
     public static readonly HashSet<string> Entities =
     [
         "txn", "account", "category", "goal", "monthTarget",
-        "reconciliation", "dayMark", "holding", "valuation", "schedule", "plan"
+        "reconciliation", "dayMark", "holding", "valuation", "schedule", "plan", "layout"
     ];
 }

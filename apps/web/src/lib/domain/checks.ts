@@ -327,24 +327,43 @@ function newestFirst(a: Txn, b: Txn): number {
  * spending and then the market stall it paid for a second time.
  */
 function measuredRows(context: MonthContext): Txn[] {
-	return context.txns.filter(
-		(t) => !t.isDeleted && !isMove(t) && monthKey(t.date) === context.month
+	return measurable(context.txns).filter((t) => monthKey(t.date) === context.month);
+}
+
+/**
+ * An inflow filed under a spending bucket is a refund, not income: it nets
+ * against what that bucket cost. Counting it as income is the mistake the
+ * spreadsheet made every month — the gas bill showed 2 500 Kč of spending and
+ * 1 250 Kč of "income", inflating both sides of the same transaction.
+ */
+function isIncomeRow(txn: Txn, categories: readonly Category[]): boolean {
+	return (
+		txn.categoryId === null || (categories.find((c) => c.id === txn.categoryId)?.isIncome ?? false)
 	);
+}
+
+/**
+ * What a month counts as spending: every outflow, and every refund — an
+ * inflow filed under a spending bucket — netting against it. The one
+ * definition, so the month slab, Přehled and the charts on Domů cannot
+ * disagree about what a day cost. Tombstones and moves are the caller's to
+ * have removed (`measuredRows`).
+ */
+export function spendingRows(rows: readonly Txn[], categories: readonly Category[]): Txn[] {
+	return rows.filter((t) => t.amount < 0 || (t.amount > 0 && !isIncomeRow(t, categories)));
+}
+
+/** Live, and not a move: the rows any measurement starts from (Q83). */
+export function measurable(txns: readonly Txn[]): Txn[] {
+	return txns.filter((t) => !t.isDeleted && !isMove(t));
 }
 
 export function summariseMonth(context: MonthContext): MonthSummary {
 	const { month, categories } = context;
 	const rows = measuredRows(context);
 
-	// An inflow filed under a spending bucket is a refund, not income: it nets
-	// against what that bucket cost. Counting it as income is the mistake the
-	// spreadsheet made every month — the gas bill showed 2 500 Kč of spending and
-	// 1 250 Kč of "income", inflating both sides of the same transaction.
-	const isIncomeRow = (txn: Txn) =>
-		txn.categoryId === null || (categories.find((c) => c.id === txn.categoryId)?.isIncome ?? false);
-
 	const inflowRows = rows.filter((t) => t.amount > 0);
-	const incomeRows = inflowRows.filter(isIncomeRow);
+	const incomeRows = inflowRows.filter((t) => isIncomeRow(t, categories));
 	const income = sum(incomeRows.map((t) => t.amount));
 	const earned = sum(
 		incomeRows.filter((t) => t.categoryId !== EXCHANGE_CATEGORY_ID).map((t) => t.amount)
@@ -352,7 +371,7 @@ export function summariseMonth(context: MonthContext): MonthSummary {
 
 	const spendRows = [
 		...rows.filter((t) => t.amount < 0),
-		...inflowRows.filter((t) => !isIncomeRow(t))
+		...inflowRows.filter((t) => !isIncomeRow(t, categories))
 	];
 	const outflow = sum(spendRows.map((t) => t.amount));
 	const oneOffOutflow = sum(spendRows.filter((t) => t.isOneOff).map((t) => t.amount));

@@ -1,7 +1,8 @@
 # @prosper/contracts
 
 The sync protocol, as TypeScript types. `docs/PROJECT-PLAN.md` §10 and nothing
-else.
+else — plus the push wake behind Upozornění, which is §10's server telling a
+phone *when*, never *what*.
 
 This package exists so the client and the server agree on a shape in one place
 rather than two. `apps/web` imports it directly; `apps/api` mirrors it in C# in
@@ -20,6 +21,9 @@ bundle almost nothing, which matters against a 150 kB brotli budget.
 | `PushRequest` / `PushResponse`      | `POST /api/v1/sync/push`                    |
 | `PullQuery` / `PullResponse`        | `GET /api/v1/sync/pull`                     |
 | `HealthResponse`                    | `GET /api/v1/health`                        |
+| `NotifyKeyResponse`                 | `GET /api/v1/notify/key`                    |
+| `NotifySubscribeRequest`            | `POST /api/v1/notify/subscribe`             |
+| `NotifyResponse`, `MAX_WAKES`       | Both notify answers, and the wake list cap  |
 | `mergeDecision`                     | LWW on `updatedAt`, tie-break on `deviceId` |
 | `PUSH_BATCH_SIZE`, `PULL_PAGE_SIZE` | The batch limits both sides assume          |
 

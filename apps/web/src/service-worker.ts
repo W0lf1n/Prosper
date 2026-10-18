@@ -4,7 +4,7 @@
 /// <reference lib="webworker" />
 
 /**
- * App shell cache.
+ * App shell cache — and, since 2026-10-18, the voice of Upozornění.
  *
  * Offline is the normal case, not the error case (§11.5). Everything the app
  * needs to boot is precached at install; the network is only ever consulted for
@@ -12,6 +12,13 @@
  */
 
 import { build, files, prerendered, version } from '$service-worker';
+import {
+	OPEN_MESSAGE,
+	PERIODIC_TAG,
+	PUSH_LEEWAY_MINUTES,
+	showNotice,
+	takeDueNotices
+} from '$lib/notify/notices';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -69,6 +76,49 @@ sw.addEventListener('fetch', (event) => {
 	if (url.pathname.startsWith('/api/')) return;
 
 	event.respondWith(respond(request, url));
+});
+
+/**
+ * Upozornění (`lib/notify/`). A push from the sync server carries nothing —
+ * it is a wake-up at a minute the phone asked for — and a periodic sync is
+ * the browser's own wake-up. Either way the worker reads this device's ledger
+ * and says whatever is due, through the same function the open page uses, so
+ * the log they share keeps every notice a once.
+ */
+async function announce(leeway = 0): Promise<void> {
+	const notices = await takeDueNotices(new Date(), leeway).catch(() => []);
+	await Promise.all(notices.map((notice) => showNotice(sw.registration, notice)));
+}
+
+sw.addEventListener('push', (event) => {
+	event.waitUntil(announce(PUSH_LEEWAY_MINUTES));
+});
+
+// Chromium only, and missing from the DOM typings — hence the string type.
+sw.addEventListener('periodicsync', (event: Event) => {
+	const wake = event as ExtendableEvent & { tag?: string };
+	if (wake.tag === PERIODIC_TAG) wake.waitUntil(announce());
+});
+
+/**
+ * A tap opens the app where the notice points. An open window is focused and
+ * told where to go, so a half-typed amount is not reloaded away.
+ */
+sw.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+	const path = String((event.notification.data as { url?: string } | null)?.url ?? '/');
+	event.waitUntil(
+		(async () => {
+			const windows = await sw.clients.matchAll({ type: 'window', includeUncontrolled: true });
+			const open = windows[0];
+			if (open) {
+				await open.focus();
+				open.postMessage({ type: OPEN_MESSAGE, url: path });
+				return;
+			}
+			await sw.clients.openWindow(path);
+		})()
+	);
 });
 
 async function respond(request: Request, url: URL): Promise<Response> {

@@ -99,6 +99,7 @@ describe('exportBackup', () => {
 				'format',
 				'goals',
 				'holdings',
+				'layouts',
 				'monthTargets',
 				'plans',
 				'reconciliations',

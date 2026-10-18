@@ -345,14 +345,22 @@ model ever gains a column, an existing database keeps the old schema silently
 and the API fails on the first query naming the new column — with no migration
 error, because nothing tried to migrate.
 
-This has not bitten because the server model has not changed since it was
-written, and it is unlikely to: the server stores the client's row as JSON and
-reasons about four fields, so **a client schema change is not a server
-concern**. Dexie migrations happen on the device.
+The ledger's tables have not changed since they were written, and are
+unlikely to: the server stores the client's row as JSON and reasons about four
+fields, so **a client schema change is not a server concern**. Dexie
+migrations happen on the device.
 
-If the server model does change, the honest fix at that point is to add EF
-migrations and switch the startup call to `MigrateAsync()`. Generating a
-migration history now, for a schema that has never moved, would be ceremony.
+**One table has been added since: `notify_subscriptions`** (2026-10-18, for
+Upozornění). It is a new table rather than a changed one, so it arrives the
+cheap way: `NotifyService.EnsureTableAsync` runs `CREATE TABLE IF NOT EXISTS`
+right after `EnsureCreatedAsync`, in DDL that Postgres and SQLite both read,
+named and shaped as EF would name it. A database from before that date gets
+the table on the next start; a new one gets it from `EnsureCreated` and the
+DDL is a no-op. `NotifyTests` builds the old shape and checks both.
+
+If an existing table ever has to *change*, the honest fix at that point is to
+add EF migrations and switch the startup call to `MigrateAsync()`. Generating a
+migration history now, for tables that have never moved, would be ceremony.
 
 ### Running the database on a laptop instead
 
@@ -447,6 +455,19 @@ the new build. It takes a commit id to deploy an older one, and it refuses
 anything that is not on `origin/master`. **Deploying from GitHub** below is the
 same script, run by a workflow instead of a person.
 
+**Prod, the demo, or both.** A second argument says where the commit goes:
+
+```bash
+sudo /opt/prosper/deploy/deploy.sh master demo
+```
+
+`both` is the default — the real app, then the demo on a box with
+`DEPLOY_DEMO=1`. `prod` leaves the demo as it is; `demo` rebuilds only the
+demo and never touches the real app or its database, and is refused on a box
+without a demo. The checkout moves to the commit either way. On GitHub it is
+the _target_ choice on **Run workflow** (Actions › Deploy); a push to master
+always goes to both.
+
 By hand, it is:
 
 ```bash
@@ -495,7 +516,9 @@ What keeps that connection from being a shell on the server (Q72):
 - **An account that can do one thing.** `prosper-deploy` has a locked password
   and a key that carries a forced `command=`: whatever the client asks for,
   `/usr/local/bin/prosper-deploy` runs instead, and it accepts a commit id or
-  `master` and nothing else.
+  `master`, optionally followed by `both`, `prod` or `demo`, and nothing else.
+  **After pulling a new version of it, install it again** (the `install` line
+  below) — until then the box ignores the target and deploys both.
 - **One sudoers line.** The account may run `/opt/prosper/deploy/deploy.sh` as
   root and nothing else — which is why the checkout must be owned by root and
   writable by nobody else. An account that could edit that script could edit
@@ -621,6 +644,43 @@ commit yet, or _Deploy_ was dispatched with a commit from a branch.
 different path; `sudo visudo -c` reads it back.
 
 ---
+
+## Upozornění — notices that reach a closed phone
+
+The app's notices (Nastavení › Upozornění: the evening question, a payment that
+went, a payment waiting) are said by the app itself while it is open. To reach
+a phone where Prosper is **closed**, the server sends a Web Push at the
+instants the phone asked for. The push is **empty**: the phone wakes, reads its
+own ledger and decides what to say, so nothing about the ledger leaves the
+server and there is nothing to encrypt. The server keeps one row per paired
+device in `notify_subscriptions` — the push endpoint and a list of UTC
+instants — and a thirty-second timer sends whatever has come due.
+
+**It needs two things.** A paired device (pairing is what authenticates the
+subscription), and a VAPID key pair on the server:
+
+```bash
+cd /opt/prosper/deploy && docker compose run --rm api vapid
+```
+
+Paste the two lines it prints into `.env`, with a contact in `NOTIFY_SUBJECT`,
+and recreate the API:
+
+```bash
+docker compose up -d api
+```
+
+Then on the phone, Nastavení › Upozornění › _Jak dorazí_ should read _Přes
+server_. If it says the server has no keys, the API did not pick up `.env`.
+
+**What the server will POST to.** Only https endpoints on the push services'
+own hosts — FCM, Mozilla, Apple, Windows (`NotifyService.PushHosts`). The
+endpoint comes from a paired device, but a server that POSTs wherever it is
+told can be pointed at its own network, and the database is one hostname away.
+
+**iPhone.** Web Push reaches an iPhone only when Prosper is added to the home
+screen and opened from there; in a Safari tab the room says notifications are
+not available.
 
 ## The demo
 

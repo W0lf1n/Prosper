@@ -7,6 +7,7 @@
 	 */
 	import { formatDateTime } from '$lib/domain/datetime';
 	import { RECORDS, counted } from '$lib/domain/czech';
+	import { syncChannels } from '$lib/notify/push';
 	import { defaultBaseUrl, pair, unpair } from '$lib/sync/pair';
 	import { SYNC_LABEL, initSync, syncNow, syncStatus } from '$lib/sync/status.svelte';
 	import AppBar from '$lib/ui/AppBar.svelte';
@@ -35,6 +36,8 @@
 			});
 			code = '';
 			toast.show('Spárováno');
+			// A paired server can now wake the phone for Upozornění.
+			void syncChannels();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Spárovat se nepodařilo';
 		} finally {

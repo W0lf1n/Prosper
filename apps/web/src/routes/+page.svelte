@@ -10,20 +10,35 @@
 	 * bar below. The three action pills that stood under the figure and the
 	 * sliders in the corner went on 2026-09-06 (Q61): every one of them
 	 * repeated a slot in the bar.
+	 *
+	 * Since 2026-10-18 the cards under the net and the decks are his to
+	 * arrange (`domain/dashboard.ts`, a prototype): which of them, in what
+	 * order, and four charts besides — the pace, the calendar, the split as
+	 * meters, the balance over time. Nastavení › Domů is where they are
+	 * arranged (Q95); this screen only shows them.
 	 */
 	import { liveQuery } from 'dexie';
 	import { resolve } from '$app/paths';
 	import { db } from '$lib/db/schema';
-	import { confirmScheduled, deleteTxn, skipScheduled, updateTxn } from '$lib/db/repo';
+	import {
+		confirmScheduled,
+		deleteTxn,
+		getHomeLayout,
+		skipScheduled,
+		updateTxn
+	} from '$lib/db/repo';
 	import { IS_DEMO } from '$lib/demo';
 	import { homeCurrency, inCurrency, liveAccounts } from '$lib/domain/accounts';
+	import { spendCalendar, spendPace } from '$lib/domain/charts';
 	import { summariseMonth } from '$lib/domain/checks';
+	import { DEFAULT_HOME, type HomeLayout, type WidgetId } from '$lib/domain/dashboard';
 	import { capitalize } from '$lib/domain/czech';
 	import { formatDayHeading, formatMonthHeading, monthKey, today } from '$lib/domain/datetime';
 	import { goalStatus, pickPrimary, type GoalStatus } from '$lib/domain/goals';
 	import { readHoldings, wealthTotal } from '$lib/domain/holdings';
 	import { balancesByCurrency, openHolds } from '$lib/domain/ledger';
 	import { ZERO, formatMoney, type Minor } from '$lib/domain/money';
+	import { prosperitySplit } from '$lib/domain/prosperity';
 	import { dueGroups, type DueGroup } from '$lib/domain/recurring';
 	import type {
 		Account,
@@ -35,10 +50,15 @@
 		Txn,
 		Valuation
 	} from '$lib/domain/types';
+	import BalanceCard from '$lib/ui/BalanceCard.svelte';
+	import CalendarCard from '$lib/ui/CalendarCard.svelte';
 	import DueCard from '$lib/ui/DueCard.svelte';
 	import HoldCard from '$lib/ui/HoldCard.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
+	import PaceCard from '$lib/ui/PaceCard.svelte';
+	import SplitCard from '$lib/ui/SplitCard.svelte';
 	import TabBar from '$lib/ui/TabBar.svelte';
+	import TxnSheet from '$lib/ui/TxnSheet.svelte';
 	import { categoryStyle, colorVar } from '$lib/ui/palette';
 	import { toast } from '$lib/ui/toast.svelte';
 	import type { PageProps } from './$types';
@@ -101,6 +121,32 @@
 		)
 	);
 
+	// ── the arranged part ───────────────────────────────────────────────────
+	/* `meta` is a table like any other, so an edit in the sheet re-renders
+	   this list as it is tapped. Until it is read, Domů as it always was. */
+	const storedLayout = liveQuery(() => getHomeLayout());
+	const layout = $derived<HomeLayout>($storedLayout ?? { widgets: [...DEFAULT_HOME] });
+	const showing = $derived(new Set<WidgetId>(layout.widgets));
+
+	const month = $derived(monthKey(today()));
+	/* Each chart is computed only while its card is on the screen. */
+	const pace = $derived(
+		showing.has('pace')
+			? spendPace({ txns: currencyTxns, categories: liveCategories, month, today: today() })
+			: null
+	);
+	const calendar = $derived(
+		showing.has('calendar')
+			? spendCalendar({ txns: currencyTxns, categories: liveCategories, month, today: today() })
+			: null
+	);
+	/* Against earnings, not income — an exchange is not a raise (Q49). */
+	const split = $derived(
+		showing.has('split')
+			? prosperitySplit({ income: summary.earned, buckets: summary.buckets })
+			: null
+	);
+
 	/** The rows the bank has only blocked so far, in this currency (Q75, Q83). */
 	const holds = $derived(openHolds(currencyTxns));
 
@@ -146,6 +192,9 @@
 			})
 		});
 	});
+
+	/** The row editor Výpis uses — a recent row opens it the same way. */
+	let sheet = $state<ReturnType<typeof TxnSheet>>();
 
 	/** The last three rows, every account, newest first. */
 	const recent = $derived(
@@ -253,87 +302,125 @@
 
 	<HoldCard {holds} categories={liveCategories} code={currency} onsettle={settleHold} />
 
-	{#if currency === home}
-		{#if goal}
-			<a class="card card--press goal" href={resolve('/cil')}>
-				<div class="card__head">
-					<span class="label">Cíl · {goal.goal.name}</span>
-					{#if goal.isComplete}
-						<span class="badge badge--in">hotovo</span>
-					{:else if goal.pace === 'done'}
-						<span class="badge badge--in">měsíc splněn</span>
-					{:else if goal.pace === 'behind'}
-						<span class="badge badge--flag">pozadu</span>
+	{#snippet goalCard()}
+		{#if currency === home}
+			{#if goal}
+				<a class="card card--press goal" href={resolve('/cil')}>
+					<div class="card__head">
+						<span class="label">Cíl · {goal.goal.name}</span>
+						{#if goal.isComplete}
+							<span class="badge badge--in">hotovo</span>
+						{:else if goal.pace === 'done'}
+							<span class="badge badge--in">měsíc splněn</span>
+						{:else if goal.pace === 'behind'}
+							<span class="badge badge--flag">pozadu</span>
+						{/if}
+					</div>
+					<div class="goal__numbers">
+						<span class="goal__saved">{formatMoney(goal.monthSaved)}</span>
+						<span class="goal__of">z {formatMoney(goal.monthTarget)} tento měsíc</span>
+					</div>
+					<div class="meter">
+						<span class="meter__fill" data-tone={goalTone} style="width: {goal.monthPercent}%"
+						></span>
+					</div>
+				</a>
+			{:else}
+				<a class="card card--press goal" href={resolve('/cil')}>
+					<div class="card__head">
+						<span class="label">Cíl</span>
+						<span class="card__go"><Icon name="chevron-right" size={18} /></span>
+					</div>
+					<span class="goal__invite">Napsat cíl</span>
+					<span class="hint">Nenapsaný cíl je jen přání.</span>
+				</a>
+			{/if}
+		{/if}
+	{/snippet}
+
+	{#snippet wealthCard()}
+		<a class="card card--press wealth" href={resolve('/jmeni')}>
+			<div class="wealth__body">
+				<span class="label">Jmění celkem</span>
+				<span class="wealth__total">{formatMoney(wealth.total)}</span>
+				<span class="wealth__sub" class:wealth__sub--stale={wealth.staleCount > 0}>
+					Na účtu {formatMoney(wealth.cash, { currency: false })} · V investicích
+					{formatMoney(wealth.invested, { currency: false })}
+					{#if wealth.staleCount > 0}
+						· hodnota je stará
 					{/if}
-				</div>
-				<div class="goal__numbers">
-					<span class="goal__saved">{formatMoney(goal.monthSaved)}</span>
-					<span class="goal__of">z {formatMoney(goal.monthTarget)} tento měsíc</span>
-				</div>
-				<div class="meter">
-					<span class="meter__fill" data-tone={goalTone} style="width: {goal.monthPercent}%"></span>
-				</div>
-			</a>
-		{:else}
-			<a class="card card--press goal" href={resolve('/cil')}>
-				<div class="card__head">
-					<span class="label">Cíl</span>
-					<span class="card__go"><Icon name="chevron-right" size={18} /></span>
-				</div>
-				<span class="goal__invite">Napsat cíl</span>
-				<span class="hint">Nenapsaný cíl je jen přání.</span>
-			</a>
-		{/if}
-	{/if}
+				</span>
+			</div>
+			<span class="card__go"><Icon name="chevron-right" size={18} /></span>
+		</a>
+	{/snippet}
 
-	<a class="card card--press wealth" href={resolve('/jmeni')}>
-		<div class="wealth__body">
-			<span class="label">Jmění celkem</span>
-			<span class="wealth__total">{formatMoney(wealth.total)}</span>
-			<span class="wealth__sub" class:wealth__sub--stale={wealth.staleCount > 0}>
-				Na účtu {formatMoney(wealth.cash, { currency: false })} · V investicích
-				{formatMoney(wealth.invested, { currency: false })}
-				{#if wealth.staleCount > 0}
-					· hodnota je stará
-				{/if}
-			</span>
-		</div>
-		<span class="card__go"><Icon name="chevron-right" size={18} /></span>
-	</a>
-
-	<section class="card card--list recent">
-		<div class="card__head recent__head">
-			<h2 class="label">Poslední záznamy</h2>
-			<a class="link" href={resolve('/vypis')}>Zobrazit vše</a>
-		</div>
-		{#if recent.length === 0}
-			<p class="hint recent__empty">Zatím tu nic není. Zapiš první výdaj.</p>
-		{:else}
-			{#each recent as txn (txn.id)}
-				{@const code = accountById.get(txn.accountId)?.currency ?? currency}
-				<div class="row row--recent">
-					<span class="circle" style="--c: {rowColour(txn)}">
-						<Icon name={rowIcon(txn)} size={18} stroke={2} />
-					</span>
-					<span class="row__body">
-						<span class="row__title">{rowTitle(txn)}</span>
-						<span class="row__sub">
-							{#if txn.isProvisional}
-								<span class="badge badge--tiny recent__flag">blokace</span>
-							{/if}
-							{rowSub(txn)}
+	{#snippet recentCard()}
+		<section class="card card--list recent">
+			<div class="card__head recent__head">
+				<h2 class="label">Poslední záznamy</h2>
+				<a class="link" href={resolve('/vypis')}>Zobrazit vše</a>
+			</div>
+			{#if recent.length === 0}
+				<p class="hint recent__empty">Zatím tu nic není. Zapiš první výdaj.</p>
+			{:else}
+				{#each recent as txn (txn.id)}
+					{@const code = accountById.get(txn.accountId)?.currency ?? currency}
+					<button type="button" class="row row--press row--recent" onclick={() => sheet?.open(txn)}>
+						<span class="circle" style="--c: {rowColour(txn)}">
+							<Icon name={rowIcon(txn)} size={18} stroke={2} />
 						</span>
-					</span>
-					<span class="row__amount" class:row__amount--in={txn.amount > 0}>
-						{formatMoney(txn.amount, { sign: 'always', code })}
-					</span>
-				</div>
-			{/each}
+						<span class="row__body">
+							<span class="row__title">{rowTitle(txn)}</span>
+							<span class="row__sub">
+								{#if txn.isProvisional}
+									<span class="badge badge--tiny recent__flag">blokace</span>
+								{/if}
+								{rowSub(txn)}
+							</span>
+						</span>
+						<span class="row__amount" class:row__amount--in={txn.amount > 0}>
+							{formatMoney(txn.amount, { sign: 'always', code })}
+						</span>
+					</button>
+				{/each}
+			{/if}
+		</section>
+	{/snippet}
+
+	<!-- The arranged part (`domain/dashboard.ts`): his cards, in his order. -->
+	{#each layout.widgets as id (id)}
+		{#if id === 'goal'}
+			{@render goalCard()}
+		{:else if id === 'wealth'}
+			{@render wealthCard()}
+		{:else if id === 'recent'}
+			{@render recentCard()}
+		{:else if id === 'pace' && pace}
+			<PaceCard {pace} code={currency} />
+		{:else if id === 'calendar' && calendar}
+			<CalendarCard {calendar} code={currency} />
+		{:else if id === 'split' && split}
+			<SplitCard {split} code={currency} />
+		{:else if id === 'balance'}
+			<BalanceCard
+				accounts={($allAccounts ?? []) as Account[]}
+				txns={liveRows}
+				{currency}
+				today={today()}
+			/>
 		{/if}
-	</section>
+	{/each}
 </main>
 
 <TabBar />
+
+<TxnSheet
+	bind:this={sheet}
+	accounts={($allAccounts ?? []) as Account[]}
+	categories={($allCategories ?? []) as Category[]}
+	ledger={liveRows}
+/>
 
 <style>
 	/* The sub-line is text and ends in an ellipsis; the badge goes first, so

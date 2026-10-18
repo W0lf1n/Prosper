@@ -29,17 +29,31 @@ The full reasoning is in `docs/DECISIONS.md`.
 
 ## Endpoints
 
-| Method | Path                | What                                          |
-| ------ | ------------------- | --------------------------------------------- |
-| `GET`  | `/api/v1/health`    | `{ ok, version }`. No auth                    |
-| `POST` | `/api/v1/pair`      | Code in, `{ deviceId, token }` out            |
-| `POST` | `/api/v1/sync/push` | A batch of rows. Idempotent on `(entity, id)` |
-| `GET`  | `/api/v1/sync/pull` | `?since=<cursor>&limit=500`, in cursor order  |
+| Method | Path                         | What                                              |
+| ------ | ---------------------------- | ------------------------------------------------- |
+| `GET`  | `/api/v1/health`             | `{ ok, version }`. No auth                        |
+| `POST` | `/api/v1/pair`               | Code in, `{ deviceId, token }` out                |
+| `POST` | `/api/v1/sync/push`          | A batch of rows. Idempotent on `(entity, id)`     |
+| `GET`  | `/api/v1/sync/pull`          | `?since=<cursor>&limit=500`, in cursor order      |
+| `GET`  | `/api/v1/notify/key`         | The VAPID public key; 404 when push is not set up |
+| `POST` | `/api/v1/notify/subscribe`   | This device's push endpoint and its wake instants |
+| `POST` | `/api/v1/notify/unsubscribe` | Forget this device's subscription                 |
 
 Everything but `health` and `pair` needs `Authorization: Bearer <token>`.
 
 The wire types live in `packages/contracts` and are mirrored here in
 `Sync/Contracts.cs`.
+
+### Upozornění — the one thing it does on its own
+
+`Notify/` sends an **empty** Web Push to a paired phone at instants the phone
+chose — every evening at the minute set in Upozornění, and the morning of each
+payment it can see coming. The phone does the calendar and the time zone and
+sends UTC; the server keeps a sorted list and pops the front every thirty
+seconds. What the notice says is decided on the phone, from its own ledger, so
+this stays true: the server never reads a row. VAPID (RFC 8292) is hand-rolled
+on `ECDsa` — no package — and with no keys configured the endpoints answer 404
+and nothing is scheduled. `dotnet run -- vapid` prints a pair.
 
 ---
 
@@ -103,8 +117,10 @@ unset pairing code makes the server refuse to pair rather than accept anything.
 
 There are **no EF migrations here.** On startup the API calls
 `EnsureCreatedAsync()` — gated behind `Database:MigrateOnStart`, default true —
-which creates `changes`, `devices` and `sync_state` if the database has no
-tables, and does nothing otherwise. There is no `dotnet ef database update` step
+which creates `changes`, `devices`, `sync_state` and `notify_subscriptions` if
+the database has no tables, and does nothing otherwise. `notify_subscriptions`
+is newer than the rest, so a database that predates it gets it from
+`NotifyService.EnsureTableAsync` — `CREATE TABLE IF NOT EXISTS`, right after. There is no `dotnet ef database update` step
 in this project, on a server or on a laptop.
 
 The consequence worth knowing: `EnsureCreated` never *alters* a schema. It has
@@ -128,7 +144,7 @@ has the schema, the inspection commands and the reset.
 dotnet test
 ```
 
-50 tests. The ones that reach the database use SQLite in memory rather than the
+82 tests. The ones that reach the database use SQLite in memory rather than the
 EF in-memory provider: this code opens transactions and relies on a unique
 index, and the in-memory provider honours neither. A fake that cannot fail the
 way the real thing fails is a fake that proves nothing.

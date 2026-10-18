@@ -6,9 +6,12 @@
 # arrives here as $SSH_ORIGINAL_COMMAND and nothing else ever runs: not a
 # shell, not a copy, not a port forward (the key's other options say so).
 #
-# The one accepted request is a commit to deploy: forty hex digits, or the
-# word `master`. It is handed to deploy.sh through the single sudoers line the
-# account has. Anything else is refused, and the refusal lands in the SSH log.
+# The one accepted request is a commit to deploy — forty hex digits, or the
+# word `master` — and optionally where: `both` (the default), `prod` or `demo`.
+# The commit comes first so a workflow that sends only a commit, or a box still
+# running an older copy of this file, means what it always meant: both. It is
+# handed to deploy.sh through the single sudoers line the account has.
+# Anything else is refused, and the refusal lands in the SSH log.
 set -eu
 
 REQUEST=${SSH_ORIGINAL_COMMAND:-master}
@@ -18,6 +21,7 @@ REQUEST=${SSH_ORIGINAL_COMMAND:-master}
 set -- $REQUEST
 [ "${1:-}" = prosper-deploy ] && shift
 WANT=$(printf '%s' "${1:-master}" | tr -d "'\"")
+TARGET=$(printf '%s' "${2:-both}" | tr -d "'\"")
 
 case $WANT in
 	master) ;;
@@ -29,4 +33,12 @@ case $WANT in
 		;;
 esac
 
-exec sudo -n /opt/prosper/deploy/deploy.sh "$WANT"
+case $TARGET in
+	both | prod | demo) ;;
+	*)
+		echo "prosper-deploy: refused: $TARGET is not a target (both, prod or demo)" >&2
+		exit 64
+		;;
+esac
+
+exec sudo -n /opt/prosper/deploy/deploy.sh "$WANT" "$TARGET"

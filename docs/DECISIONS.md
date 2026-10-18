@@ -3512,3 +3512,252 @@ uses. "Zapisuje se sem" did not fit as a badge at phone width. With a single
 account nothing is highlighted: there is nothing to tell it from, and the
 line keeps saying _zapisuje se sem_. The other rows keep _ťukni a zapisuj
 sem_.
+
+---
+
+## The 2026-10-18 pass — the phone speaks first, Domů is arranged by hand, and four charts
+
+Five things asked for in one message: a notice at the end of the day asking
+whether everything is written; a notice when an automatic payment goes and
+when one waits to be confirmed; a design plan for charts — a spending
+heatmap, a readable version of the 10/10/10/70 ring, a balance over
+day/week/month/year/everything, and anything else proven to help; a Domů
+whose cards can be arranged, as a prototype; and recent rows on Domů that
+open like the rows on Výpis.
+
+**The gate.** `PROJECT-PLAN.md` §11 holds features behind fourteen days of
+real use. All five were asked for directly, in the same spirit as Q67, and
+they go in on that basis — recorded here so the exception is on the record
+rather than quiet. Q91 is a defect fix and exempt anyway.
+
+### Q89 — Upozornění: three notices, each off until turned on, at his hour · answered 2026-10-18 · builds R3, answers Q32
+
+**Asked for.** "A notification at the end of the day — Prosper asks if he has
+everything written"; a notice "that some payment automatically proceeded";
+and one "that some payment is waiting to be approved".
+
+**Answer.** Nastavení gained a sixth room, **Upozornění**
+(`/nastaveni/upozorneni`), with three switches, all off by default (R3: a
+finance app that nags unasked gets uninstalled):
+
+- **Večerní kontrola** at a time he picks — Q32 answered by giving him the
+  hour rather than guessing it; 21:00 is where the field opens. Title
+  _Máš dnešek zapsaný?_; the body says what today holds — _Dnešek je zatím
+  prázdný._, or _Dnes 3 záznamy, utraceno 1 249 Kč. Chybí něco?_ (spending
+  summed only while it is one currency). A tap opens Zápis. **It is asked
+  every evening, not only on an empty day** — the ask was "has everything
+  been written", which a day with one row can still fail — and **it asks for
+  nothing**: no confirm, no mark. An empty day stays a no-spend day
+  (2026-08-28); a forgotten one is still fixed by typing it with its date.
+- **Proběhla automatická platba** — an `auto` schedule fell due: _Hypotéka
+  −30 000 Kč · dnes. Do výpisu se zapíše sama._ The row is still written by
+  the launch catch-up (`RECURRING.md` §2); when the launch is what writes it,
+  the app says _Zapsáno automaticky_ in a toast instead, and the notice for
+  that instance is never sent (`notePaymentsTold`).
+- **Platba čeká na potvrzení** — a `confirm` schedule fell due; a tap opens
+  Domů, where the deck is.
+
+The two payment notices come on the morning of the due day at a second hour
+he picks (9:00 by default), once per instance, several schedules in one
+notice, and a missed one still comes within a week — older than that, Domů's
+deck already says it. **Every notice is said once**: `NoticeLog` in `meta`
+remembers the evening asked and every `schedule:month` told, which is what
+lets three channels race to the same minute without saying anything twice.
+
+The rule is `domain/notifications.ts` (pure, 36 tests); the delivery is
+`lib/notify/`. While the app is open and in front of him a notice is a toast
+with one pill (_Zapsat_, _Ukázat_, _Výpis_) — a system notice about the
+screen in his hand is noise; behind another window it is a system notice.
+
+**R3 said "one notification a day, at most".** It is now up to three kinds a
+day, each one switched on by him, which is the difference between a nag and
+something asked for. The stale-holding reminder in `INVESTMENTS.md` would
+still join this channel rather than open a second.
+
+### Q90 — A closed phone is woken by an empty push it scheduled itself · answered 2026-10-18
+
+**Found.** A PWA cannot set a timer that outlives it. Notification triggers
+never shipped; Chrome's periodic background sync runs at intervals the
+browser picks (twelve hours asked, often more given) and only for an
+installed app on Android. Neither can say anything _at 21:00_.
+
+**Answer.** The sync server sends **Web Push** — and only the wake-up:
+
+- The push carries **no payload**. The phone's service worker wakes, reads its
+  own ledger and says whatever `dueNotices` finds due, so nothing about the
+  ledger reaches the server and there is nothing to encrypt (RFC 8291 is for
+  content; there is none). The server still never reads a row.
+- **The phone does the calendar.** It sends a list of UTC instants — every
+  evening for sixty days, and the morning of each due day it can see coming,
+  minus the days already settled — computed with the browser's own zone
+  rules, so summer time is the phone's arithmetic. The server keeps a sorted
+  list per device and pops the front every thirty seconds. No tz database,
+  no opinion about what 21:00 means. A launch refreshes the list.
+- **VAPID is hand-rolled** on `ECDsa` (ES256, RFC 8292) and `Base64Url` — no
+  package. Without keys the endpoints answer 404 and nothing is scheduled;
+  `dotnet run -- vapid` (or `docker compose run --rm api vapid`) prints a pair.
+- **The endpoint is allowlisted**: https on FCM, Mozilla, Apple or Windows push
+  hosts only. It comes from a paired device, but a server that POSTs where it
+  is told can be aimed at its own network, and Postgres is one hostname away.
+- **One table, added the cheap way.** `notify_subscriptions` is new rather
+  than changed, so `CREATE TABLE IF NOT EXISTS` after `EnsureCreated` reaches
+  a database that predates it (`DEPLOYMENT.md` › the caveat). A dead
+  subscription (404/410) and an unpaired device's row are dropped by the tick.
+- **A wake missed by more than 45 minutes is dropped**, not sent late: an
+  evening question at 23:40 about a day nearly over is not worth a buzz.
+
+Without a paired server the phone keeps the other two channels: the open
+tab's timer, and periodic sync on Android as a late fallback. The room says
+which one it has — _Přes server_, or _jen když je Prosper otevřený_ and why —
+rather than leaving a switch on that cannot deliver.
+
+**Not run on the box yet.** The keys go into `deploy/.env`
+(`NOTIFY_PUBLIC_KEY`, `NOTIFY_PRIVATE_KEY`, `NOTIFY_SUBJECT`); until they are
+there the server sends nothing. Verified locally against the real API in
+SQLite mode: 401 without a token, the key served, a non-push endpoint and a
+malformed instant refused with a sentence, the row stored and removed. The
+push itself has not yet reached a real phone.
+
+### Q91 — A recent row on Domů opens the editor Výpis uses · answered 2026-10-18
+
+**Asked for.** "The transactions on the main page should be clickable like
+they are in /vypis."
+
+**Answer.** The edit sheet came out of `/vypis` into `ui/TxnSheet.svelte` —
+one editor for a row wherever it is printed, opened with `sheet.open(txn)`.
+Domů's three rows are now pressable rows that open it; Výpis opens the same
+one. The sheet reads the row's own account for its currency and ranks buckets
+by that account's use, because Domů lists every account's rows together.
+Nothing in what the sheet can do changed.
+
+### Q92 — Domů is arranged by hand · answered 2026-10-18 · a prototype
+
+**Asked for.** "A customizable main page, the dashboards there. Try to make a
+prototype of how it could work."
+
+**Answer.** _Upravit Domů_, a pill at the bottom of Domů, opens a sheet: the
+cards on Domů in order, each with ↑, ↓ and _Skrýt_; under them, the cards
+that can be added. Changes land as they are tapped. Arrows rather than drag:
+a drag inside a sheet that is itself pulled down to close is two gestures
+fighting over one thumb.
+
+**What is not on the list.** The month's net stays first — Domů leading with
+it is the Tracking law's own line — and the dues and holds decks stay under
+it: they only appear when something waits for a tap, and a waiting payment
+that can be hidden is one that gets missed. Everything below is his: Cíl,
+Jmění, Poslední záznamy, and the four charts of Q93.
+
+**Stored** as the list shown, in order, in `meta` — a device preference like
+the folded months, not synced (`domain/dashboard.ts`, `getHomeLayout`). A card
+a later build adds arrives hidden, so a screen he arranged is never
+rearranged under him. The default is Domů exactly as it was.
+
+### Q93 — Four charts, and the split read as meters · answered 2026-10-18
+
+**Asked for.** A design plan for charts — (a) a heatmap of the month's
+spending, (b) a better chart of financial wellbeing, "the users don't use it
+because they can't read it", (c) a progress chart over a day, week, month,
+year and everything, (d) anything else widely used and proven.
+
+**Answer.** `docs/CHARTS.md` is the plan. Four of it are built, as cards for
+the arranged Domů (Q92), with the arithmetic in `domain/charts.ts` and
+`prosperity.ts` → `splitBars`, all tested:
+
+- **Kalendář útraty** — the month as a calendar, a day in as much ink as it
+  cost (quartiles of the month's own spending days; four `--heat-*` tokens,
+  because money out has no hue), mint for a day that cost nothing.
+- **Rozdělení příjmu as four meters** — each class against its own mark in
+  koruny: _splněno_, _chybí 3 200 Kč_, _zbývá 6 000 Kč_, _o 2 000 Kč přes_.
+  The ring asked for three encodings at once; this asks the law's question
+  once per row, in the shape every other "how far along" in the app has.
+- **Vývoj zůstatku** — the active currency's balance with _Den · Týden ·
+  Měsíc · Rok · Vše_, a hairline where the range began, a finger to scrub. A
+  range longer than the ledger starts at its first day and says _od
+  začátku_.
+- **Tempo útraty** — this month's cumulative spending over last month's, and
+  one sentence comparing the same day.
+
+Spending in all of them is `checks.ts` → `spendingRows`, the predicate
+`summariseMonth` already used, now named and shared — so no chart can
+disagree with the month slab — and no chart sums two currencies.
+
+Přehled's ring was replaced by the same meters the same day (Q94).
+
+### Q94 — The split is four meters on Přehled too · answered 2026-10-18
+
+**Asked.** `CHARTS.md` §b's open question: do the meters replace the ring on
+Přehled? **Yes.**
+
+**Answer.** Přehled's _Rozdělení příjmu_ is now `ui/SplitCard.svelte`, the
+same card Domů shows, so the split has one definition on both screens. The
+ring, its legend of signed deltas and the colour map behind them are gone
+from the screen; `Doughnut.svelte` stays for _Dny bez výdaje_, which is a
+single fill and reads fine.
+
+### Q95 — Domů is arranged in Nastavení only, every card starts on, and the arrangement syncs · answered 2026-10-18 · revises Q92
+
+**Asked.** "Put the designer of the main menu to the Settings only"; and, to
+`CHARTS.md`'s three open questions, yes / all / yes.
+
+**Answer.**
+
+- **Nastavení › Domů** (`/nastaveni/domu`, the hub's seventh room, `x karet
+  pod zůstatkem`) holds the arranger — the same list, now a page of two cards
+  rather than a sheet (`ui/HomeArranger.svelte`). The _Upravit Domů_ pill is
+  gone from Domů, which now carries only what it shows.
+- **Every card is on until he arranges them** — `DEFAULT_HOME` is the whole
+  catalogue, the cards that were on Domů before first, so the top of the
+  screen is where it always was and the four charts follow.
+- **The arrangement syncs.** A new synced entity, `layout`, in a new table
+  (`layouts`, schema **v16**; backup format **8**; `checkRow` knows its
+  shape; the server's entity allowlist and the contracts package list it).
+  One row is all there is meant to be, but ids are the client's (rule 3), so
+  two devices that each arranged Domů before pairing bring one each: the
+  newest live row is the arrangement (`newestLayout`, the merge's own
+  last-write-wins), and saving rewrites that row rather than adding another.
+  The widget names are stored as plain strings, so a card a newer build added
+  is dropped by an older reader rather than refusing the row. It is
+  configuration, so _Začít znovu_ keeps it.
+
+The prototype's `meta.homeLayout` (one day old, never released) is not read;
+a device that had arranged Domů on it starts again from every card.
+
+### Q96 — A deploy says where it goes: prod, the demo, or both · answered 2026-10-18
+
+**Asked for.** "Update the Deploy, so I can deploy either on DEMO, or PROD,
+or BOTH."
+
+**Answer.** `deploy.sh` takes a second argument, `both` (the default), `prod`
+or `demo`; `prosper-deploy` passes it through after the commit, refusing any
+other word; and the `Deploy` workflow's manual run has a _target_ choice. A
+push to master still goes to both. `demo` rebuilds only the demo compose
+project and leaves the real app and its database alone, and is refused on a
+box with no `DEPLOY_DEMO=1` rather than doing nothing quietly.
+
+The commit stays first in the SSH request on purpose: a box still running the
+previous `prosper-deploy` reads only the first word and deploys both, which is
+what it did before — the change is safe to push before the box's copy is
+reinstalled (`DEPLOYMENT.md` › Deploying from GitHub).
+
+### Q97 — Four small ones · answered 2026-10-18
+
+- **A tab stays lit on its own rooms.** The bar lit a tab on its exact address
+  or an `also` list, and Nastavení listed nothing, so every room under it
+  went dark. A page under a tab's own address now counts as that tab's;
+  Domů, which is `/`, still lists its pages.
+- **A pressed row keeps its card's corners.** `.row--press` bleeds to the
+  card's edge, so at the top and the bottom of a list card its tint squared
+  off the 20 px corner — the hub's last row, Výpis's days, the dues deck.
+  `.card--list` and the deck's slides now clip with `overflow: clip`, which —
+  unlike `hidden` — makes no scroll container and so keeps the automatic
+  minimum size the flex trap in `CLAUDE.md` is about. Every other pressable in
+  the app already carried its own radius.
+- **Vývoj zůstatku chooses its account.** The currency in the card's corner
+  is a pill: a tap steps through the active currency's accounts together,
+  then each account alone, then the other currencies (`balanceScopes`). Never
+  two currencies in one line (Q49). It changes only what the chart draws,
+  not the account the keypad writes to.
+- **Kalendář útraty, pared down.** Dots instead of numbered tiles, one-letter
+  weekdays, no legend and no month label; the month's total in the corner and
+  one line under the field. The ink steps, the mint no-spend dot and the tap
+  are unchanged.

@@ -25,7 +25,16 @@ import {
 	sharesForPosting,
 	type DueItem
 } from '$lib/domain/recurring';
+import { newestLayout, readHomeLayout, type HomeLayout } from '$lib/domain/dashboard';
 import { newDeviceId, uuidv7 } from '$lib/domain/ids';
+import {
+	paymentKey,
+	readNoticeLog,
+	readNoticePrefs,
+	withPaymentsLogged,
+	type NoticeLog,
+	type NoticePrefs
+} from '$lib/domain/notifications';
 import { cleanLines, defaultPlanName } from '$lib/domain/plans';
 import { ADJUSTMENT_PAYEE, reconcileDelta } from '$lib/domain/reconcile';
 import { MAX_SHARES, isOpenShare, sharesOf } from '$lib/domain/receivables';
@@ -38,6 +47,7 @@ import type {
 	DayMark,
 	Goal,
 	Holding,
+	Layout,
 	MonthTarget,
 	Plan,
 	PlanLine,
@@ -59,6 +69,8 @@ const META_ACTIVE_ACCOUNT = 'activeAccountId';
 const META_SYNC_BASE_URL = 'syncBaseUrl';
 const META_ADOPTED = 'ledgerAdopted';
 const META_TAPE_COLLAPSED = 'tapeCollapsedMonths';
+const META_NOTICE_PREFS = 'noticePrefs';
+const META_NOTICE_LOG = 'noticeLog';
 
 /**
  * Whether mutations are queued for the server.
@@ -133,6 +145,68 @@ export async function getCollapsedMonths(): Promise<string[]> {
 
 export async function setCollapsedMonths(keys: string[]): Promise<void> {
 	await setMeta(META_TAPE_COLLAPSED, keys);
+}
+
+/**
+ * Which cards Domů shows, in order (`domain/dashboard.ts`). A synced row
+ * since Q95 — every paired device shows the same Domů — so, unlike the folded
+ * months, it is not in `meta`. No row yet means every card.
+ */
+export async function getHomeLayout(): Promise<HomeLayout> {
+	return readHomeLayout(newestLayout(await db().layouts.toArray()) ?? undefined);
+}
+
+/** Rewrites the newest row rather than adding one, so the table stays a row. */
+export async function setHomeLayout(layout: HomeLayout): Promise<void> {
+	const database = db();
+	const current = newestLayout(await database.layouts.toArray());
+	const row: Layout = {
+		id: current?.id ?? uuidv7(),
+		widgets: [...layout.widgets],
+		...(await stamp()),
+		isDeleted: false
+	};
+	await database.layouts.put(row);
+	await enqueue('layout', row.id, row);
+}
+
+/**
+ * What this phone buzzes about (`domain/notifications.ts`).
+ *
+ * A device preference, like the folded months: the phone in the pocket and
+ * the laptop on the desk have no business agreeing about what interrupts
+ * them, so it lives in `meta` and never syncs. Read tolerantly — a field a
+ * newer build added is the default until it is saved.
+ */
+export async function getNoticePrefs(): Promise<NoticePrefs> {
+	return readNoticePrefs(await getMeta<unknown>(META_NOTICE_PREFS));
+}
+
+export async function setNoticePrefs(prefs: NoticePrefs): Promise<void> {
+	await setMeta(META_NOTICE_PREFS, prefs);
+}
+
+/**
+ * What has already been said — the watermark that makes every notice a
+ * once. The service worker writes it too, which is why it is in IndexedDB:
+ * a worker has no `localStorage`, and §13.10 would not allow it anyway.
+ */
+export async function getNoticeLog(): Promise<NoticeLog> {
+	return readNoticeLog(await getMeta<unknown>(META_NOTICE_LOG));
+}
+
+export async function setNoticeLog(log: NoticeLog): Promise<void> {
+	await setMeta(META_NOTICE_LOG, log);
+}
+
+/**
+ * The launch posted these `auto` instances: they are news already told, so
+ * no channel announces them as coming afterwards.
+ */
+export async function notePaymentsTold(items: readonly DueItem[]): Promise<void> {
+	if (items.length === 0) return;
+	const keys = items.map((item) => paymentKey(item.schedule.id, item.month));
+	await setNoticeLog(withPaymentsLogged(await getNoticeLog(), keys, today()));
 }
 
 // ── outbox seam ─────────────────────────────────────────────────────────────
@@ -1052,6 +1126,8 @@ export async function skipScheduled(item: DueItem): Promise<void> {
 export interface CatchUpResult {
 	/** Rows written without being asked. */
 	posted: number;
+	/** Which instances those were — the launch tells the notice log (Upozornění). */
+	items: DueItem[];
 	/** Instances now waiting to be confirmed. */
 	waiting: number;
 }
@@ -1065,7 +1141,7 @@ export interface CatchUpResult {
  * counted and shown.
  */
 export async function catchUpSchedules(accountId: string | null): Promise<CatchUpResult> {
-	if (!accountId) return { posted: 0, waiting: 0 };
+	if (!accountId) return { posted: 0, items: [], waiting: 0 };
 
 	const schedules = await db().schedules.toArray();
 	const items = dueSchedules({ schedules, today: today() });
@@ -1075,7 +1151,7 @@ export async function catchUpSchedules(accountId: string | null): Promise<CatchU
 		await confirmScheduled(item, { accountId });
 	}
 
-	return { posted: auto.length, waiting: confirm.length };
+	return { posted: auto.length, items: auto, waiting: confirm.length };
 }
 
 // ── holdings ─────────────────────────────────────────────────────
@@ -1554,6 +1630,7 @@ export async function seedOutbox(local?: ReadonlySet<string>): Promise<number> {
 	await queue('schedule', await database.schedules.toArray());
 	await queue('reconciliation', await database.reconciliations.toArray());
 	await queue('plan', await database.plans.toArray());
+	await queue('layout', await database.layouts.toArray());
 
 	// Day marks are keyed by their date rather than an id.
 	for (const mark of await database.dayMarks.toArray()) {
@@ -1594,6 +1671,7 @@ export async function ledgerKeys(): Promise<Set<string>> {
 	await collect('schedule', database.schedules.toCollection().primaryKeys());
 	await collect('reconciliation', database.reconciliations.toCollection().primaryKeys());
 	await collect('plan', database.plans.toCollection().primaryKeys());
+	await collect('layout', database.layouts.toCollection().primaryKeys());
 	await collect('dayMark', database.dayMarks.toCollection().primaryKeys());
 
 	return keys;
@@ -1794,6 +1872,7 @@ export async function resetLedger(): Promise<ResetResult> {
 			database.schedules,
 			database.reconciliations,
 			database.plans,
+			database.layouts,
 			database.outbox
 		],
 		async () => {
@@ -1886,9 +1965,9 @@ async function tombstone<T extends Versioned>(
  *   4 → schedules · 5 → reconciliations
  *   6 → `shares` on txns and schedules (Q47) — an older build would read only
  *       the legacy single-share fields and lose every second payer on import
- *   7 → plans (Q69)
+ *   7 → plans (Q69) · 8 → layouts (Q95)
  */
-export const BACKUP_VERSION = 7;
+export const BACKUP_VERSION = 8;
 
 export interface Backup {
 	format: 'finance-backup';
@@ -1906,6 +1985,8 @@ export interface Backup {
 	reconciliations: Reconciliation[];
 	/** Absent in a file older than format 7. */
 	plans?: Plan[];
+	/** Absent in a file older than format 8. */
+	layouts?: Layout[];
 }
 
 /**
@@ -1932,7 +2013,8 @@ export async function exportBackup(): Promise<Backup> {
 		valuations: await database.valuations.toArray(),
 		schedules: await database.schedules.toArray(),
 		reconciliations: await database.reconciliations.toArray(),
-		plans: await database.plans.toArray()
+		plans: await database.plans.toArray(),
+		layouts: await database.layouts.toArray()
 	};
 }
 
@@ -2004,6 +2086,7 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 	const schedules = admit<Schedule>('schedule', backup.schedules);
 	const reconciliations = admit<Reconciliation>('reconciliation', backup.reconciliations);
 	const plans = admit<Plan>('plan', backup.plans);
+	const layouts = admit<Layout>('layout', backup.layouts);
 	const dayMarks = admit<DayMark>('dayMark', backup.dayMarks);
 
 	if (refused.length > 0) {
@@ -2097,6 +2180,12 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 				plans,
 				(id) => database.plans.get(id),
 				(row) => database.plans.put(row)
+			);
+			await mergeRows(
+				'layout',
+				layouts,
+				(id) => database.layouts.get(id),
+				(row) => database.layouts.put(row)
 			);
 			for (const mark of dayMarks) {
 				await database.dayMarks.put(mark);

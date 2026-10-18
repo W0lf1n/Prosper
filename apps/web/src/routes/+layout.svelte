@@ -8,6 +8,7 @@
 	import Toaster from '$lib/ui/Toaster.svelte';
 	import { applyCurrencyTint, currencyTint, syncThemeColor } from '$lib/ui/tint';
 	import { applyUpdate, watchUpdates } from '$lib/ui/update';
+	import { watchNotices } from '$lib/notify/watch';
 	import { initSync, watchTriggers } from '$lib/sync/status.svelte';
 	import type { LayoutProps } from './$types';
 
@@ -60,6 +61,13 @@
 	 */
 	$effect(() => watchUpdates());
 	afterNavigate(applyUpdate);
+
+	/**
+	 * Upozornění: the evening question and the standing orders, said in the
+	 * app while it is open, and the push subscription kept in step with the
+	 * preference (`lib/notify/`). `posted` is what the launch wrote itself.
+	 */
+	$effect(() => watchNotices(data.posted ?? []));
 
 	/**
 	 * The launch splash lives in `app.html`, on screen from the first paint.

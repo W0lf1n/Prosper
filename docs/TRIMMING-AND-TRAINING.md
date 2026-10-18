@@ -8,9 +8,11 @@
 > superseded, and their descriptions have gone with them — the app is what
 > describes those now, and `PROJECT-PLAN.md` §2 says what each one does.
 >
-> What remains is **T2 caps**, **R2 the monthly close**, **R3 the nudge** and
-> **R5 cap history**, plus two standing refusals that have to keep being
-> refused. Three of the four are blocked on a question in `TODO.md` §5.
+> What remains is **T2 caps**, **R2 the monthly close** and **R5 cap
+> history**, plus two standing refusals that have to keep being refused.
+> **R3, the nudge, shipped on 2026-10-18** as Upozornění (`DECISIONS.md`
+> Q89–Q90); its section below now records what was built and where it
+> departed from this design. The rest are blocked on a question in `TODO.md` §2.
 
 ---
 
@@ -129,31 +131,32 @@ yes, like `Goal.why`. An unfinished close is a wish._
 
 ---
 
-# R3 — The nudge
+# R3 — The nudge · **built 2026-10-18**
 
-One notification, at most, per day: **21:00, only if today has no record.** (It
-said "no record and no `DayMark`" until 2026-08-28; there is no mark any more,
-and the question it guarded — is this a real zero or a forgotten day — is one the
-app has stopped asking.) Not a summary, not a tip. One line:
+Shipped as **Upozornění** (`/nastaveni/upozorneni`, `domain/notifications.ts`,
+`lib/notify/`; `DECISIONS.md` Q89–Q90). What survived of the design above it,
+and what changed:
 
-> Dnešek je zatím prázdný.
+- **Off by default, turned on from Nastavení** — as designed.
+- **The hour is his** (Q32): a time field, opening on 21:00, rather than a
+  guess the entry timestamps would one day confirm.
+- **It is asked every evening, not only on an empty day.** The ask was "has
+  everything been written", which a day with one row can still fail. The
+  body says what today holds, and on an empty day it is this design's own
+  line: _Dnešek je zatím prázdný._ It still asks for nothing — no confirm, no
+  mark; a tap opens Zápis.
+- **Two more notices joined it**: an `auto` payment that went, and a
+  `confirm` one waiting. So "at most one notification a day" became "at most
+  one of each kind he switched on". The stale-holding reminder would be a
+  fourth switch on the same channel — never a second channel.
+- **Web Push with VAPID, as designed — but empty.** The server sends a wake-up
+  at instants the phone chose; the phone reads its own ledger and decides what
+  to say. iOS is reached only when installed to the home screen, which is the
+  degradation agreed in Q16.
 
-Tapping it opens `/` with the keypad focused.
-
-Android is primary (Q16), so Web Push with VAPID works; iOS degrades to nothing,
-which is the agreed position. **Off by default, turned on from `/nastaveni`.** A
-finance app that nags without being asked gets uninstalled, and this one only
-has to survive one user.
-
-**This is the one channel.** The stale-holding reminder in `INVESTMENTS.md`
-joins it rather than opening a second — at most one notification a day, and the
-empty-day nudge outranks the stale valuation, because a missing day is
-unrecoverable and a stale valuation is merely stale.
-
-**Blocked on Q32** (is 21:00 the right hour — the entry timestamps will answer
-it after the gate) **and on a deployed server**: Web Push needs VAPID and a push
-subscription, neither of which exists until the API is actually running
-somewhere.
+**Still waiting on a deployed server with keys** (`TODO.md` §4.1). Until then
+the notices come only while the app is open, and late through Android's
+periodic background sync.
 
 ---
 
@@ -203,7 +206,7 @@ that Excel lost on friction.
 2. **R2** monthly close — the moment to look back, now that four of its five
    steps only need calling
 3. **R5** cap history — free once T2 exists
-4. **R3** nudge — last, because it needs a server as well as an answer
+4. ~~**R3** nudge~~ — shipped 2026-10-18 (Q89); waits only on the push keys
 
 ## What none of this adds
 

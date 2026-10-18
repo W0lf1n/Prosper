@@ -4,7 +4,18 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Prosper.Api.Data;
+using Prosper.Api.Notify;
 using Prosper.Api.Sync;
+
+// `dotnet run -- vapid` prints a fresh key pair for Upozornění and exits —
+// `docker compose run --rm api vapid` on the box (`DEPLOYMENT.md`).
+if (args is ["vapid"])
+{
+    var (publicKey, privateKey) = Vapid.Generate();
+    Console.WriteLine($"NOTIFY_PUBLIC_KEY={publicKey}");
+    Console.WriteLine($"NOTIFY_PRIVATE_KEY={privateKey}");
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +46,21 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<DeviceAuth>();
+builder.Services.AddScoped<NotifyService>();
+
+// Upozornění reaching a closed phone: an empty Web Push at the instants the
+// phone asked for. Optional — without keys the endpoints say so, the phone
+// keeps its notices to when the app is open, and nothing else changes.
+var vapid = Vapid.FromConfig(
+    builder.Configuration["Notify:PublicKey"],
+    builder.Configuration["Notify:PrivateKey"],
+    builder.Configuration["Notify:Subject"]);
+if (vapid is not null)
+{
+    builder.Services.AddSingleton(vapid);
+    builder.Services.AddHttpClient<IPushSender, WebPushSender>(http => http.Timeout = TimeSpan.FromSeconds(15));
+    builder.Services.AddHostedService<NotifyScheduler>();
+}
 
 // The pairing code is the only thing between the internet and the whole ledger.
 // `DEPLOYMENT.md` generates twelve digits, because the code's own length is the
@@ -122,7 +148,9 @@ app.UseRateLimiter();
 if (app.Configuration.GetValue("Database:MigrateOnStart", true))
 {
     using var scope = app.Services.CreateScope();
-    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreatedAsync();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.EnsureCreatedAsync();
+    await NotifyService.EnsureTableAsync(db);
 }
 
 var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.1";
@@ -180,6 +208,46 @@ app.MapGet("/api/v1/sync/pull", async (
     if (device is null) return Results.Unauthorized();
 
     return Results.Ok(await sync.PullAsync(since, limit ?? SyncLimits.MaxPullPage, ct));
+});
+
+// ── Upozornění ──────────────────────────────────────────────────────────────
+
+app.MapGet("/api/v1/notify/key", async (HttpContext http, DeviceAuth auth, CancellationToken ct) =>
+{
+    var device = await auth.ResolveAsync(http.Request.Headers.Authorization, ct);
+    if (device is null) return Results.Unauthorized();
+
+    return vapid is null
+        ? Results.Problem("Server upozornění neposílá: chybí klíče.", statusCode: 404)
+        : Results.Ok(new NotifyKeyResponse(vapid.PublicKey));
+});
+
+app.MapPost("/api/v1/notify/subscribe", async (
+    NotifySubscribeRequest request,
+    HttpContext http,
+    DeviceAuth auth,
+    NotifyService notify,
+    CancellationToken ct) =>
+{
+    var device = await auth.ResolveAsync(http.Request.Headers.Authorization, ct);
+    if (device is null) return Results.Unauthorized();
+    if (vapid is null) return Results.Problem("Server upozornění neposílá: chybí klíče.", statusCode: 404);
+
+    var refused = await notify.SubscribeAsync(device, request, DateTimeOffset.UtcNow, ct);
+    return refused is null ? Results.Ok(new NotifyResponse(true)) : Results.BadRequest(refused);
+});
+
+app.MapPost("/api/v1/notify/unsubscribe", async (
+    HttpContext http,
+    DeviceAuth auth,
+    NotifyService notify,
+    CancellationToken ct) =>
+{
+    var device = await auth.ResolveAsync(http.Request.Headers.Authorization, ct);
+    if (device is null) return Results.Unauthorized();
+
+    await notify.UnsubscribeAsync(device, ct);
+    return Results.Ok(new NotifyResponse(true));
 });
 
 app.Run();

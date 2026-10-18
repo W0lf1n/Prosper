@@ -147,6 +147,7 @@ const ROWS: Record<SyncedEntity, Record<string, unknown>> = {
 		createdAt: synced.updatedAt,
 		...synced
 	},
+	layout: { id: 'h1', widgets: ['pace', 'goal'], ...synced },
 	dayMark: { date: '2026-08-20', deviceId: synced.deviceId, updatedAt: synced.updatedAt }
 };
 
@@ -160,6 +161,10 @@ function without(row: Record<string, unknown>, ...fields: string[]): Record<stri
 describe('checkRow — what passes', () => {
 	it.each(Object.keys(ROWS) as SyncedEntity[])('accepts a well-formed %s', (entity) => {
 		expect(checkRow(entity, ROWS[entity])).toBeNull();
+	});
+
+	it('refuses a layout whose cards are not names', () => {
+		expect(checkRow('layout', { ...ROWS.layout, widgets: ['pace', 3] })).toMatch(/widgets/);
 	});
 
 	it('ignores fields it has never heard of — a newer build is still this app', () => {

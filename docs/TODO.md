@@ -1,6 +1,6 @@
 # TODO — what is left
 
-**Revised:** 2026-09-16
+**Revised:** 2026-10-18
 **Audience:** Petr (decisions), Claude Code (implementation)
 
 > The only file in `docs/` that carries a backlog. Everything else describes the
@@ -13,16 +13,16 @@
 
 ---
 
-## State, 2026-09-16
+## State, 2026-10-18
 
 | Check                      | Result                          |
 | -------------------------- | ------------------------------- |
-| `pnpm test`                | 545 pass, 26 files              |
-| `pnpm check`               | 0 errors, 0 warnings, 437 files |
+| `pnpm test`                | 666 pass, 30 files              |
+| `pnpm check`               | 0 errors, 0 warnings, 476 files |
 | `pnpm lint`                | eslint passes; see the note     |
-| `pnpm budget`              | 90.6 kB of 150 kB brotli        |
-| `dotnet test` (`apps/api`) | 50 pass                         |
-| Schema · backup format     | **v15** · **7**                 |
+| `pnpm budget`              | 112.4 kB of 150 kB brotli       |
+| `dotnet test` (`apps/api`) | 82 pass                         |
+| Schema · backup format     | **v16** · **8**                 |
 
 **Note on `pnpm lint`:** on a checkout made with `core.autocrlf=true` every
 file has CRLF endings and Prettier's check fails on all of them, touched or
@@ -135,6 +135,19 @@ copy kept alongside. Petr drew the line at structural rework: the tab bar
 stays six, the empty-tape slab and the `/platby` copy deletions were
 reverted, and F10 (the low month-swipe) was declined.
 
+**Five things landed on 2026-10-18, all asked for in one message**
+(`DECISIONS.md`, the 2026-10-18 pass, Q89–Q93): **Upozornění** — the evening
+question at an hour he picks, and notices for an automatic payment that went
+and one waiting to be confirmed, all off until switched on (R3 built, Q32
+answered); a closed phone is reached by an **empty Web Push** the phone
+scheduled itself, through the sync server, with VAPID hand-rolled; Domů's
+**recent rows open the Výpis editor** (`ui/TxnSheet.svelte`); **Domů can be
+arranged**, in Nastavení › Domů, synced between devices (schema **v16**); and
+**four charts**, on for everybody — the month as a heatmap, the split as four
+meters (on Přehled too, replacing the ring), the balance over
+day/week/month/year/everything, and the spending pace — with
+`docs/CHARTS.md` as the plan for the rest (Q94, Q95).
+
 The app was renamed **Výdaje → Prosper** on 2026-08-27 (`DECISIONS.md`, Q0 —
 Name). The IndexedDB database is still called `finance` and stays that way:
 renaming it opens a second, empty database rather than migrating the first.
@@ -162,14 +175,14 @@ project's own.
 | Q29 | Does a broken cap get raised automatically after two months, or stay?     | T2 caps    | Offer once, with the real average beside it                                            |
 | Q30 | Is the health score dropped for good?                                     | R4         | **Yes.** A compounded number is uninterpretable when it moves                          |
 | Q31 | Must the monthly close's written sentence be mandatory?                   | R2 close   | Yes, like `Goal.why`. An unfinished close is a wish                                    |
-| Q32 | Nudge at 21:00 — right hour?                                              | R3 nudge   | Ask after the gate; the entry timestamps will answer it                                |
 | Q35 | Is `DARY` really "given away, nothing back", or are gifts something else? | The split  | Yes for now. If gifts to family read differently, add `CHARITA` and put DARY to `want` |
 | Q5  | Is there active debt worth a `Loan` entity?                               | Trimming   | Ask again once the split has run for a month                                           |
 | Q6  | Which bank, and does it export GPC?                                       | P4 shape   | —                                                                                      |
 | Q19 | Is there a timebox, or does this run until it stops being used?           | Phase plan | —                                                                                      |
 
-**Q29–Q32 block most of P3 between them.** Four answers unlock caps, the monthly
-close and the nudge — which is the whole of the Training law.
+**Q29–Q31 block most of P3 between them.** Three answers unlock caps and the
+monthly close. Q32 was answered on 2026-10-18 by letting him choose the hour,
+and the nudge shipped as Upozornění (Q89).
 
 ---
 
@@ -236,6 +249,11 @@ What is genuinely left needs a box, not a keyboard:
 - **The demo domain** (`DEPLOYMENT.md` › _The demo_, Q74). An `A` record for
   `demo.`, the vhost, certbot, and `DEPLOY_DEMO=1` in `deploy/.env`; the code
   and the compose file are in. Until then the demo image is only built in CI.
+- **The push keys** (`DEPLOYMENT.md` › _Upozornění_, Q90). `docker compose
+  run --rm api vapid` on the box, the two lines into `.env`, and the API
+  recreated. Until then Upozornění reaches the phone only while the app is
+  open (and late, through Android's periodic sync). Nothing has been pushed
+  to a real phone yet; the first evening after the keys go in is the test.
 - **The deploy account and the three secrets** (`DEPLOYMENT.md` › _Deploying
   from GitHub_, Q72). The `Deploy` workflow exists and runs after every green
   CI on master; until the account, the key and the secrets exist it fails at
@@ -252,10 +270,11 @@ explicit about. All of it is designed in `TRIMMING-AND-TRAINING.md`.
 | **T2** category caps, end to end | **Q29**                    |
 | **R2** monthly close ritual      | **Q31**                    |
 | **R5** cap history               | T2, so Q29                 |
-| **R3** nudge notification        | **Q32**, and a live server |
 
 **There is nothing left in P3 that does not need you.** R1, reconciliation and
-T4 were the three that did not, and all three shipped on 2026-08-27.
+T4 were the three that did not, and all three shipped on 2026-08-27. R3, the
+nudge, shipped on 2026-10-18 as Upozornění (Q89, Q90) — its server half waits
+on the push keys in §4.1.
 
 `Category.monthlyCap` is in the schema and `null` on every row: Trimming has
 enforcement and a target shape but still no **cap**, which is the mechanism the
@@ -279,8 +298,12 @@ days + exact amount + fuzzy payee, review-before-apply. **Never auto-apply.**
   of the reword in the app to compare against. The entry screen's `misfiled` fix
   is the one place left. It needs a preference, which is why it is still here.
 
-- **The stale-value push notification** — blocked on R3, deliberately. Building a
-  second push channel first would be building the thing R3 exists to prevent.
+- **The stale-value notification** — no longer blocked: R3's channel exists
+  (Q89). It would be a fourth switch in Upozornění, said through the same
+  `dueNotices`, never a second channel.
+- **The rest of `CHARTS.md`** — cash flow by month for Přehled (d2), the
+  savings rate over time (d3), the upcoming payments strip (d4), net worth
+  rather than cash on _Vývoj zůstatku_. Ordered there; none is urgent.
 - **Recurring payments**, four things named "not now" and still not now:
   promotion to `auto` after three identical confirmed months, exact
   missing-payment detection, the T3 panel on `/mesic`, cadences other than
@@ -319,5 +342,11 @@ observation has happened.
 - **Does a trend line ever say something you did not already know?** It is new
   and unproven. If every month reads "±20 % oproti obvyklým", the window is too
   short or the threshold too low.
+- **Is the evening question answered, or swiped away?** If it is swiped away
+  every night, the hour is wrong or the question is — and the fix is the
+  hour first. Q32's own suggestion still stands: the entry timestamps say
+  when the day's last row is usually written.
+- **Which of the four charts stay on Domů?** All four start on. One taken
+  off within a week is wallpaper, and its section of `CHARTS.md` should say so.
 - **Does the tape feel slow?** `buildTape` materialises every gap day, capped at
   `maxGapDays: 400`. The knob is the cap; the real fix is windowing.

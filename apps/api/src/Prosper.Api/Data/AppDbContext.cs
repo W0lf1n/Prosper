@@ -7,6 +7,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ChangeRow> Changes => Set<ChangeRow>();
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<SyncState> SyncState => Set<SyncState>();
+    public DbSet<NotifySubscription> NotifySubscriptions => Set<NotifySubscription>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -46,6 +47,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("sync_state");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).ValueGeneratedNever();
+        });
+
+        // Upozornění. Named and shaped exactly as `NotifyService.EnsureTableAsync`
+        // creates it, because a database older than this table gets it from
+        // there and not from `EnsureCreated`.
+        model.Entity<NotifySubscription>(entity =>
+        {
+            entity.ToTable("notify_subscriptions");
+            entity.HasKey(e => e.DeviceId);
+            entity.HasIndex(e => e.NextWakeAt);
+            entity.Property(e => e.DeviceId).HasMaxLength(64);
+            entity.Property(e => e.Endpoint).HasMaxLength(NotifySubscription.EndpointMaxLength);
+            entity.Property(e => e.P256dh).HasMaxLength(NotifySubscription.KeyMaxLength);
+            entity.Property(e => e.Auth).HasMaxLength(NotifySubscription.KeyMaxLength);
         });
     }
 }

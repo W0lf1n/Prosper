@@ -104,7 +104,8 @@ const TABLES: Record<SyncedEntity, string> = {
 	holding: 'holdings',
 	valuation: 'valuations',
 	schedule: 'schedules',
-	plan: 'plans'
+	plan: 'plans',
+	layout: 'layouts'
 };
 
 /**
@@ -159,7 +160,7 @@ const REJECTING = new Set([400, 409, 413, 422]);
  */
 const REQUEST_TIMEOUT_MS = 30_000;
 
-async function request<T>(
+export async function request<T>(
 	settings: SyncSettings,
 	path: string,
 	init: RequestInit = {}

@@ -97,6 +97,16 @@
 	/* The denominator of every meter and ring — the soft surface. */
 	--split-left: var(--surface-3);
 
+	/* ── the spending calendar (Domů) ──────────────────────────────────
+	   Money out has no hue, so a day that cost more is a day in more ink:
+	   four steps of it, the quartiles of the month's own spending days. A
+	   day that cost nothing wears the mint wash — a verdict that came out
+	   right. The figure on the two darkest steps takes the card's colour. */
+	--heat-1: rgb(25 28 31 / 9%);
+	--heat-2: rgb(25 28 31 / 22%);
+	--heat-3: rgb(25 28 31 / 45%);
+	--heat-4: rgb(25 28 31 / 78%);
+
 	/* ── elevation ─────────────────────────────────────────────────────────
 	   No shadow on a resting surface. Only the layers that float: the sheet
 	   has its own, and every other floating layer is glass. */
@@ -295,6 +305,11 @@
 	--dark-flag-wash: rgb(236 126 0 / 16%);
 	--dark-danger-wash: rgb(226 59 74 / 16%);
 
+	--dark-heat-1: rgb(255 255 255 / 10%);
+	--dark-heat-2: rgb(255 255 255 / 24%);
+	--dark-heat-3: rgb(255 255 255 / 48%);
+	--dark-heat-4: rgb(255 255 255 / 82%);
+
 	--dark-elev-sheet: 0 -12px 48px rgb(0 0 0 / 60%);
 	--dark-overlay: rgb(0 0 0 / 60%);
 	--dark-glass: rgb(31 34 38 / 72%);
@@ -337,6 +352,10 @@
 		--ink-wash: var(--dark-ink-wash);
 		--flag-wash: var(--dark-flag-wash);
 		--danger-wash: var(--dark-danger-wash);
+		--heat-1: var(--dark-heat-1);
+		--heat-2: var(--dark-heat-2);
+		--heat-3: var(--dark-heat-3);
+		--heat-4: var(--dark-heat-4);
 
 		--elev-sheet: var(--dark-elev-sheet);
 		--overlay: var(--dark-overlay);
@@ -387,6 +406,10 @@
 	--ink-wash: var(--dark-ink-wash);
 	--flag-wash: var(--dark-flag-wash);
 	--danger-wash: var(--dark-danger-wash);
+	--heat-1: var(--dark-heat-1);
+	--heat-2: var(--dark-heat-2);
+	--heat-3: var(--dark-heat-3);
+	--heat-4: var(--dark-heat-4);
 
 	--elev-sheet: var(--dark-elev-sheet);
 	--overlay: var(--dark-overlay);

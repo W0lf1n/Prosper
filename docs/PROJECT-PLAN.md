@@ -123,11 +123,13 @@ The law has enforcement and a target _shape_. It still has no _cap_ —
 | A subscription seen in each of the last three months but missing from this one becomes a question.                        | `checks.ts` → `findMissingRecurring` |
 | The record of months against a written target — ✓ or ✗, four in a row being the book's actual claim about training.       | `/cil` → `monthHistory`              |
 | Undo on every save.                                                                                                       | `ui/Toaster.svelte`                  |
+| An evening question at the hour he chose — _Máš dnešek zapsaný?_ — that asks for nothing and opens the keypad.            | `domain/notifications.ts`, Upozornění |
 
 This is still the least finished of the four laws, though less so: the ring and
 the streak shipped 2026-08-27, and both changed meaning on 2026-08-28 — they
-count days without an expense now, not days recorded. The monthly close ritual and the nudge
-are designed in `TRIMMING-AND-TRAINING.md` and not built. The **health score is proposed for rejection** (R4): a single compounded
+count days without an expense now, not days recorded. The nudge shipped on 2026-10-18
+as Upozornění (Q89). The monthly close ritual is designed in `TRIMMING-AND-TRAINING.md` and
+not built. The **health score is proposed for rejection** (R4): a single compounded
 number is uninterpretable when it moves, which is the one thing a training
 signal must never be.
 
@@ -592,7 +594,8 @@ already on Domů, so the slot went to Nastavení (Q61).
 │ └────────────────────────────────┘  │
 │ ┌ Jmění celkem ─────────────── › ┐  │  → /jmeni
 │ ┌ Poslední záznamy ─ Zobrazit vše┐  │  → /vypis · last three rows, every account
-│ │ (◔) Bolt        LIFESTYLE · Včera │
+│ │ (◔) Bolt        LIFESTYLE · Včera │  ← a tap opens the row's editor (Q91)
+│ … the charts he added, in his order │  ← Q92–Q93, `docs/CHARTS.md`
 ├────────────────────────────────────┤
 │ Domů Výpis (⊕) Přehled Nastavení   │
 └────────────────────────────────────┘
@@ -612,7 +615,15 @@ correcting); the holds the bank has not posted yet, in the same deck, each
 settled as it stood or at the figure that arrived (`ui/HoldCard.svelte`, Q75);
 the goal's month, with its meter and a badge when the month is met or behind;
 the wealth total with its two halves; and the last three rows of the ledger
-across every account, each with its bucket's circle.
+across every account, each with its bucket's circle — and each opening the
+same editor a row on Výpis opens (`ui/TxnSheet.svelte`, Q91).
+
+**Everything under the decks is arranged in Nastavení › Domů** (Q92, Q95):
+Cíl, Jmění, Poslední záznamy, and four charts — _Tempo útraty_, _Kalendář
+útraty_, _Rozdělení příjmu_ as four meters, _Vývoj zůstatku_ over a day to
+everything (`docs/CHARTS.md`, Q93). Every card shows until he arranges them.
+The net and the two decks are not on the list. The arrangement is a synced
+`Layout` row, so every paired device shows the same Domů.
 
 ### `/zapis` — Zápis (the record screen)
 
@@ -720,13 +731,13 @@ days _elapsed_, and the current run, counted over **every account** whatever
 chip is chosen, because a day is not a sum of money (Q66); the **Kontrola**
 card listing the month's findings, each with its fix where one exists; **Dluží
 mi** — everything outstanding, with a one-tap _Přijato_; **Rozdělení příjmu**
-— the 10/10/10/70 split as one ring with the remainder in its centre and,
-beside it, each class with its share and its distance from the mark, and a
-_Naplánovat_ link to the planner at `/rozdeleni`; and **Kam to šlo**, buckets
+— the 10/10/10/70 split as four meters, each class against its own share of
+the income in koruny, with what is missing or left in words (Q94, the same
+card Domů shows), and a _Naplánovat_ link to the planner at `/rozdeleni`; and **Kam to šlo**, buckets
 ranked by spend, each with its circle and a meter in its own colour, and each
-opening — one at a time — to the rows that make it up, newest first (Q63). The second
-ring — the book's shape — went with this edition; the label carries the four
-numbers and the deltas carry the comparison.
+opening — one at a time — to the rows that make it up, newest first (Q63). The ring that
+stood here until 2026-10-18 could not be read — three encodings for one
+question — and the meters ask the question once per row.
 
 **Platby** is the standing orders and what they cost: the same _K potvrzení_
 card as Domů, the **net year** with the month's figures under it, **Odchází** —
@@ -804,9 +815,9 @@ month's split.
 
 ### `/nastaveni` — Nastavení
 
-A hub of five rows — a circle, a title, a live one-line summary, a chevron —
+A hub of seven rows — a circle, a title, a live one-line summary, a chevron —
 each opening its own page with a back chevron to the hub: `/nastaveni/ucty`,
-`/kategorie`, `/vzhled`, `/sync`, `/data`. The hub is the last slot of the bar
+`/kategorie`, `/domu`, `/upozorneni`, `/vzhled`, `/sync`, `/data`. The hub is the last slot of the bar
 (Q61); `lib/ui/settings.ts` builds the summaries. **Účty**: every live
 account with what is on it right now, by currency, the pockets that joined it
 (Q50) indented under it; _Přidat účet_ in any of the twenty-six currencies,
@@ -820,7 +831,13 @@ keypad has no minus (Q85, Q86).
 **Kategorie**: one row per bucket with its circle, its type and a chevron —
 tapping opens the editor (`ui/CategorySheet.svelte`): name, type, ten colours,
 thirty-two icons, and archiving; colour and icon apply live, everywhere the
-bucket appears. _Nová kategorie_ opens the same sheet empty. **Vzhled**: systém
+bucket appears. _Nová kategorie_ opens the same sheet empty. **Domů** (Q95): the cards under the month's net in order, with ↑ ↓,
+_Skrýt_ and _Přidat_ — synced, so every paired device shows the same.
+**Upozornění** (Q89–Q90): three switches, all off
+until turned on — _Večerní kontrola_ at an hour he picks, _Proběhla
+automatická platba_ and _Platba čeká na potvrzení_ on the morning of the due
+day — and a card saying how they will arrive: through the paired server even
+with the app closed, or only while it is open, and why. **Vzhled**: systém
 / světlý / tmavý. **Synchronizace**: pairing, or the last cycle to the minute.
 **Data**: the JSON backup out and in, the spreadsheet, the counts, and **Začít
 znovu** — the app's only destructive action, behind a typed phrase and a backup
@@ -1029,6 +1046,9 @@ Prosper/
 │  │  │  ├─ prosperity.ts           #   the 10/10/10/70 split, against income
 │  │  │  ├─ holdings.ts             #   stated values, staleness, the total
 │  │  │  ├─ recurring.ts            #   declared schedules, catch-up, cost
+│  │  │  ├─ notifications.ts        #   Upozornění: what is due, said once
+│  │  │  ├─ charts.ts               #   the heatmap, the pace, the balance line
+│  │  │  ├─ dashboard.ts            #   which cards Domů shows, in order
 │  │  │  ├─ trends.ts               #   month over month, per bucket
 │  │  │  ├─ xlsx.ts                 #   a spreadsheet, without a dependency
 │  │  │  ├─ workbook.ts             #   the export, in the workbook's shape
@@ -1036,15 +1056,16 @@ Prosper/
 │  │  │  └─ checks.ts               #   the four laws, enforced
 │  │  ├─ src/lib/db/                # schema + migrations; the only writer
 │  │  ├─ src/lib/sync/              # outbox drain, pull, pairing, status
+│  │  ├─ src/lib/notify/            # notices: open tab, push, periodic sync
 │  │  ├─ src/lib/ui/                # hand-rolled components, no UI kit
 │  │  ├─ src/lib/styles/            # tokens.css, app.css, self-hosted fonts
 │  │  ├─ src/routes/                # / · /zapis · /vypis · /prehled · /cil
-│  │  │                             #   · /jmeni · /nastaveni and its five pages
-│  │  ├─ src/service-worker.ts      # app shell cache, hand-rolled
+│  │  │                             #   · /jmeni · /nastaveni and its seven pages
+│  │  ├─ src/service-worker.ts      # app shell cache, push, notice taps
 │  │  └─ vite.config.ts             # SvelteKit + adapter + Vitest, all inline
 │  └─ api/                          # ASP.NET Core 10 + EF Core + Postgres 16
-│     ├─ src/Prosper.Api/           #   pairing, push, pull, health
-│     └─ tests/Prosper.Api.Tests/   #   50 tests, SQLite in memory
+│     ├─ src/Prosper.Api/           #   pairing, push, pull, health, notify
+│     └─ tests/Prosper.Api.Tests/   #   82 tests, SQLite in memory
 ├─ deploy/                          # compose, both nginx configs, backup.sh, deploy.sh
 ├─ packages/contracts/              # the sync protocol, shared with the client
 ├─ scripts/check-bundle.mjs         # the 150 kB budget, enforced
@@ -1057,6 +1078,7 @@ Prosper/
 │  ├─ TRIMMING-AND-TRAINING.md      # laws 3 and 4 — design, not yet built
 │  ├─ INVESTMENTS.md                # /jmeni — shipped, plus what is left
 │  ├─ RECURRING.md                  # declared recurring payments — shipped
+│  ├─ CHARTS.md                     # the charts — plan, four built
 │  ├─ DEPLOYMENT.md                 # the VPS runbook — Docker, nginx, backups
 │  └─ screens/                      # README screenshots
 ├─ CLAUDE.md                        # working rules for the whole repository
@@ -1166,8 +1188,9 @@ the one place a header decides something.
 > is deployment rather than code: a run against actual Postgres, the nightly
 > `pg_dump`, and serving the client from the same origin.
 >
-> The next feature phase is **P3** — reconciliation, the coverage ring, category
-> caps, the monthly close ritual and the nudge. Most of it is blocked on Q29–Q32
-> in `TODO.md` §5; ask before building on them.
+> The next feature phase is **P3** — category caps and the monthly close
+> ritual; reconciliation, the coverage ring and the nudge have shipped. Most
+> of what is left is blocked on Q29–Q31 in `TODO.md` §2; ask before building
+> on them.
 >
 > Follow §13 without exception. The domain layer stays pure and stays tested.

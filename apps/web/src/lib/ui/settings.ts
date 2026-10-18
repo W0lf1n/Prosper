@@ -1,17 +1,19 @@
 /**
- * The five rooms of Nastavení, as the hub lists them: a title, a
+ * The seven rooms of Nastavení, as the hub lists them: a title, a
  * one-line live summary, an icon and the page it opens. One function feeds
  * both screens, so the two lists cannot drift apart.
  */
 
-import { CATEGORIES, RECORDS, counted } from '$lib/domain/czech';
+import { CARDS, CATEGORIES, RECORDS, counted } from '$lib/domain/czech';
 import { formatMoney, type Minor } from '$lib/domain/money';
+import { noticeSummary, type NoticePrefs } from '$lib/domain/notifications';
 import type { Account } from '$lib/domain/types';
 import { SYNC_LABEL, type SyncState } from '$lib/sync/status.svelte';
 import type { IconName } from './Icon.svelte';
 import { THEME_LABEL, type Theme } from './theme';
 
-export type SettingsPage = 'ucty' | 'kategorie' | 'vzhled' | 'sync' | 'data';
+export type SettingsPage =
+	'ucty' | 'kategorie' | 'domu' | 'upozorneni' | 'vzhled' | 'sync' | 'data';
 
 export interface SettingsRow {
 	id: SettingsPage;
@@ -28,6 +30,10 @@ export interface SettingsFacts {
 	balance: Minor | null;
 	/** Live, unarchived buckets. */
 	categoryCount: number;
+	/** How many cards Domů shows under the net and the decks. */
+	homeCards: number;
+	/** What this phone says on its own (Upozornění). */
+	notices: NoticePrefs;
 	theme: Theme;
 	syncState: SyncState;
 	/** Live rows — never the tombstones. */
@@ -53,6 +59,23 @@ export function settingsRows(facts: SettingsFacts): SettingsRow[] {
 			title: 'Kategorie',
 			sub: `${counted(facts.categoryCount, CATEGORIES)}, ikony a barvy`,
 			icon: 'tag'
+		},
+		{
+			id: 'domu',
+			href: '/nastaveni/domu',
+			title: 'Domů',
+			sub:
+				facts.homeCards === 0
+					? 'jen zůstatek měsíce'
+					: `${counted(facts.homeCards, CARDS)} pod zůstatkem`,
+			icon: 'layout'
+		},
+		{
+			id: 'upozorneni',
+			href: '/nastaveni/upozorneni',
+			title: 'Upozornění',
+			sub: noticeSummary(facts.notices),
+			icon: 'bell'
 		},
 		{
 			id: 'vzhled',

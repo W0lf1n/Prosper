@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { IS_DEMO } from '$lib/demo';
+import type { DueItem } from '$lib/domain/recurring';
 import type { LayoutLoad } from './$types';
 
 /**
@@ -11,9 +12,10 @@ export const ssr = false;
 export const prerender = true;
 
 export const load: LayoutLoad = async () => {
-	if (!browser) return { accountId: null };
+	if (!browser) return { accountId: null, posted: [] as DueItem[] };
 
-	const { ensureSeeded, catchUpGoalTargets, catchUpSchedules } = await import('$lib/db/repo');
+	const { ensureSeeded, catchUpGoalTargets, catchUpSchedules, notePaymentsTold } =
+		await import('$lib/db/repo');
 	const { accountId, seeded } = await ensureSeeded();
 
 	// The demo opens on a ledger, not on a blank sheet (Q74) — only when the
@@ -26,7 +28,11 @@ export const load: LayoutLoad = async () => {
 	// Standing orders do not post themselves while the app is closed — there is
 	// no server. They are settled on the way in: `auto` schedules write their
 	// rows here, `confirm` ones surface on the entry screen.
-	await catchUpSchedules(accountId);
+	const caughtUp = await catchUpSchedules(accountId);
+
+	// What was just written is news already told: no notice will announce it
+	// as coming. The layout says it in the app instead (`lib/notify/watch.ts`).
+	await notePaymentsTold(caughtUp.items);
 
 	// The same idea for the Targeting law: this month's number writes itself, so
 	// the record of months means something without a monthly ritual in front of
@@ -37,5 +43,5 @@ export const load: LayoutLoad = async () => {
 	// Chrome grants this silently once the app is installed.
 	void navigator.storage?.persist?.().catch(() => undefined);
 
-	return { accountId };
+	return { accountId, posted: caughtUp.items };
 };

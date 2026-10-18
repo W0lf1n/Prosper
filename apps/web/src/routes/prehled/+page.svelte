@@ -43,9 +43,10 @@
 		scheduleSharesOf,
 		type DueGroup
 	} from '$lib/domain/recurring';
-	import { prosperitySplit, verdict, type ProsperityClass } from '$lib/domain/prosperity';
+	import { prosperitySplit } from '$lib/domain/prosperity';
 	import type { Account, Category, Holding, Schedule, Txn, Valuation } from '$lib/domain/types';
-	import Doughnut, { type Segment } from '$lib/ui/Doughnut.svelte';
+	import Doughnut from '$lib/ui/Doughnut.svelte';
+	import SplitCard from '$lib/ui/SplitCard.svelte';
 	import DueCard from '$lib/ui/DueCard.svelte';
 	import Explainer from '$lib/ui/Explainer.svelte';
 	import Icon from '$lib/ui/Icon.svelte';
@@ -223,41 +224,8 @@
 	}
 
 	// ── the 10/10/10/70 split ───────────────────────────────────────────────
+	// Four meters since 2026-10-18 (Q94): the ring could not be read.
 	const split = $derived(prosperitySplit({ income: summary.earned, buckets: summary.buckets }));
-
-	const CLASS_COLOUR: Record<ProsperityClass, string> = {
-		give: 'var(--split-give)',
-		save: 'var(--split-save)',
-		debt: 'var(--split-debt)',
-		live: 'var(--split-live)'
-	};
-
-	const CLASS_SHORT: Record<ProsperityClass, string> = {
-		give: 'Dávání',
-		save: 'Spoření',
-		debt: 'Dluhy',
-		live: 'Život'
-	};
-
-	const actualSegments = $derived<Segment[]>([
-		...split.slices.map((slice) => ({
-			value: slice.amount,
-			colour: CLASS_COLOUR[slice.cls],
-			label: slice.label
-		})),
-		...(split.left > 0 ? [{ value: split.left, colour: 'var(--split-left)', label: 'Zbylo' }] : [])
-	]);
-
-	function deltaTone(
-		cls: ProsperityClass,
-		delta: number,
-		amount: Minor
-	): 'under' | 'over' | 'flat' {
-		if (cls === 'debt' && amount === 0) return 'flat';
-		if (delta < 0) return 'under';
-		if (delta > 0) return 'over';
-		return 'flat';
-	}
 
 	/**
 	 * Which bucket is open to its rows (Q63). One at a time, so the ranking
@@ -646,60 +614,7 @@
 		{/if}
 
 		{#if view !== 'all'}
-			<section class="card split-card">
-				<div class="card__head">
-					<h2 class="label">
-						<Explainer term="Rozdělení příjmu">
-							<p>
-								Z každé koruny příjmu: 10 % dávání, 10 % spoření, 10 % dluhy, 70 % život. Kruh je
-								tvůj měsíc; čísla vpravo říkají, o kolik se každý díl liší od předlohy. Měří se
-								proti příjmu, ne proti výdajům — proto může něco zbýt. A zbytek je taky výsledek.
-								Plánovač vedle spočítá částky dopředu, z příjmu, který teprve přijde.
-							</p>
-						</Explainer>
-						· 10 / 10 / 10 / 70
-					</h2>
-					<a class="link" href={resolve('/rozdeleni')}>Naplánovat</a>
-				</div>
-
-				{#if split.hasIncome}
-					<div class="split">
-						<Doughnut
-							segments={actualSegments}
-							size={120}
-							thickness={14}
-							title="Jak jsi rozdělil příjem"
-						>
-							{#snippet centre()}
-								{#if split.left < 0}
-									<span class="split__big split__big--over">{split.leftPercent} %</span>
-									<span class="split__small">přečerpáno</span>
-								{:else}
-									<span class="split__big">{split.leftPercent} %</span>
-									<span class="split__small">zbylo</span>
-								{/if}
-							{/snippet}
-						</Doughnut>
-
-						<ul class="legend">
-							{#each split.slices as slice (slice.cls)}
-								{@const tone = deltaTone(slice.cls, slice.delta, slice.amount)}
-								<li class="legend__row">
-									<span class="legend__dot" style="background: {CLASS_COLOUR[slice.cls]}"></span>
-									<span class="legend__name">{CLASS_SHORT[slice.cls]}</span>
-									<span class="legend__pct">{slice.percent} %</span>
-									<span class="legend__delta" data-tone={tone}>
-										{tone === 'flat' ? '—' : `${slice.delta > 0 ? '+' : ''}${slice.delta}`}
-									</span>
-								</li>
-							{/each}
-						</ul>
-					</div>
-					<p class="hint">{verdict(split)}</p>
-				{:else}
-					<p class="hint">{verdict(split)}</p>
-				{/if}
-			</section>
+			<SplitCard {split} code={currency} />
 
 			<section class="card buckets">
 				<h2 class="label">Kam to šlo</h2>
@@ -1167,83 +1082,6 @@
 	.owed-ok {
 		background: var(--in-wash);
 		color: var(--in);
-	}
-
-	/* ── the split ───────────────────────────────────────────────────────── */
-
-	.split-card {
-		gap: 14px;
-	}
-
-	.split {
-		display: flex;
-		align-items: center;
-		gap: var(--space-4);
-	}
-
-	.split__big {
-		font-size: var(--text-xl);
-		font-weight: 600;
-		letter-spacing: var(--track-xl);
-	}
-
-	.split__big--over {
-		color: var(--danger);
-	}
-
-	.split__small {
-		font-size: var(--text-2xs);
-		color: var(--ink-2);
-	}
-
-	.legend {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		font-size: var(--text-md);
-	}
-
-	.legend__row {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-	}
-
-	.legend__dot {
-		flex: none;
-		width: 10px;
-		height: 10px;
-		border-radius: var(--radius-full);
-	}
-
-	.legend__name {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.legend__pct {
-		font-weight: 600;
-	}
-
-	.legend__delta {
-		flex: none;
-		width: 28px;
-		text-align: right;
-		font-size: var(--text-xs);
-		color: var(--ink-3);
-	}
-
-	.legend__delta[data-tone='under'] {
-		color: var(--danger);
-	}
-
-	.legend__delta[data-tone='over'] {
-		color: var(--flag);
 	}
 
 	/* ── the buckets ─────────────────────────────────────────────────────── */

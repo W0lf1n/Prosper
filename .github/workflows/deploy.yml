@@ -3,10 +3,12 @@
 # Not a push trigger: `workflow_run` fires when the CI workflow finishes, and
 # the job proceeds only if that run succeeded, so a commit that fails a test is
 # never the one on the phone. The manual trigger is for a re-run (fresh base
-# images, a box restored from backup) and takes an optional commit.
+# images, a box restored from backup), takes an optional commit, and says
+# where it goes: **both** (the default, and what every push to master does),
+# **prod** alone, or **demo** alone.
 #
-# What it does is one SSH command: the commit id, to an account whose key can
-# do nothing else (`deploy/prosper-deploy`). Building happens on the box, from
+# What it does is one SSH command: the commit id and the target, to an account
+# whose key can do nothing else (`deploy/prosper-deploy`). Building happens on the box, from
 # source, as it always has. There is no registry and nothing is uploaded.
 # Setting up the account and the three secrets is in `docs/DEPLOYMENT.md`
 # under "Deploying from GitHub".
@@ -23,6 +25,11 @@ on:
         description: Commit to deploy (40 hex digits), or empty for the newest master
         required: false
         default: ''
+      target:
+        description: Where it goes
+        type: choice
+        options: [both, prod, demo]
+        default: both
 
 # Two deployments never overlap, and a queued one is not cancelled: the box
 # must end up on the newest commit, not on whichever one was left running.
@@ -45,6 +52,8 @@ jobs:
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
       WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
       REQUESTED: ${{ inputs.commit }}
+      # A push to master moves both, as it always has; only a manual run picks.
+      TARGET: ${{ inputs.target || 'both' }}
     steps:
       - name: Which commit
         id: which
@@ -63,8 +72,15 @@ jobs:
               fi
               ;;
           esac
+          case "$TARGET" in
+            both|prod|demo) ;;
+            *)
+              echo "::error::$TARGET is not a target (both, prod or demo)"
+              exit 1
+              ;;
+          esac
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Deploying $sha"
+          echo "Deploying $sha to $TARGET"
 
       - name: The three secrets are set
         run: |
@@ -94,7 +110,7 @@ jobs:
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
-            "prosper-deploy@$DEPLOY_HOST" "$SHA"
+            "prosper-deploy@$DEPLOY_HOST" "$SHA $TARGET"
 
       - name: Forget the key
         if: always()

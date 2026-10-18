@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-10-05 · schema v15 · 599 web tests · 56 API tests
+**Last revised:** 2026-10-18 · schema v16 · 666 web tests · 82 API tests
 
 ---
 
@@ -16,12 +16,12 @@ It is structured on the four laws from _The Four Laws of Financial Prosperity_
 (Harris & Coonradt). That is not decoration: **a feature that serves no law does
 not get built.** Before adding anything, name which law it serves.
 
-| Law           | Mechanism in the app                                                         |
-| ------------- | ---------------------------------------------------------------------------- |
+| Law           | Mechanism in the app                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **Tracking**  | The record screen is one tap from anywhere; Domů leads with the month's net; a day with no expense says so, and stays fixable |
-| **Targeting** | A goal needs a why, an amount and a date; a month gets a target it writes itself |
-| **Trimming**  | `spendType` on every bucket; the 10/10/10/70 split measured against income   |
-| **Training**  | Checks on every keystroke; the record of months; days without an expense     |
+| **Targeting** | A goal needs a why, an amount and a date; a month gets a target it writes itself                                              |
+| **Trimming**  | `spendType` on every bucket; the 10/10/10/70 split measured against income                                                    |
+| **Training**  | Checks on every keystroke; the record of months; days without an expense; an evening question at his hour                     |
 
 ---
 
@@ -66,7 +66,7 @@ so its own IndexedDB. `pnpm test` runs Vitest once (`vitest --run`); `pnpm --fil
 watches. `pnpm check` is `svelte-kit sync && svelte-check` under TypeScript
 strict. `pnpm build` writes precompressed static output to `apps/web/build`.
 `pnpm budget` measures the entry route against the 150 kB brotli budget and
-fails over it — run it after a build. `pnpm api:test` runs the API's 50 tests;
+fails over it — run it after a build. `pnpm api:test` runs the API's 82 tests;
 `pnpm api` starts the server.
 
 To run a single test file:
@@ -91,10 +91,13 @@ apps/web/src/
 │                  app.css also owns the shared primitives: page, card, row,
 │                  circle, meter, badge, seg, btn, field, toggle, facts, tile.
 │                  One definition each, no per-route copies.
+├─ lib/notify/     Upozornění's delivery: the open tab's timer, the push
+│                  subscription, periodic sync. The rules are domain/notifications.ts.
 ├─ routes/         / · /zapis · /vypis · /prehled · /rozdeleni · /cil · /jmeni ·
 │                  /nastaveni (the last tab, a hub over /ucty · /kategorie ·
-│                  /vzhled · /sync · /data; /mesic, /platby, /ja and /tape redirect)
-└─ service-worker.ts
+│                  /domu · /upozorneni · /vzhled · /sync · /data; /mesic,
+│                  /platby, /ja and /tape redirect)
+└─ service-worker.ts   the shell cache; answers a push and a notice tap
 ```
 
 `apps/api/` is the sync server (ASP.NET Core 10 + EF Core + Postgres 16) and
@@ -110,32 +113,35 @@ client imports a sibling workspace package. The runbook is `docs/DEPLOYMENT.md`.
 
 ### The domain layer
 
-| File              | What it owns                                                    |
-| ----------------- | --------------------------------------------------------------- |
-| `money.ts`        | The **only** place money is computed. Integer haléře, branded   |
-| `amount-input.ts` | Keypad state machine — whole koruny first, haléře after a comma |
-| `datetime.ts`     | `IsoDate` / `IsoDateTime`, month arithmetic, Czech formatting   |
-| `czech.ts`        | Czech plurals — "3 záznamy", not "3 záznamů" — and `capitalize` |
-| `ids.ts`          | UUIDv7, hand-rolled, no dependency                              |
-| `types.ts`        | The data model. Mirrors the server, when there is one           |
-| `accounts.ts`     | Several accounts per currency, moves and exchanges, pockets, home currency, never-sum-across |
-| `vocabulary.ts`   | A hand-written dictionary of Petr's own words. Not ML, ever     |
-| `checks.ts`       | The four laws, enforced. Every rule cites its workbook figure   |
-| `ledger.ts`       | Tape building, every day of it, bucket rankings, recent payees  |
-| `receivables.ts`  | Money owed to you                                               |
-| `goals.ts`        | Targeting — validation, pace, required monthly, the record      |
-| `prosperity.ts`   | The 10/10/10/70 split, measured against income                  |
-| `plans.ts`        | A plan for the month — lines, what comes back, pro mě, the book’s figures |
-| `holdings.ts`     | Stated values, staleness, the wealth total                      |
-| `recurring.ts`    | Declared schedules — due dates, catch-up, the year net of shares |
-| `trends.ts`       | Month over month per bucket, against what it usually costs      |
-| `coverage.ts`     | Days without an expense, against days elapsed, and the run       |
-| `reconcile.ts`    | The ledger against a bank statement                             |
-| `refile.ts`       | Draining a bucket — the month's rows, and where they belong     |
-| `reset.ts`        | Starting over — the phrase typed to unlock the wipe              |
-| `rows.ts`         | What a row must look like before it may be written — the guard at the backup and sync doors |
-| `xlsx.ts`         | A spreadsheet, hand-rolled, no dependency                       |
-| `workbook.ts`     | The export in `Výdaje 2026.xlsx`'s shape — months, SUMA, tables |
+| File               | What it owns                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| `money.ts`         | The **only** place money is computed. Integer haléře, branded                                |
+| `amount-input.ts`  | Keypad state machine — whole koruny first, haléře after a comma                              |
+| `datetime.ts`      | `IsoDate` / `IsoDateTime`, month arithmetic, Czech formatting                                |
+| `czech.ts`         | Czech plurals — "3 záznamy", not "3 záznamů" — and `capitalize`                              |
+| `ids.ts`           | UUIDv7, hand-rolled, no dependency                                                           |
+| `types.ts`         | The data model. Mirrors the server, when there is one                                        |
+| `accounts.ts`      | Several accounts per currency, moves and exchanges, pockets, home currency, never-sum-across |
+| `vocabulary.ts`    | A hand-written dictionary of Petr's own words. Not ML, ever                                  |
+| `checks.ts`        | The four laws, enforced. Every rule cites its workbook figure                                |
+| `ledger.ts`        | Tape building, every day of it, bucket rankings, recent payees                               |
+| `receivables.ts`   | Money owed to you                                                                            |
+| `goals.ts`         | Targeting — validation, pace, required monthly, the record                                   |
+| `prosperity.ts`    | The 10/10/10/70 split, measured against income                                               |
+| `plans.ts`         | A plan for the month — lines, what comes back, pro mě, the book’s figures                    |
+| `holdings.ts`      | Stated values, staleness, the wealth total                                                   |
+| `recurring.ts`     | Declared schedules — due dates, catch-up, the year net of shares                             |
+| `notifications.ts` | Upozornění — what is due at a minute, said once; the wake times the server gets              |
+| `charts.ts`        | Domů's charts — the month as a calendar, the pace, the balance over a range                  |
+| `dashboard.ts`     | Which cards Domů shows, in what order — a synced `Layout` row, newest wins                   |
+| `trends.ts`        | Month over month per bucket, against what it usually costs                                   |
+| `coverage.ts`      | Days without an expense, against days elapsed, and the run                                   |
+| `reconcile.ts`     | The ledger against a bank statement                                                          |
+| `refile.ts`        | Draining a bucket — the month's rows, and where they belong                                  |
+| `reset.ts`         | Starting over — the phrase typed to unlock the wipe                                          |
+| `rows.ts`          | What a row must look like before it may be written — the guard at the backup and sync doors  |
+| `xlsx.ts`          | A spreadsheet, hand-rolled, no dependency                                                    |
+| `workbook.ts`      | The export in `Výdaje 2026.xlsx`'s shape — months, SUMA, tables                              |
 
 ---
 
@@ -248,6 +254,16 @@ ledger. The same goes for `Category.icon` / `Category.color` (v13): backfilled
 by name, and still read only through `categoryStyle()`, because an old backup
 can bring back a row without them.
 
+**`EnsureCreated` never adds a table to a database that exists.** The API has
+no migrations; a new server table (`notify_subscriptions`, 2026-10-18) reaches
+a deployed Postgres only through `CREATE TABLE IF NOT EXISTS` run after it —
+`NotifyService.EnsureTableAsync`. A changed column would need real migrations.
+
+**A PWA cannot keep a timer once it is closed.** Anything that must happen at
+a minute while the app is not running needs the server to wake it — the
+empty push of Upozornění (Q90). The service worker then reads IndexedDB itself
+and never writes the ledger: posting stays the launch's job.
+
 **Dexie must not be constructed during SSR/prerender.** `db()` is lazy for
 exactly that reason. `ssr = false`, `prerender = true` in `routes/+layout.ts`.
 
@@ -284,6 +300,7 @@ month figures) are in that club too.
 | `docs/TRIMMING-AND-TRAINING.md` | Laws 3 and 4 — design for what is not built yet                |
 | `docs/INVESTMENTS.md`           | `/jmeni` — what shipped, and items 5–8 which did not           |
 | `docs/RECURRING.md`             | Declared recurring payments — shipped                          |
+| `docs/CHARTS.md`                | The charts — the plan, four of it built on Domů                |
 | `docs/DEPLOYMENT.md`            | The VPS runbook — Docker, nginx, the certificate, the backups  |
 
 `Výdaje 2026.xlsx` — eight months, 547 rows — is the source for the category set

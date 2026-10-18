@@ -54,6 +54,12 @@ services:
       # The code a device types once, when pairing. No default — an unset code
       # makes the server refuse to pair rather than accept anything.
       Pairing__Code: ${PAIRING_CODE:?set PAIRING_CODE in .env}
+      # Upozornění reaching a closed phone (DEPLOYMENT.md › Upozornění). All
+      # three optional: without the keys the server sends no pushes and the
+      # app keeps its notices to when it is open.
+      Notify__PublicKey: ${NOTIFY_PUBLIC_KEY:-}
+      Notify__PrivateKey: ${NOTIFY_PRIVATE_KEY:-}
+      Notify__Subject: ${NOTIFY_SUBJECT:-}
     # Deliberately not published. The only way in is through `web`, which is
     # what makes the client and the API one origin and retires CORS.
     expose:
