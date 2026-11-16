@@ -3807,3 +3807,11 @@ block, and the API's global limiter compared without trimming the slash. Only
 the per-address limit still held. nginx now matches
 `~* ^/api/v1/pair/?$` and the API trims the slash before comparing. Read from
 the code; not tested against a live nginx.
+
+### Q103 — Deleting or restoring a transfer is one transaction · answered 2026-11-16
+
+`deleteTxn` and `restoreTxn` wrote each leg and each queue entry on its own:
+four writes, so an app killed between them kept one leg of a transfer live —
+money from nowhere on one account — or saved a row that never left the device.
+Both now go through one helper that flags the row and its pair inside a single
+`txns` + `outbox` transaction, the way `createTransfer` already did.

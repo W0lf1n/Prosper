@@ -436,22 +436,35 @@ export async function updateTxn(id: string, patch: TxnPatch): Promise<Txn | unde
  * account and free money on the other.
  */
 export async function deleteTxn(id: string): Promise<void> {
+	await flagTxn(id, true);
+}
+
+/**
+ * Flags a row and its transfer pair in one transaction, rows and queue
+ * together: killed half-way, a transfer used to keep one leg live, or a row
+ * saved that never left the device.
+ */
+async function flagTxn(id: string, isDeleted: boolean): Promise<void> {
 	const database = db();
-	const existing = await database.txns.get(id);
-	if (!existing || existing.isDeleted) return;
+	// Resolved before the transaction — `enqueue` and `stamp` read `meta`,
+	// which is not one of the tables below (the importBackup trap).
+	await refreshSyncEnabled();
+	const stamped = await stamp();
 
-	const next: Txn = { ...existing, isDeleted: true, ...(await stamp()) };
-	await database.txns.put(next);
-	await enqueue('txn', next.id, next);
+	await database.transaction('rw', [database.txns, database.outbox], async () => {
+		const existing = await database.txns.get(id);
+		if (!existing || existing.isDeleted === isDeleted) return;
+		const pair = existing.transferPairId
+			? await database.txns.get(existing.transferPairId)
+			: undefined;
 
-	if (existing.transferPairId) {
-		const pair = await database.txns.get(existing.transferPairId);
-		if (pair && !pair.isDeleted) {
-			const gone: Txn = { ...pair, isDeleted: true, ...(await stamp()) };
-			await database.txns.put(gone);
-			await enqueue('txn', gone.id, gone);
+		for (const row of [existing, pair]) {
+			if (!row || row.isDeleted === isDeleted) continue;
+			const next: Txn = { ...row, isDeleted, ...stamped };
+			await database.txns.put(next);
+			await enqueue('txn', next.id, next);
 		}
-	}
+	});
 }
 
 /**
@@ -462,24 +475,9 @@ export async function deleteTxn(id: string): Promise<void> {
  * sync engine, not the person who just mis-tapped.
  */
 export async function restoreTxn(id: string): Promise<void> {
-	const database = db();
-	const existing = await database.txns.get(id);
-	if (!existing || !existing.isDeleted) return;
-
-	const next: Txn = { ...existing, isDeleted: false, ...(await stamp()) };
-	await database.txns.put(next);
-	await enqueue('txn', next.id, next);
-
 	// The undo of a transfer delete brings back both legs, same as the delete
 	// took both — the toast's undo is the only caller, moments later.
-	if (existing.transferPairId) {
-		const pair = await database.txns.get(existing.transferPairId);
-		if (pair?.isDeleted) {
-			const back: Txn = { ...pair, isDeleted: false, ...(await stamp()) };
-			await database.txns.put(back);
-			await enqueue('txn', back.id, back);
-		}
-	}
+	await flagTxn(id, false);
 }
 
 // ── receivables ─────────────────────────────────────────────────────────────
