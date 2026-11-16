@@ -144,7 +144,7 @@ has the schema, the inspection commands and the reset.
 dotnet test
 ```
 
-82 tests. The ones that reach the database use SQLite in memory rather than the
+83 tests. The ones that reach the database use SQLite in memory rather than the
 EF in-memory provider: this code opens transactions and relies on a unique
 index, and the in-memory provider honours neither. A fake that cannot fail the
 way the real thing fails is a fake that proves nothing.

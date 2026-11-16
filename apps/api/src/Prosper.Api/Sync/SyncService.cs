@@ -45,6 +45,11 @@ public sealed class SyncService(AppDbContext db)
         if (string.IsNullOrWhiteSpace(row.DeviceId))
             return new SyncRejection(row.Entity, row.Id, "malformed", "Chybí deviceId.");
 
+        if (row.Id.Length > SyncLimits.MaxIdLength
+            || row.UpdatedAt.Length > SyncLimits.MaxUpdatedAtLength
+            || row.DeviceId.Length > SyncLimits.MaxIdLength)
+            return new SyncRejection(row.Entity, row.Id, "malformed", "Pole je příliš dlouhé.");
+
         if (row.Payload.ValueKind != JsonValueKind.Object)
             return new SyncRejection(row.Entity, row.Id, "malformed", "Payload není objekt.");
 

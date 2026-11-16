@@ -176,6 +176,20 @@ public sealed class SyncServiceTests : IDisposable
         Assert.Equal("malformed", Assert.Single(result.Rejected).Reason);
     }
 
+    // SQLite ignores column widths, so without this check the test suite would
+    // pass while Postgres answered 500 and the client retried it forever.
+    [Fact]
+    public async Task An_id_wider_than_its_column_is_rejected()
+    {
+        var result = await _sync.PushAsync([
+            Row(new string('a', SyncLimits.MaxIdLength + 1), "2026-08-01T10:00:00.000Z"),
+            Row("b", "2026-08-01T10:00:00.000Z")
+        ]);
+
+        Assert.Equal(1, result.Applied);
+        Assert.Equal("malformed", Assert.Single(result.Rejected).Reason);
+    }
+
     [Fact]
     public async Task An_oversized_payload_is_rejected()
     {

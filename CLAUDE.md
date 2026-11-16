@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-**Last revised:** 2026-11-16 · schema v16 · 671 web tests · 82 API tests
+**Last revised:** 2026-11-16 · schema v16 · 671 web tests · 83 API tests
 
 ---
 
@@ -66,7 +66,7 @@ so its own IndexedDB. `pnpm test` runs Vitest once (`vitest --run`); `pnpm --fil
 watches. `pnpm check` is `svelte-kit sync && svelte-check` under TypeScript
 strict. `pnpm build` writes precompressed static output to `apps/web/build`.
 `pnpm budget` measures the entry route against the 150 kB brotli budget and
-fails over it — run it after a build. `pnpm api:test` runs the API's 82 tests;
+fails over it — run it after a build. `pnpm api:test` runs the API's 83 tests;
 `pnpm api` starts the server.
 
 To run a single test file:

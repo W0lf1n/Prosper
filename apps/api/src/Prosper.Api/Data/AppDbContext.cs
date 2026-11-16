@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Prosper.Api.Sync;
 
 namespace Prosper.Api.Data;
 
@@ -27,9 +28,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(e => e.Seq).IsUnique();
 
             entity.Property(e => e.Entity).HasMaxLength(32);
-            entity.Property(e => e.EntityId).HasMaxLength(64);
-            entity.Property(e => e.UpdatedAt).HasMaxLength(40);
-            entity.Property(e => e.DeviceId).HasMaxLength(64);
+            entity.Property(e => e.EntityId).HasMaxLength(SyncLimits.MaxIdLength);
+            entity.Property(e => e.UpdatedAt).HasMaxLength(SyncLimits.MaxUpdatedAtLength);
+            entity.Property(e => e.DeviceId).HasMaxLength(SyncLimits.MaxIdLength);
         });
 
         model.Entity<Device>(entity =>

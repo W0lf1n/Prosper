@@ -1065,7 +1065,7 @@ Prosper/
 │  │  └─ vite.config.ts             # SvelteKit + adapter + Vitest, all inline
 │  └─ api/                          # ASP.NET Core 10 + EF Core + Postgres 16
 │     ├─ src/Prosper.Api/           #   pairing, push, pull, health, notify
-│     └─ tests/Prosper.Api.Tests/   #   82 tests, SQLite in memory
+│     └─ tests/Prosper.Api.Tests/   #   83 tests, SQLite in memory
 ├─ deploy/                          # compose, both nginx configs, backup.sh, deploy.sh
 ├─ packages/contracts/              # the sync protocol, shared with the client
 ├─ scripts/check-bundle.mjs         # the 150 kB budget, enforced

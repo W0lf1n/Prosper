@@ -61,6 +61,13 @@ public static class SyncLimits
     /// </summary>
     public const int MaxPayloadBytes = 64 * 1024;
 
+    /// <summary>
+    /// The column widths, checked in <c>Validate</c> before Postgres sees them:
+    /// a 500 is retried forever and blocks every push queued behind it.
+    /// </summary>
+    public const int MaxIdLength = 64;
+    public const int MaxUpdatedAtLength = 40;
+
     /// <summary>The entity kinds the client is allowed to send.</summary>
     public static readonly HashSet<string> Entities =
     [

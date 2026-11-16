@@ -3815,3 +3815,14 @@ four writes, so an app killed between them kept one leg of a transfer live —
 money from nowhere on one account — or saved a row that never left the device.
 Both now go through one helper that flags the row and its pair inside a single
 `txns` + `outbox` transaction, the way `createTransfer` already did.
+
+### Q104 — The server refuses a field wider than its column · answered 2026-11-16
+
+`Validate` checked that `id`, `updatedAt` and `deviceId` were present, not
+that they fit: Postgres caps them at 64, 40 and 64. A row restored from a
+backup with a longer id passed the client's `checkRow`, failed the insert
+with a 500, and the client — which drops only what the server rejects —
+retried it at the head of the queue forever, holding back every later push.
+`Validate` now answers "malformed" for an over-wide field, and the widths are
+constants in `SyncLimits` that `AppDbContext` reads too. The API tests run on
+SQLite, which ignores widths, so the new test asserts the rejection directly.
