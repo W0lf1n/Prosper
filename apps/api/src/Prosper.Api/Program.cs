@@ -100,7 +100,8 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
-        http.Request.Path.Equals(new PathString("/api/v1/pair"), StringComparison.OrdinalIgnoreCase)
+        // Routing ignores a trailing slash, so the fence must too, or "/pair/" walks round it.
+        string.Equals(http.Request.Path.Value?.TrimEnd('/'), "/api/v1/pair", StringComparison.OrdinalIgnoreCase)
             ? RateLimitPartition.GetFixedWindowLimiter("pair-everyone", _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = PairAttemptsPerHour,

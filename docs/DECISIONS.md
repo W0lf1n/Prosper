@@ -3797,3 +3797,13 @@ the row comes back with this device's own `updatedAt`, flagged. That tie read
 as "superseded" and the row stayed alive on this device alone. A superseded
 incoming row that says deleted now flags the local one. The same holds for the
 toast's undo once the delete has been pushed — §6.1 wins.
+
+### Q102 — The pairing fence takes `/pair/` and `/PAIR` too · answered 2026-11-16
+
+Both hourly caps on pairing matched the exact path `/api/v1/pair`, but ASP.NET
+routes a trailing slash and any case to the same handler. nginx's
+`location = /api/v1/pair` let `/api/v1/pair/` through to the unfenced `/api/`
+block, and the API's global limiter compared without trimming the slash. Only
+the per-address limit still held. nginx now matches
+`~* ^/api/v1/pair/?$` and the API trims the slash before comparing. Read from
+the code; not tested against a live nginx.
