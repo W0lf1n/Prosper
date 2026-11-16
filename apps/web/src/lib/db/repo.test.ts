@@ -540,6 +540,26 @@ describe('shares — one expense, several payers (Q47)', () => {
 		expect(posted.shares.map((s) => s.id)).not.toContain(schedule.shares[0]!.id);
 	});
 
+	// Two devices catching up on stale data each post the month. Same id,
+	// so the merge keeps one row, not two rents.
+	it('confirmScheduled posts one row per schedule and month, whoever posts it', async () => {
+		const schedule = await createSchedule({
+			accountId,
+			payee: 'Nájem',
+			categoryId: 'cat',
+			amount: -1500000 as Minor,
+			dayOfMonth: 1,
+			startMonth: '2026-08'
+		});
+		const item = { schedule, month: '2026-08', date: '2026-08-01' };
+
+		const first = await confirmScheduled(item, { accountId });
+		const second = await confirmScheduled(item, { accountId });
+
+		expect(second.id).toBe(first.id);
+		expect((await db.txns.toArray()).filter((t) => t.scheduleId === schedule.id)).toHaveLength(1);
+	});
+
 	it('a settled legacy row is upgraded to the array shape on the way through', async () => {
 		// A row as an old build left it — the trio, no array. It can arrive via
 		// an old backup or an old device's push long after the migration ran.

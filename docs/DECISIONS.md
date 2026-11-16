@@ -3780,3 +3780,12 @@ empties the queue, and `adoptRemoteLedger` queues its tombstones one line
 before the backfill, so a device re-paired after a server restore sent only a
 handful of rows while both sides reported success. The guard is gone: a row
 queued twice costs one "superseded".
+
+### Q100 — A standing order's instance has one id, whichever device posts it · answered 2026-11-16
+
+`scheduleId:YYYY-MM`, not a UUIDv7. The launch catch-up runs before any pull,
+so a second device opened after the due date posted the month again on stale
+data; with a fresh id each, both rows stood and the rent was paid twice. Now
+both devices write the same row and the merge keeps one. This is the one
+deliberate exception to rule 3's UUIDv7, and it is still an id the client
+generates. Duplicates already in a ledger stay until deleted by hand.

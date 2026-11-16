@@ -359,10 +359,14 @@ export interface NewTxn {
 
 export async function createTxn(input: NewTxn): Promise<Txn> {
 	const { updatedAt, deviceId } = await stamp();
+	const date = input.date ?? today();
 	const txn: Txn = {
-		id: uuidv7(),
+		// A standing order's instance is one fact, whichever device posts it: two
+		// devices catching up on stale data write the same row, and the merge
+		// keeps one instead of two rents.
+		id: input.scheduleId ? `${input.scheduleId}:${monthKey(date)}` : uuidv7(),
 		accountId: input.accountId,
-		date: input.date ?? today(),
+		date,
 		amount: input.amount,
 		categoryId: input.categoryId ?? null,
 		payee: input.payee?.trim() ?? '',
