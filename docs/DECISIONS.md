@@ -1019,7 +1019,7 @@ and if one ever appears the host's nginx needs its own `real_ip` block first.
 ## Design pass · graphite instrument, second edition · 2026-08-27
 
 Same instrument, calmer machining. Delivered as a handoff bundle
-(`docs/design_handoff_prosper_visual_refresh/`) of a wholesale `tokens.css`
+(`docs/design_handoff_prosper_visual_refresh/`, removed 2026-11-16 — git history keeps it) of a wholesale `tokens.css`
 replacement plus four patch files. Flow, routing, component structure, state and
 logic were not touched: every change is a token value or a rule inside an
 existing `<style>` block.
