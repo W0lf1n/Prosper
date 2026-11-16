@@ -418,7 +418,17 @@ async function applyRemotePage(rows: SyncRow[]): Promise<{ applied: number; skip
 					continue;
 				}
 
-				if (mergeDecision(row, before ?? null) === 'superseded') continue;
+				if (mergeDecision(row, before ?? null) === 'superseded') {
+					// The server keeps a delete even on the copy that beat it on time, and
+					// sends that copy back with our own updatedAt — a tie this side would
+					// otherwise call superseded, leaving the row alive here alone.
+					if (row.isDeleted && before && !before.isDeleted) {
+						winners.set(key, { ...((winners.get(key) ?? existing[i]) as object), isDeleted: true });
+						merged.set(key, { ...before, isDeleted: true });
+						applied += 1;
+					}
+					continue;
+				}
 
 				// A delete is never undone by a merge (§6.1). The winner decides
 				// every other field; `isDeleted` is the one field where either side

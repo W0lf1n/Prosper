@@ -3789,3 +3789,11 @@ data; with a fresh id each, both rows stood and the rent was paid twice. Now
 both devices write the same row and the merge keeps one. This is the one
 deliberate exception to rule 3's UUIDv7, and it is still an id the client
 generates. Duplicates already in a ledger stay until deleted by hand.
+
+### Q101 — A delete the server kept sticks on the device that lost to it · answered 2026-11-16
+
+The server never un-deletes, so an edit made here after another device deleted
+the row comes back with this device's own `updatedAt`, flagged. That tie read
+as "superseded" and the row stayed alive on this device alone. A superseded
+incoming row that says deleted now flags the local one. The same holds for the
+toast's undo once the delete has been pushed — §6.1 wins.

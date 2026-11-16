@@ -332,6 +332,22 @@ describe('pullOnce', () => {
 		expect(stored?.payee).toBe('Zpět');
 	});
 
+	// Edited here after another device deleted it: the server keeps the delete
+	// and returns this device's own copy, same updatedAt, flagged.
+	it('takes a delete the server kept, even on a copy that ties with ours', async () => {
+		const txn = await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
+		const back = remote(txn.id, 'Oběd', txn.updatedAt);
+		back.deviceId = txn.deviceId;
+		back.isDeleted = true;
+		responses = [() => json({ changes: [back], cursor: 4, hasMore: false })];
+
+		await pullOnce(SETTINGS);
+
+		const stored = await db.txns.get(txn.id);
+		expect(stored?.isDeleted).toBe(true);
+		expect(stored?.payee).toBe('Oběd');
+	});
+
 	it('follows the pages, saving the cursor as it goes', async () => {
 		responses = [
 			() =>
