@@ -3826,3 +3826,10 @@ retried it at the head of the queue forever, holding back every later push.
 `Validate` now answers "malformed" for an over-wide field, and the widths are
 constants in `SyncLimits` that `AppDbContext` reads too. The API tests run on
 SQLite, which ignores widths, so the new test asserts the rejection directly.
+
+### Q105 — A write made during a cycle goes out in ten seconds, not fifteen minutes · answered 2026-11-16
+
+`syncAfterWrite` stands aside while a cycle runs, and a successful cycle then
+re-armed the idle quarter-hour. A row saved in that window waited up to fifteen
+minutes. A successful cycle that leaves anything in the outbox now re-arms at
+the ten-second debounce instead.

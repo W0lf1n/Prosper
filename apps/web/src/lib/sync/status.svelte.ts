@@ -125,9 +125,10 @@ export async function syncNow(): Promise<void> {
 		running = false;
 		await refreshPending();
 		// Failed: the backoff ladder, as written, with no floor over it.
-		// Succeeded: nothing is waiting, so the next cycle is the idle safety
-		// net rather than a ten-second poll.
-		schedule(backoffMs(status.failures), status.failures > 0 ? 0 : IDLE_POLL_MS);
+		// Succeeded: the idle safety net — unless a write landed mid-cycle, when
+		// `syncAfterWrite` stood aside and its row is still in the outbox.
+		const idle = status.pending > 0 ? AFTER_WRITE_DEBOUNCE_MS : IDLE_POLL_MS;
+		schedule(backoffMs(status.failures), status.failures > 0 ? 0 : idle);
 	}
 }
 
