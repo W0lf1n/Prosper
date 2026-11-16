@@ -2100,7 +2100,7 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 	// answer is cached by the time a row is written inside.
 	await refreshSyncEnabled();
 
-	// Ten tables, plus the outbox — a restore is a mutation like any other
+	// Twelve tables, plus the outbox — a restore is a mutation like any other
 	// (rule 4) and everything it writes has to be able to leave the device.
 	// Same transaction, so the rows and the queue entries for them commit
 	// together or not at all.
@@ -2118,6 +2118,7 @@ export async function importBackup(backup: Backup): Promise<ImportResult> {
 			database.schedules,
 			database.reconciliations,
 			database.plans,
+			database.layouts,
 			database.outbox
 		],
 		async () => {

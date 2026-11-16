@@ -31,6 +31,7 @@ import {
 	ensureSeeded,
 	exportBackup,
 	getCollapsedMonths,
+	getHomeLayout,
 	importBackup,
 	pinGoal,
 	pocketToAccount,
@@ -40,6 +41,7 @@ import {
 	restorePlan,
 	restoreTxn,
 	setCollapsedMonths,
+	setHomeLayout,
 	setMeta,
 	settleReceivable,
 	unsettleReceivable,
@@ -229,6 +231,17 @@ describe('importBackup — the row guard', () => {
 		const backup = { ...(await exportBackup()), txns: 'nope' as unknown as never };
 
 		await expect(importBackup(backup)).resolves.toMatchObject({ txns: 0, skipped: 0 });
+	});
+
+	// The layouts table was missing from the restore's transaction, so any file
+	// carrying Domů's arrangement threw NotFoundError and restored nothing.
+	it('restores a file that carries a Domů layout', async () => {
+		await setHomeLayout(await getHomeLayout());
+		const backup = await exportBackup();
+		backup.layouts![0]!.updatedAt = '2099-01-01T00:00:00.000Z';
+
+		await expect(importBackup(backup)).resolves.toMatchObject({ skipped: 0 });
+		expect((await db.layouts.toArray())[0]?.updatedAt).toBe('2099-01-01T00:00:00.000Z');
 	});
 
 	it('reports nothing skipped on a clean file', async () => {

@@ -3761,3 +3761,14 @@ reinstalled (`DEPLOYMENT.md` › Deploying from GitHub).
   weekdays, no legend and no month label; the month's total in the corner and
   one line under the field. The ink steps, the mint no-spend dot and the tap
   are unchanged.
+
+## The 2026-11-16 audit — defects in restore, sync and the server
+
+A whole-repo audit found the defects below. Each was fixed on its own, with a
+test where there is logic to test.
+
+### Q98 — A backup with Domů's arrangement restores · answered 2026-11-16
+
+`importBackup` wrote `layouts` inside a transaction that did not list the
+table, so any file from after Q95 threw `NotFoundError` and merged nothing.
+The table is in the list now.
