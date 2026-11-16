@@ -3772,3 +3772,11 @@ test where there is logic to test.
 `importBackup` wrote `layouts` inside a transaction that did not list the
 table, so any file from after Q95 threw `NotFoundError` and merged nothing.
 The table is in the list now.
+
+### Q99 — Re-pairing backfills the whole ledger, always · answered 2026-11-16
+
+`seedOutbox` refused to run while the outbox held anything. Unpairing never
+empties the queue, and `adoptRemoteLedger` queues its tombstones one line
+before the backfill, so a device re-paired after a server restore sent only a
+handful of rows while both sides reported success. The guard is gone: a row
+queued twice costs one "superseded".

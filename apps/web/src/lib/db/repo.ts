@@ -1598,13 +1598,14 @@ export async function contributeToGoal(input: {
  * about rows written *after* pairing, and the second device would sync down a
  * ledger that starts on a Tuesday in October.
  *
- * Idempotent by way of being a no-op the second time: it refuses to run if the
- * outbox already holds anything, and pairing writes the base URL before calling
- * it, so `enqueue` is live by then and ordinary writes are not lost either.
+ * It runs on every pairing, whatever the outbox already holds. A queue left
+ * over from before an unpair, or the tombstones `adoptRemoteLedger` has just
+ * queued, used to make it a no-op — and a device re-paired after a server
+ * restore then sent only those few rows. A row queued twice costs the server
+ * one "superseded"; a row never queued is a row the server never has.
  */
 export async function seedOutbox(local?: ReadonlySet<string>): Promise<number> {
 	const database = db();
-	if ((await database.outbox.count()) > 0) return 0;
 
 	// Only what was here before the pull. A row that arrived from the server
 	// during pairing is one the server already holds; sending it back is a

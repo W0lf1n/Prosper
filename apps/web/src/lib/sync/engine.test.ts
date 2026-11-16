@@ -382,10 +382,20 @@ describe('a whole cycle', () => {
 		expect(queued.some((e) => e.entity === 'txn')).toBe(true);
 	});
 
-	it('refuses to backfill twice', async () => {
-		await createTxn({ accountId, amount: -24900 as Minor, payee: 'Oběd' });
+	// Re-pairing after a server restore: the outbox still holds what was
+	// queued before, and the whole ledger must go up anyway.
+	it('backfills even when the outbox already holds something', async () => {
+		await db.outbox.clear();
+		const old = await createTxn({ accountId, amount: -24900 as Minor, payee: 'Starý' });
+		await db.outbox.clear();
+		const queued = await createTxn({ accountId, amount: -100 as Minor, payee: 'Ve frontě' });
 
-		expect(await seedOutbox()).toBe(0);
+		await seedOutbox();
+
+		const ids = (await db.outbox.toArray()).map((e) => e.entityId);
+		expect(ids).toContain(old.id);
+		expect(ids).toContain(queued.id);
+		expect(ids).toContain(accountId);
 	});
 
 	/**
